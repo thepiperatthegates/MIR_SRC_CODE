@@ -74,7 +74,7 @@ Go to ``sockets_files.py`` and change the COM Port name from the global variable
 File location
 ------------
 
-i) **main.py **
+i) **main.py**
 
 Main files that handles the GUI
 
