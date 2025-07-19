@@ -1,0 +1,4 @@
+/Users/mac/Documents/again_try/build/Debug/CMakeFiles/again_try_CM4.dir
+/Users/mac/Documents/again_try/build/Debug/CMakeFiles/again_try_CM7.dir
+/Users/mac/Documents/again_try/build/Debug/CMakeFiles/edit_cache.dir
+/Users/mac/Documents/again_try/build/Debug/CMakeFiles/rebuild_cache.dir

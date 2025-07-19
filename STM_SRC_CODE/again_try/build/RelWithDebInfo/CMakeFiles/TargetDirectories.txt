@@ -1,0 +1,4 @@
+/Users/mac/Documents/again_try/build/RelWithDebInfo/CMakeFiles/again_try_CM4.dir
+/Users/mac/Documents/again_try/build/RelWithDebInfo/CMakeFiles/again_try_CM7.dir
+/Users/mac/Documents/again_try/build/RelWithDebInfo/CMakeFiles/edit_cache.dir
+/Users/mac/Documents/again_try/build/RelWithDebInfo/CMakeFiles/rebuild_cache.dir

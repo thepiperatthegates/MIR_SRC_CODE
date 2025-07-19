@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CMakeFiles/again_try_CM7"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CMakeFiles/again_try_CM7.rule"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CMakeFiles/again_try_CM7-complete.rule"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CM7/src/again_try_CM7-stamp/again_try_CM7-build.rule"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CM7/src/again_try_CM7-stamp/again_try_CM7-configure.rule"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CM7/src/again_try_CM7-stamp/again_try_CM7-download.rule"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CM7/src/again_try_CM7-stamp/again_try_CM7-install.rule"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CM7/src/again_try_CM7-stamp/again_try_CM7-mkdir.rule"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CM7/src/again_try_CM7-stamp/again_try_CM7-patch.rule"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CM7/src/again_try_CM7-stamp/again_try_CM7-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"again_try_CM7"
+		],
+		"name" : "again_try_CM7"
+	}
+}

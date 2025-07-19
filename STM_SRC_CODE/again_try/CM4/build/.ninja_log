@@ -1,0 +1,27 @@
+# ninja log v6
+6	1005	1750844891685271624	CMakeFiles/STM32_Drivers.dir/Users/mac/Documents/again_try/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_gpio.c.obj	29872b07f24f2e2c
+7	1362	1750844891686004749	CMakeFiles/STM32_Drivers.dir/Users/mac/Documents/again_try/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_dma.c.obj	4a3b44d1fc29bdb3
+4	1100	1750844891683070916	CMakeFiles/STM32_Drivers.dir/Users/mac/Documents/again_try/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_rcc.c.obj	121cb1695d218823
+3	206	1750851362434136749	/Users/mac/Documents/again_try/CM4/build/cmake_install.cmake	3434bcb1d66ec84e
+4	1045	1750844891682629416	CMakeFiles/STM32_Drivers.dir/Users/mac/Documents/again_try/Common/Src/system_stm32h7xx_dualcore_boot_cm4_cm7.c.obj	1798874dc11081d1
+3	206	1750851362436271291	build.ninja	3434bcb1d66ec84e
+7	1042	1750844891685660166	CMakeFiles/STM32_Drivers.dir/Users/mac/Documents/again_try/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_hsem.c.obj	ffddca4e0309d7bb
+5	269	1748867470371105332	CMakeFiles/again_try_CM4.dir/Core/Startup/startup_stm32h757xx_CM4.s.obj	bddf779e3593ffb0
+5	1104	1750844891684001874	CMakeFiles/STM32_Drivers.dir/Users/mac/Documents/again_try/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash.c.obj	6ff40793128f7f2f
+5	356	1748867470370425041	CMakeFiles/again_try_CM4.dir/Core/Src/sysmem.c.obj	f9fa63d42ebe12cc
+5	1290	1750844891683534041	CMakeFiles/STM32_Drivers.dir/Users/mac/Documents/again_try/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_rcc_ex.c.obj	389f6d9b177788f1
+2	952	1750844891681327249	CMakeFiles/again_try_CM4.dir/Core/Src/main.c.obj	183de5aa5c99d312
+1005	1558	1750844892683678208	CMakeFiles/STM32_Drivers.dir/Users/mac/Documents/again_try/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_cortex.c.obj	e089c792d65dc197
+850	1558	1750844892529199374	CMakeFiles/STM32_Drivers.dir/Users/mac/Documents/again_try/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_mdma.c.obj	169421f03430f803
+3	850	1750844891681895707	CMakeFiles/again_try_CM4.dir/Core/Src/stm32h7xx_it.c.obj	603946b457585f3f
+8	1170	1750844891686443499	CMakeFiles/STM32_Drivers.dir/Users/mac/Documents/again_try/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_dma_ex.c.obj	ee696b06fbf582e8
+3	992	1750844891682233958	CMakeFiles/again_try_CM4.dir/Core/Src/stm32h7xx_hal_msp.c.obj	701e7cd639bcf589
+992	1591	1750844892670708582	CMakeFiles/STM32_Drivers.dir/Users/mac/Documents/again_try/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr_ex.c.obj	bad7c9e0a789c2fe
+1104	1661	1750844892783294333	CMakeFiles/STM32_Drivers.dir/Users/mac/Documents/again_try/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_exti.c.obj	ad438a3b95d942f5
+952	1554	1750844892631287333	CMakeFiles/STM32_Drivers.dir/Users/mac/Documents/again_try/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pwr.c.obj	d16943ddfc857807
+6	1186	1750844891684670374	CMakeFiles/STM32_Drivers.dir/Users/mac/Documents/again_try/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_flash_ex.c.obj	f9abd2d7e792eba4
+5	380	1748867470370759082	CMakeFiles/again_try_CM4.dir/Core/Src/syscalls.c.obj	150871a7977bfa35
+1045	1739	1750844892723708458	CMakeFiles/STM32_Drivers.dir/Users/mac/Documents/again_try/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_i2c.c.obj	fbf6397e80d8ea74
+1100	1603	1750844892778425832	CMakeFiles/STM32_Drivers.dir/Users/mac/Documents/again_try/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_i2c_ex.c.obj	5c91d21349e02a4c
+1739	1988	1750844893417437582	again_try_CM4.elf	60a34629eb0216da
+1042	1586	1750844892721206207	CMakeFiles/STM32_Drivers.dir/Users/mac/Documents/again_try/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal.c.obj	f32891daf2b102de

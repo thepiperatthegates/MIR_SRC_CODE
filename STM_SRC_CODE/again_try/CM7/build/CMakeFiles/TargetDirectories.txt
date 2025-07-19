@@ -1,0 +1,5 @@
+/Users/mac/Documents/again_try/CM7/build/CMakeFiles/again_try_CM7.dir
+/Users/mac/Documents/again_try/CM7/build/CMakeFiles/STM32_Drivers.dir
+/Users/mac/Documents/again_try/CM7/build/CMakeFiles/USB_Device_Library.dir
+/Users/mac/Documents/again_try/CM7/build/CMakeFiles/edit_cache.dir
+/Users/mac/Documents/again_try/CM7/build/CMakeFiles/rebuild_cache.dir

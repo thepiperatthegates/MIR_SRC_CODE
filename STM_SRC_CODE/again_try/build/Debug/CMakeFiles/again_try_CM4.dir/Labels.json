@@ -1,0 +1,43 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CMakeFiles/again_try_CM4"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CMakeFiles/again_try_CM4.rule"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CMakeFiles/again_try_CM4-complete.rule"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CM4/src/again_try_CM4-stamp/again_try_CM4-build.rule"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CM4/src/again_try_CM4-stamp/again_try_CM4-configure.rule"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CM4/src/again_try_CM4-stamp/again_try_CM4-download.rule"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CM4/src/again_try_CM4-stamp/again_try_CM4-install.rule"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CM4/src/again_try_CM4-stamp/again_try_CM4-mkdir.rule"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CM4/src/again_try_CM4-stamp/again_try_CM4-patch.rule"
+		},
+		{
+			"file" : "/Users/mac/Documents/again_try/build/Debug/CM4/src/again_try_CM4-stamp/again_try_CM4-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"again_try_CM4"
+		],
+		"name" : "again_try_CM4"
+	}
+}

@@ -1,0 +1,4 @@
+/Users/mac/Documents/again_try/CM4/build/CMakeFiles/again_try_CM4.dir
+/Users/mac/Documents/again_try/CM4/build/CMakeFiles/STM32_Drivers.dir
+/Users/mac/Documents/again_try/CM4/build/CMakeFiles/edit_cache.dir
+/Users/mac/Documents/again_try/CM4/build/CMakeFiles/rebuild_cache.dir

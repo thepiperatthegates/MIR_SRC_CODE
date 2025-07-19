@@ -1,0 +1,235 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>analyse_Window</class>
+ <widget class="QMainWindow" name="analyse_Window">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>1453</width>
+    <height>959</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MainWindow</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <widget class="QPushButton" name="csv_Button">
+    <property name="geometry">
+     <rect>
+      <x>30</x>
+      <y>10</y>
+      <width>161</width>
+      <height>41</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Open CSV file</string>
+    </property>
+   </widget>
+   <widget class="QSplitter" name="splitter">
+    <property name="geometry">
+     <rect>
+      <x>230</x>
+      <y>30</y>
+      <width>291</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="orientation">
+     <enum>Qt::Horizontal</enum>
+    </property>
+    <widget class="QLabel" name="label">
+     <property name="font">
+      <font>
+       <family>CMU Serif</family>
+       <pointsize>10</pointsize>
+      </font>
+     </property>
+     <property name="text">
+      <string>Select</string>
+     </property>
+    </widget>
+    <widget class="QComboBox" name="data_show_comboBox">
+     <item>
+      <property name="text">
+       <string>Data table</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Currents diagram</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Voltage diagram</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Phase diagram</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Shear rate diagram</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Shear stress diagram</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Viscosity diagram</string>
+      </property>
+     </item>
+    </widget>
+   </widget>
+   <widget class="QWidget" name="horizontalLayoutWidget">
+    <property name="geometry">
+     <rect>
+      <x>930</x>
+      <y>10</y>
+      <width>331</width>
+      <height>61</height>
+     </rect>
+    </property>
+    <layout class="QHBoxLayout" name="horizontalLayout"/>
+   </widget>
+   <widget class="QPushButton" name="save_Button">
+    <property name="geometry">
+     <rect>
+      <x>580</x>
+      <y>20</y>
+      <width>121</width>
+      <height>41</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Save CSV file</string>
+    </property>
+   </widget>
+   <widget class="QWidget" name="verticalLayoutWidget">
+    <property name="geometry">
+     <rect>
+      <x>60</x>
+      <y>80</y>
+      <width>1351</width>
+      <height>801</height>
+     </rect>
+    </property>
+    <layout class="QVBoxLayout" name="mlp_layout">
+     <item>
+      <widget class="QTableWidget" name="table_Widget">
+       <column>
+        <property name="text">
+         <string>Time / s</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>Voltage 1 / V</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>Voltage 2 / V</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>Current 1 / mA</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>Current 2 / mA</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>Angle of permanent magnet Φ_B / rad</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>Angle of permanent magnet  Φ_m / rad</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>Phase difference / rad</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>Shear rate / 1/s</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>Shear stress / Pa/Nm</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>Viscocity / Pa⋅ s </string>
+        </property>
+       </column>
+      </widget>
+     </item>
+    </layout>
+   </widget>
+   <widget class="QLabel" name="label_file">
+    <property name="geometry">
+     <rect>
+      <x>30</x>
+      <y>50</y>
+      <width>441</width>
+      <height>16</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>MS UI Gothic</family>
+      <pointsize>10</pointsize>
+      <weight>75</weight>
+      <bold>true</bold>
+     </font>
+    </property>
+    <property name="text">
+     <string/>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="normalise_Button">
+    <property name="geometry">
+     <rect>
+      <x>20</x>
+      <y>890</y>
+      <width>131</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>Normalise Voltages</string>
+    </property>
+   </widget>
+  </widget>
+  <widget class="QMenuBar" name="menubar">
+   <property name="geometry">
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>1453</width>
+     <height>37</height>
+    </rect>
+   </property>
+  </widget>
+  <widget class="QStatusBar" name="statusbar"/>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

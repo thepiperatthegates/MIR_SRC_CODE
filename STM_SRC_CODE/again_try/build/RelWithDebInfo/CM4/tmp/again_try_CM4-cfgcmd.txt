@@ -1,0 +1,1 @@
+cmd='cube-cmake;-DCMAKE_EXPORT_COMPILE_COMMANDS=ON;-DCMAKE_TOOLCHAIN_FILE=/Users/mac/Documents/again_try/gcc-arm-none-eabi.cmake;-GNinja;-S;<SOURCE_DIR><SOURCE_SUBDIR>;-B;<BINARY_DIR>'
