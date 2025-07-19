@@ -15,36 +15,80 @@ Exact list for required libraries is to be found in ``requirements.txt``
 
 For an automatic installation of all packages, copy and run following command in terminal;
 
-``pip install -r requirements.txt``
+.. code-block:: sh
+
+    pip install -r requirements.txt
+
+
+**Important note!**: 
+
+Code were built with Python 3.13.3 in mind (click `here <https://www.python.org/downloads/release/python-3133/>`_), use other version of Python with own risk!
 
 
 
 How to run?
 ------------
 
-There is few ways to flash the chips with source code. Below are options that I did during thesis;
+Run the main file ``main.py`` with following command line in terminal;
+
+.. code-block:: sh
+
+    python main.py
+
+or if using macOs
+
+.. code-block:: sh
+
+    python3 main.py
 
 
-Toolchain : 
+**Important note!**: 
 
-i) STM32CubeIDE (original toolchain)
+The connection between firmware and software depended on the USB port name! Different PC used will use expectedly different port name. To check the port name used by USB-OTG-FS, check;
 
-ii) VSCode with STM32CubeMX extension, clangd for compiler front-end, arm-none-eabi-gcc from ARM GNU for on-board chip flashing, ST-Link GBD for debugging tool-chain, CMake for cross-compile software development
+i) **Windows 10/11**
+
+Select Start, search `Device Manager`, find device port name under `USB COM-Port`
 
 
-STM32CubeIDE is recommended as it requires the least amount of step needed to compile, debug and flash the code onto the chips, 
-but the IDE is very slow in this case. 
+ii) **MacOs or Linux**
+
+Go to terminal and type 
+
+.. code-block:: sh 
+
+    ls /dev/tty.*
+
+It will show bunch of list for USB such as 
+
+.. code-block:: sh 
+
+    /dev/tty.Bluetooth-Incoming-Port	/dev/tty.debug-console      /dev/tty.usbmodem3776345D32331
+
+
+Pick the ``usbmodem`` as the COM port name. 
+
+Go to ``sockets_files.py`` and change the COM Port name from the global variable ``port_name``.
 
 
 File location
 ------------
 
-/STM_SRC_CODE/again_try/CM7/Src/main.c is the MAIN source code file, run here!.
+i) **main.py **
 
-For filtering source code, check conv-direct.c and conv-direct.h for headers file.
+Main files that handles the GUI
+
+ii) **sockets_files.py**
+
+Subfiles that handles connection and connection port between firmware and hardware
+
+iii) **packet_transmission.py**
+
+Subfiles to store functions for use between subfiles
 
 
-Setting up for use with VS-Code (if)
-------------
+iv) **window_show.py**
 
-Tutorial to set up the toolchain is provided `here <https://www.youtube.com/watch?v=aWMni01XGeI>`_, and `here <https://marketplace.visualstudio.com/items?itemName=stmicroelectronics.stm32-vscode-extension&ssr=false#overview>`_. 
+Subfiles that handles the extra windows that pops out when data acquisition is commenced, and also another window with subprocess to *calculate rheological properties*
+
+
