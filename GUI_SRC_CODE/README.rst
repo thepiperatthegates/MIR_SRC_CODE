@@ -29,7 +29,18 @@ Code were built with Python 3.13.3 in mind (click `here <https://www.python.org/
 How to run?
 ------------
 
-Run the main file ``main.py`` with following command line in terminal;
+Make sure your terminal's current working directory is set to the project folder. Example if the folder is in the following PATH;
+
+.. code-block:: sh 
+
+    C:/Users/mac/Documents/YOUR_FILE_HERE
+
+change the directory by using 
+
+.. code-block:: sh 
+    cd 'C:/Users/mac/Documents/YOUR_FILE_HERE'
+
+Now run the main file ``main.py`` with following command line in terminal;
 
 .. code-block:: sh
 

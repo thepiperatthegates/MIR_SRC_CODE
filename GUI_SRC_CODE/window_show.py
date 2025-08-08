@@ -179,7 +179,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
     
     ############calculation constant##############################################################
     
-        self.FRICTION_COEFFICIENT = 14.05e-19
+        self.FRICTION_COEFFICIENT = 14.05e-9
         self.COIL_CONSTANT = 3.1e-3
         self.DIPOLE_MOMENT = 8.6e-3
         self.CALIBRATION_FACTOR = 0.301
