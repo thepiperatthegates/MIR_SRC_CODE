@@ -38,6 +38,8 @@ Make sure your terminal's current working directory is set to the project folder
 change the directory by using 
 
 .. code-block:: sh 
+
+    
     cd 'C:/Users/mac/Documents/YOUR_FILE_HERE'
 
 Now run the main file ``main.py`` with following command line in terminal;
