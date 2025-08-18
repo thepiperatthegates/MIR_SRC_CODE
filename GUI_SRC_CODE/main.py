@@ -238,8 +238,8 @@ class MyGUI(QMainWindow, Ui_Title):
         super().__init__()
         self.setupUi(self)
         
-        self.save_button.setIcon(QtGui.QIcon("save_icon.png"))
-        self.button_cal_constant.setIcon(QtGui.QIcon("calibrate.png"))
+        self.save_button.setIcon(QtGui.QIcon("GUI_SRC_CODE/save_icon.png"))
+        self.button_cal_constant.setIcon(QtGui.QIcon("GUI_SRC_CODE/calibrate.png"))
 
         self.setWindowTitle("Mini rheometer")
         
@@ -548,6 +548,18 @@ class MyGUI(QMainWindow, Ui_Title):
         self.status_label.setText("Data sent!")
     
     def start_data_event(self):
+        
+        #remove the dummy if it exists
+        if os.path.exists("dummy.csv"):
+            try:
+                os.remove("dummy.csv")
+                print("dummy.csv deleted")
+            except OSError as e:
+                print(f"Error deleting file csv: {e}")
+        else:
+            print("um ok")
+            
+            
         global data_1
         global data_2
         global data_3
@@ -865,7 +877,7 @@ def main():
     
     app_main_window = QApplication(sys.argv)
         
-    app_main_window.setWindowIcon(QtGui.QIcon('fzj.png'))
+    app_main_window.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/fzj.png"))
     
     first_window = MainGUI()
     first_window.show()

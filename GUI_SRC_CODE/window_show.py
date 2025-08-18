@@ -605,7 +605,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
 def main_3():
     app3 = QApplication([])
-    app3.setWindowIcon(QtGui.QIcon('fzj.png'))
+    app3.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/fzj.png"))
     window3 = AnalyseWindow()
     window3.show()
     app3.exec_()
