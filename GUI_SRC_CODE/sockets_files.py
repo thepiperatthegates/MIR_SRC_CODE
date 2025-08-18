@@ -170,16 +170,16 @@ def save_to_csv(cleaned_buffer, num_columns=4, time_increment=0.0001):
     col4 = reshaped_data[:, 3]                  #take fourth column (I2)
 
     #Hall Sensors
-    col1_converted = packet_transmission.change_adc_hall(col1)               #convert col1
+    col1_converted = -packet_transmission.change_adc_hall(col1)               #convert col1
     col2_converted = packet_transmission.change_adc_hall(col2)               #convert col2
     
     #Current
-    col3_converted = packet_transmission.change_current_adc(col3)               #convert col1
+    col3_converted = -packet_transmission.change_current_adc(col3)               #convert col1
     col4_converted = packet_transmission.change_current_adc(col4)               #convert col2
     
     #Justified hall sensors
-    col1_converted = packet_transmission.calibrated_hall_sensors1(col1_converted, col4_converted/1000)  
-    col2_converted = packet_transmission.calibrated_hall_sensors2(col2_converted, col3_converted/1000)
+    col1_converted = packet_transmission.calibrated_hall_sensors1(col1_converted, col3_converted/1000)  
+    col2_converted = packet_transmission.calibrated_hall_sensors2(col2_converted, col4_converted/1000)
 
     reshaped_data = reshaped_data.astype(float)
     reshaped_data[:, 0] = col1_converted

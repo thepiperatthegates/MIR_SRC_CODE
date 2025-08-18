@@ -57,8 +57,10 @@ MAX_V_AFTER_HALL = 3.3
 MIN_V_AFTER_HALL = 0.0
 
 # # default k_b
-k_b_1 = 0.08608535912146265
-k_b_2 = 0.08533231300575338
+k_b_1 = 0.08767959008681105
+k_b_2 = 0.08756711547027177
+
+
 
 
 
@@ -193,10 +195,10 @@ def combine_bytes_for_buffer(send_1, send_2, send_3, send_4, send_5, send_6, sen
     print("Frequency of DAC", send_2)
     byte_send1 = struct.pack('>I', int(send_1))       
     byte_send2 = struct.pack('<f', float(send_2))             
-    byte_send3 = struct.pack('>I', int(send_3))
-    byte_send4 = struct.pack('>i', int(send_4))              #offset1
-    byte_send5 = struct.pack('>I', int(send_5))
-    byte_send6 = struct.pack('>i', int(send_6))              #offset2
+    byte_send3 = struct.pack('<f', float(send_3))              #amplitude1
+    byte_send4 = struct.pack('<f', float(send_4))              #offset1
+    byte_send5 = struct.pack('<f', float(send_5))              #amplitude2
+    byte_send6 = struct.pack('<f', float(send_6))              #offset2
     byte_send7 = struct.pack('>I', int(send_7))
     byte_send8 = struct.pack('>I', int(send_8))
     byte_send9 = struct.pack('>I', int(send_9))
@@ -242,6 +244,10 @@ def gradient_calculate(y_intercept, y_axis, x_axis):
     gradient =  (y_axis - y_intercept)/x_axis
     
     return float(gradient)
+
+
+
+
 
 def calculate_running_frequency(input):
     

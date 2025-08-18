@@ -166,12 +166,22 @@
        </column>
        <column>
         <property name="text">
+         <string>Angular velocity / rad/s</string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
+         <string>Torque / Nm </string>
+        </property>
+       </column>
+       <column>
+        <property name="text">
          <string>Shear rate / 1/s</string>
         </property>
        </column>
        <column>
         <property name="text">
-         <string>Shear stress / Pa/Nm</string>
+         <string>Shear stress / Pa</string>
         </property>
        </column>
        <column>

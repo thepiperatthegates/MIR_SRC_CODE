@@ -19,7 +19,7 @@ import sockets_files
 from sockets_files import q_to_graph
 
 import packet_transmission
-from window_show import main_2, main_3
+from window_show import main_2, main_3, AnalyseWindow
 
 
 # GLOBAL VARIABLES
@@ -30,9 +30,9 @@ time_receive_thread = 0
 data_1 = 0
 data_2 = 0
 data_3 = 0
-data_4 = 0
+data_4 = 0       #offset 1
 data_5 = 0
-data_6 = 0
+data_6 = 0      #offset 2
 data_7 = 0
 data_8 = 0
 data_9 = 0
@@ -117,34 +117,32 @@ class DataUpdate(QThread):
 
                 v1_slice = reshaped_data[:, 0]
                 v2_slice= reshaped_data[:, 1]
-                i1_slice= reshaped_data[:, 2]
-                i2_slice= reshaped_data[:, 3]
-
-
-                
+                i1_slice= reshaped_data[:, 2] #STIMMT
+                i2_slice= reshaped_data[:, 3]   #STIMMT
+    
                 data_mutex.lock()
 
                 #Hall Sensors
-                store_array1= packet_transmission.change_adc_hall(v1_slice)               #convert col1 (in V)
+                store_array1= -packet_transmission.change_adc_hall(v1_slice)               #convert col1 (in V)
                 store_array2 = packet_transmission.change_adc_hall( v2_slice)               #convert col2 (in V)
                 
                 #Current
-                store_array3 = packet_transmission.change_current_adc(i1_slice)               #convert col3 (in mA)
+                store_array3 =  -packet_transmission.change_current_adc(i1_slice)               #convert col3 (in mA)
                 store_array4  = packet_transmission.change_current_adc(i2_slice)               #convert col4 (in mA)
                 
             
-        
+
                 #Calibrate process starts
                 if self.flag_calibrate:
-                    self.calculate_normalise(store_array1, store_array2)
+                    self.calculate_normalise(store_array1, store_array2, store_array3, store_array4)
             
                 #Calibrated hall sensors
-                store_array2 = packet_transmission.calibrated_hall_sensors1(store_array2, store_array3/1000)  
-                store_array1 = packet_transmission.calibrated_hall_sensors2(store_array1, store_array4/1000)
+                store_array1 = packet_transmission.calibrated_hall_sensors1(store_array1, store_array3/1000)  
+                store_array2 = packet_transmission.calibrated_hall_sensors2(store_array2, store_array4/1000)
                 
                  #this is normalising step (still do not know whether i want to do it immidiately or not)
                 if self.flag_normalise == True:
-                    amplitude_voltage_1 = (np.max(store_array1) - np.min(store_array1)) / 2
+                    amplitude_voltage_1 = (np.max(a=store_array1) - np.min(store_array1)) / 2
                     zero_offset_voltage_1 = (np.max(store_array1) + np.min(store_array1)) / 2
 
                     amplitude_voltage_2 = (np.max(store_array2) - np.min(store_array2)) / 2
@@ -155,7 +153,7 @@ class DataUpdate(QThread):
                     
                 #######################################################################################################
                 angle_permanent_magnet_val = np.arctan2(store_array2, store_array1)
-                angle_magnetic_field_val = np.arctan2(store_array3, store_array4)
+                angle_magnetic_field_val = np.arctan2(store_array4, store_array3)
                 
                 angle_permanent_magnet_val = np.unwrap(angle_permanent_magnet_val)
                 angle_magnetic_field_val  = np.unwrap(angle_magnetic_field_val)
@@ -167,14 +165,18 @@ class DataUpdate(QThread):
                 bytes_to_process = np.array([], dtype=np.uint16)
 
 
-    def calculate_normalise(self, store_array1_calibrate, store_array2_calibrate):
+    def calculate_normalise(self, store_array1_calibrate, store_array2_calibrate, store_array3_calibrate, store_array4_calibrate):
 
         self.accumulate_hall_1 = np.append(self.total_hall_1, store_array1_calibrate)
         self.accumulate_hall_2 = np.append(self.total_hall_2, store_array2_calibrate)
+        self.accumulate_current_1 = np.append(self.total_current_1, store_array3_calibrate)
+        self.accumulate_current_2 = np.append(self.total_current_2, store_array4_calibrate)
 
 
         self.main_window.set_constant(self.accumulate_hall_1,  
-                                    self.accumulate_hall_2)
+                                    self.accumulate_hall_2,
+                                    self.accumulate_current_1,
+                                    self.accumulate_current_2)
         
     def flag_calibration_event(self, value1, value2):
         self.flag_calibrate = value1
@@ -261,6 +263,8 @@ class MyGUI(QMainWindow, Ui_Title):
         self.mean_hall_2_0_A = None
         self.mean_hall_1_400_A = None
         self.mean_hall_2_0_A = None
+        
+        self.worker_AnalyseWindow = None
 
         #########################################################################################
         #placeholder text for textboxes################################################
@@ -270,16 +274,17 @@ class MyGUI(QMainWindow, Ui_Title):
         self.textbox_offset1.setPlaceholderText("Enter offset from 0 to +-500mA")
         self.textbox_amplitude2.setPlaceholderText("Enter amplitude from 0 to 500mA")
         self.textbox_offset2.setPlaceholderText("Enter offset from 0 to +-500mA")
+        self.k_b_label.setText(f"k_b_1 = {packet_transmission.k_b_1}           k_b_2 = {packet_transmission.k_b_2}")
         #################################################################################################
 
         #######################################################validator############################################################################
         self.textbox_time.setValidator(QIntValidator())
         self.textbox_frequency.setValidator(QDoubleValidator())
         
-        #ACCEPT ONLY INTEGER FROM 0 TO 500 (unsigned)
-        self.input_validator_unsigned = QRegularExpressionValidator(QRegularExpression("^(?:[0-9]|[1-9][0-9]|[1-4][0-9]{2}|500)$"), self)
+        #ACCEPT ONLY FLOAT FROM 0 TO 500 (unsigned)
+        self.input_validator_unsigned = QRegularExpressionValidator(QRegularExpression(r"^(?:[0-9](?:\.[0-9]+)?|[1-9][0-9](?:\.[0-9]+)?|[1-4][0-9]{2}(?:\.[0-9]+)?|500(?:\.0+)?)$"),self)
         #ACCEPT ONLY INTEGER FROM -500 to 500 (signed)
-        self.input_validator_signed = QRegularExpressionValidator(QRegularExpression("^-?(?:[0-9]|[1-9][0-9]|[1-4][0-9]{2}|500)$"), self)
+        self.input_validator_signed = QRegularExpressionValidator(QRegularExpression(r"^-?(?:[0-9](?:\.[0-9]+)?|[1-9][0-9](?:\.[0-9]+)?|[1-4][0-9]{2}(?:\.[0-9]+)?|500(?:\.0+)?)$"), self)
         self.textbox_amplitude1.setValidator(self.input_validator_unsigned)
         self.textbox_offset1.setValidator(self.input_validator_signed)
         self.textbox_amplitude2.setValidator(self.input_validator_unsigned)
@@ -320,6 +325,9 @@ class MyGUI(QMainWindow, Ui_Title):
         #Start backend serial lines
         self.worker_socket = SocketThread()
         self.worker_DataUpdate = DataUpdate(self)
+        
+        #just to send offset 1 and offset 2 to window_show
+        self.worker_AnalyseWindow = AnalyseWindow()
  
 
 
@@ -375,8 +383,10 @@ class MyGUI(QMainWindow, Ui_Title):
             self.plot2.setLabel('bottom', 'Time', units= 's')
             self.plot2.addLegend()
             self.plot2.showGrid(x=True, y=True)
-            self.curve_i1 = self.plot2.plot(pen='g', name="I2")
-            self.curve_i2 = self.plot2.plot(pen='y', name="I1")
+            
+            
+            self.curve_i1 = self.plot2.plot(pen='g', name="I1")
+            self.curve_i2 = self.plot2.plot(pen='y', name="I2")
             
             self.plot1.enableAutoRange(axis='x', enable=False)
             self.plot2.enableAutoRange(axis='x', enable=False)
@@ -514,9 +524,9 @@ class MyGUI(QMainWindow, Ui_Title):
         
         #from combobox direction
         if self.comboBox_direction.currentText() == "Clockwise":
-            data_7 = 1
-        elif self.comboBox_direction.currentText() == "Anti-clockwise":
             data_7 = 2
+        elif self.comboBox_direction.currentText() == "Anti-clockwise":
+            data_7 = 1
             
             
         if self.filter_checkbox.isChecked():
@@ -530,7 +540,9 @@ class MyGUI(QMainWindow, Ui_Title):
         packet_transmission.send_transmission_event(1)            #SET flag for Tx
         packet_transmission.start_flag_send_event(1)
         
-
+        
+        
+        self.worker_AnalyseWindow.get_offset(data_4, data_6)
         
         self.status_label.setStyleSheet("color: #32a83a;")
         self.status_label.setText("Data sent!")
@@ -560,20 +572,20 @@ class MyGUI(QMainWindow, Ui_Title):
 
         self.queue_file_name.put("dummy") #Send file name to another process
 
-        #kill the previous process if it exists
-        if self.p_window_data is not None:
-            self.p_window_data.terminate()
+  
 
         #start the process at the initialisation
+        #FOR NOW, LETS NOT DO ACQUISTION WINDOW
         self.p_window_data = multiprocessing.Process(target=main_2, args=(self.queue_file_name,))
-        self.p_window_data.start()
+        # self.p_window_data.start()
+        
 
 
         self.worker_sleep = SleepThread()
         self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
         self.worker_sleep.start()
 
-    def start_calibration_event(self, input_current = 1, count_recursion = 1 ):
+    def start_calibration_event(self, input_current = -400, count_recursion = 1 ):
         global data_1
         global data_2
         global data_3
@@ -584,6 +596,9 @@ class MyGUI(QMainWindow, Ui_Title):
         global data_8
         global data_9
         
+        
+        packet_transmission.k_b_1 = 0
+        packet_transmission.k_b_2 = 0
         
         if input_current == False:
             input_current = 1
@@ -605,14 +620,13 @@ class MyGUI(QMainWindow, Ui_Title):
         elif self.comboBox_direction.currentText() == "Anti-clockwise":
             data_7 = 2
             
-            
         data_8 = 3          #mode 3 to the board
         data_9= 0
 
         
         packet_transmission.send_function(30 , data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9)
         # send all the data to be packed
-        packet_transmission.send_transmission_event(1)            #SET flag for Tx
+        packet_transmission.send_transmission_event(this_flag_send=1)            #SET flag for Tx
         packet_transmission.start_flag_send_event(1)
 
         # send flag for calibration in the thread
@@ -663,24 +677,35 @@ class MyGUI(QMainWindow, Ui_Title):
 
         
             if count_recursion == 1:
-                self.mean_hall_1_0_A = np.mean(self.accumulate_hall_1[1:])
-                self.mean_hall_2_0_A = np.mean(self.accumulate_hall_2[1:])
+                self.mean_hall_1_0_A = np.mean(self.accumulate_hall_1[1000:])
+                self.mean_hall_2_0_A = np.mean(self.accumulate_hall_2[1000:])
+                
+                self.mean_current_1_0_A = np.mean(self.accumulate_current_1[1000:])
+                self.mean_current_2_0_A = np.mean(self.accumulate_current_2[1000:])
                 
                 self.start_calibration_event(400, 2)
             elif count_recursion == 2:
-                self.mean_hall_1_400_A = np.mean(self.accumulate_hall_1[1:])
-                self.mean_hall_2_400_A = np.mean(self.accumulate_hall_2[1:])
+                self.mean_hall_1_400_A = np.mean(self.accumulate_hall_1[1000:])
+                self.mean_hall_2_400_A = np.mean(self.accumulate_hall_2[1000:])
                 
-                k_b_1 = float ((self.mean_hall_1_400_A - self.mean_hall_1_0_A) / (0.40 - (0.001)))
-                k_b_2 = float ((self.mean_hall_2_400_A - self.mean_hall_2_0_A) / (0.40 - (0.001)))
+                
+                self.mean_current_1_400_A = np.mean(self.accumulate_current_1[1000:])
+                self.mean_current_2_400_A = np.mean(self.accumulate_current_2[1000:])
+                
+                
+                k_b_1 = float ((self.mean_hall_1_400_A - self.mean_hall_1_0_A) / ((self.mean_current_1_400_A - self.mean_current_1_0_A)/1000))
+                k_b_2 = float ((self.mean_hall_2_400_A - self.mean_hall_2_0_A) / ((self.mean_current_2_400_A - self.mean_current_2_0_A)/1000))
                 
                 packet_transmission.k_b_1 = k_b_1
                 packet_transmission.k_b_2 = k_b_2
-                          
+                
+
                 print(k_b_1)
                 print(k_b_2)
                 
-                self.popout_window()
+                self.k_b_label.setText(f"k_b_1 = {packet_transmission.k_b_1}           k_b_2 = {packet_transmission.k_b_2}")
+                
+                self.popout_window_calibration()
 
     def stop_button_push_event(self):
         # packet_transmission.stop_button_event(1)            #goto sockets_files and stop the loop for receiving
@@ -698,6 +723,16 @@ class MyGUI(QMainWindow, Ui_Title):
     def popout_window(self):
         msg = QMessageBox()
         msg.setText("Successful")
+        msg.setIcon(QMessageBox.Question)
+        
+        
+        x = msg.exec_()
+        
+     
+    def popout_window_calibration(self):
+        msg = QMessageBox()
+        msg.setText(f"k b 1 = {packet_transmission.k_b_1}\n"
+                    f"k b 2 = {packet_transmission.k_b_2}")
         msg.setIcon(QMessageBox.Question)
         
         
@@ -763,11 +798,12 @@ class MyGUI(QMainWindow, Ui_Title):
             data_read = np.loadtxt(f"dummy.csv", delimiter=';')
             np.savetxt(filename_saving, data_read, delimiter=';')
 
-    def set_constant(self, get_accumulate_hall_1, get_accumulate_hall_2):
+    def set_constant(self, get_accumulate_hall_1, get_accumulate_hall_2, get_accumulate_current_1, get_accumulate_current2):
         
         self.accumulate_hall_1 = get_accumulate_hall_1
         self.accumulate_hall_2 = get_accumulate_hall_2
-
+        self.accumulate_current_1 = get_accumulate_current_1
+        self.accumulate_current_2 = get_accumulate_current2
 
     def start_normalise_event(self):
         

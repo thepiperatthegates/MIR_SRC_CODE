@@ -159,7 +159,7 @@ def main_2(q_filename):
 
 
 class AnalyseWindow(QMainWindow, Ui_analyse_Window):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         
         self.setupUi(self)
@@ -167,25 +167,29 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         self.save_Button.setIcon(QtGui.QIcon("save_icon.png"))
         
-        ############################init variables for this class###############################
+    ############################init variables for this class###############################
         self.data = np.array([])
         self.analyse_filename = ' '
         self.final_data_to_save = np.array([])
         self.num_rows = None
         self.num_column = None
         self.total_torque = None     
+        self.offset_1 = 0.0
+        self.offset_2 = 0.0
     #######################################################################################################
     
     
-    ############calculation constant##############################################################
+   ############calculation constant##############################################################
     
-        self.FRICTION_COEFFICIENT = 14.05e-9
-        self.COIL_CONSTANT = 3.1e-3
-        self.DIPOLE_MOMENT = 8.6e-3
-        self.CALIBRATION_FACTOR = 0.301
-        self.C_SS = 11160103
-        self.C_SR = 37.099
-        
+        # self.FRICTION_COEFFICIENT = 14.05e-9  	# in Nm / (rad /s)
+        self.FRICTION_COEFFICIENT = 0  	# in Nm / (rad /s)
+        self.COIL_CONSTANT = 3.097e-3		# in T / A
+        self.DIPOLE_MOMENT = 8.594e-3		# in A m^2
+        self.CALIBRATION_FACTOR = 0.301		# torque calibration no units
+
+    ############geometry constants################################################################
+        self.C_SS = 11160103			# conversion factor to stress in Pa / Nm
+        self.C_SR = 37.099			# conversion factor to shear rate in s^-1 / s^-1
     #######################################################################################################
       
       
@@ -224,8 +228,11 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.table_Widget.setColumnWidth(8, 200)
         self.table_Widget.setColumnWidth(9, 200)
         self.table_Widget.setColumnWidth(10, 200)
+        self.table_Widget.setColumnWidth(11, 200)
+        self.table_Widget.setColumnWidth(12, 200)
         
-        self.table_Widget.setColumnCount(11)
+        
+        self.table_Widget.setColumnCount(13)
 
         self.canvas = MatplotlibCanvas(self)
         self.mlp_layout.addWidget(self.canvas)
@@ -236,7 +243,15 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.normalise_Button.clicked.connect(self.normalise_voltage_event)
         self.data_show_comboBox.setDisabled(True)
         self.save_Button.setDisabled(True)
-
+        
+    #get offset 1 and offset 2 from main.py 
+    def get_offset(self, get_offset_1, get_offset_2):
+        
+        self.offset_1 = get_offset_1
+        self.offset_2 = get_offset_2
+        
+        print(self.offset_1)
+        print(self.offset_2)
 
     def find_filename_button_pressed(self):
         self.analyse_filename = QFileDialog.getOpenFileName(filter="csv (*.csv)")[0]
@@ -285,12 +300,14 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.calculate_shear_stress()
         self.calculate_viscosity()
         
-        amf = self.angle_magnetic_field   .reshape(-1, 1)
-        amag = self.angle_magnet          .reshape(-1, 1)
-        pd  = self.phase_difference       .reshape(-1, 1)
-        sr1 = self.shear_rate             .reshape(-1, 1)
-        sr2 = self.shear_rate             .reshape(-1, 1)
-        vis = self.viscosity              .reshape(-1, 1)
+        amf = self.angle_magnetic_field.reshape(-1, 1)
+        amag = self.angle_magnet.reshape(-1, 1)
+        pd  = self.phase_difference.reshape(-1, 1)
+        angv = self.angular_velocity.reshape(-1,1)
+        trq = self.total_torque.reshape(-1, 1)
+        sr1 = self.shear_rate.reshape(-1, 1)
+        ss2 = self.shear_stress.reshape(-1, 1)
+        vis = self.viscosity.reshape(-1, 1)
                 
                 
         self.final_data_to_save = np.hstack((
@@ -298,8 +315,10 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             amf,
             amag,
             pd,
+            angv,
+            trq,
             sr1,
-            sr2,
+            ss2,
             vis
         ))
         #find the number of rows and column AGAIN
@@ -343,6 +362,10 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             self.table_Widget.hide()
             self.canvas.show()
             self.draw_viscosity_diagram()
+            
+            
+            
+
 
     def data_mode_function(self):
         if  self.num_column == 5:
@@ -395,37 +418,37 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
                 np.savetxt(filename, self.final_data_to_save, delimiter=';')
                 
     def calculate_angle(self):
-        # for row in range( self.num_rows):
-        #     for col in range(1, self.num_column, 4):
-        #         #TODO: FIND MATHEMATICAL REASON WHY ATAN2 RESOLVES ANGLE PROBLEM THAT ARISES FROM NORMAL ARCTAN
-        #         self.angle_magnet[row,0] =  np.arctan2(self.data[row][col], self.data[row][col+1])
-        #         self.angle_magnetic_field[row,0] = np.arctan2(self.data[row][col+3], self.data[row][col+2])
-        for row in range(self.num_rows):
-            angle_index = 0  # track column in output array
+        for row in range( self.num_rows):
             for col in range(1, self.num_column, 4):
-                # Read signals
-                sin1 = self.data[row][col]
-                cos1 = self.data[row][col + 1]
-                sin2 = self.data[row][col + 3]
-                cos2 = self.data[row][col + 2]
+        #         #TODO: FIND MATHEMATICAL REASON WHY ATAN2 RESOLVES ANGLE PROBLEM THAT ARISES FROM NORMAL ARCTAN
+                self.angle_magnet[row,0] =  np.arctan2(self.data[row][col], self.data[row][col+1])
+                self.angle_magnetic_field[row,0] = np.arctan2(self.data[row][col+2], self.data[row][col+3])
+        # for row in range(self.num_rows):
+        #     angle_index = 0  # track column in output array
+        #     for col in range(1, self.num_column, 4):
+        #         # Read signals
+        #         sin1 = self.data[row][col]
+        #         cos1 = self.data[row][col + 1]
+        #         sin2 = self.data[row][col + 3]
+        #         cos2 = self.data[row][col + 2]
 
-                # Vector normalization for first angle
-                norm1 = np.hypot(sin1, cos1)
-                if norm1 != 0:
-                    sin1 /= norm1
-                    cos1 /= norm1
+        #         # Vector normalization for first angle
+        #         norm1 = np.hypot(sin1, cos1)
+        #         if norm1 != 0:
+        #             sin1 /= norm1
+        #             cos1 /= norm1
 
-                # Vector normalization for second angle
-                norm2 = np.hypot(sin2, cos2)
-                if norm2 != 0:
-                    sin2 /= norm2
-                    cos2 /= norm2
+        #         # Vector normalization for second angle
+        #         norm2 = np.hypot(sin2, cos2)
+        #         if norm2 != 0:
+        #             sin2 /= norm2
+        #             cos2 /= norm2
 
-                # Compute and store angles
-                self.angle_magnet[row, angle_index] = np.arctan2(sin1, cos1)
-                self.angle_magnetic_field[row, angle_index] = np.arctan2(sin2, cos2)
+        #         # Compute and store angles
+        #         self.angle_magnet[row, angle_index] = np.arctan2(sin1, cos1)
+        #         self.angle_magnetic_field[row, angle_index] = np.arctan2(sin2, cos2)
 
-                angle_index += 1
+        #         angle_index += 1
                     
                     
                     
@@ -444,40 +467,47 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             polyorder=3,                  # 2 or 3 works well
             deriv=1,                      # first derivative
             delta=np.mean(np.diff(self.time))  # time step
-            )
+            )  # [rad /s] 
   
         
-        self.shear_rate =  self.angular_velocity * self.C_SR
+        self.shear_rate =  self.angular_velocity * self.C_SR # [1 / s]
+        
         
         
     def calculate_friction_moment(self):
-        self.friction_moment = self.shear_rate * self.FRICTION_COEFFICIENT
+        self.friction_moment = self.shear_rate * self.FRICTION_COEFFICIENT          # [Nm]
         
         
     def calculate_magnitude_current(self):
-        power_of_2 = np.power(self.current_1, 2) + np.power(self.current_2, 2)
+        power_of_2 = np.power((self.current_1 - float(self.offset_1)), 2) + np.power((self.current_2 - float(self.offset_2)), 2)
+        # power_of_2 = np.power(self.current_1, 2) + np.power(self.current_2, 2)
         self.magnitude_current = np.sqrt(power_of_2)
         
         
     def calculate_shear_stress(self):
-
-        self.total_torque = (self.CALIBRATION_FACTOR * self.DIPOLE_MOMENT * self.COIL_CONSTANT *
-                             self.magnitude_current/1000 * np.sin(self.phase_difference[:, 0])) -  self.friction_moment
-
-        self.shear_stress =  self.total_torque * self.C_SS
+        
+        
+        self.total_torque = (
+        self.CALIBRATION_FACTOR                # dimensionslos
+        * self.DIPOLE_MOMENT                    # [A·m²]
+        * self.COIL_CONSTANT                    # [T/A]
+        * self.magnitude_current / 1000         # mA -> A, [A]
+        * np.sin(self.phase_difference[:, 0])   # dimensionless
+        ) - self.friction_moment                # [Nm]
+        
+        
+        
+        self.shear_stress =  self.total_torque * self.C_SS	# [Pa]
 
     def calculate_viscosity(self):
-        self.viscosity = self.shear_stress / self.shear_rate
+        self.viscosity = self.shear_stress / self.shear_rate	# [Pa * s]
                 
-            
     def draw_current_diagrams(self):
 
         #read current, 2nd and 3rd columns
         time =  self.time
         current1 =  self.current_1
         current2 =  self.current_2
-        
-        
         
         self.canvas.axes.cla()  #clear canvas
         self.canvas.axes.set_title(r"Current sensors", fontsize=20)
@@ -510,6 +540,9 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.canvas.axes.grid(True, which='both', linestyle='--', linewidth=0.5)
         self.canvas.axes.minorticks_on()
         self.canvas.draw()
+        
+        
+        
     def draw_phase_diagram(self):
         
         time = self.time
@@ -533,9 +566,11 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.canvas.draw()
         
     def draw_shear_rate_diagram(self):
+        
+        
         self.canvas.axes.cla()  #clear canvas
         self.canvas.axes.set_title("Shear rate diagram")
-        self.canvas.axes.set_ylabel(r"Shear rate $\dot\gamma$")
+        self.canvas.axes.set_ylabel(r"Shear rate $\dot\gamma$ / $s^{-1}$")
         self.canvas.axes.set_xlabel(r"Time / $s$")
         self.canvas.axes.plot(self.time,self.shear_rate, color ='red')
         self.canvas.axes.grid(True, which='both', linestyle='--', linewidth=0.5)
@@ -546,9 +581,9 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
     def draw_shear_stress_diagram(self):
         self.canvas.axes.cla()  # clear canvas
         self.canvas.axes.set_title("Shear stress diagram")
-        self.canvas.axes.set_ylabel(r"Shear stress $\tau$")
+        self.canvas.axes.set_ylabel(r"Shear stress $\tau$ / Pa")
         self.canvas.axes.set_xlabel(r"Time / $s$")
-        self.canvas.axes.plot(self.time, self.total_torque , color='red')
+        self.canvas.axes.plot(self.time, self.shear_stress , color='red')
         self.canvas.axes.grid(True, which='both', linestyle='--', linewidth=0.5)
         self.canvas.axes.minorticks_on()
         self.canvas.draw()
