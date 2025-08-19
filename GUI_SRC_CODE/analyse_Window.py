@@ -100,6 +100,15 @@ class Ui_analyse_Window(object):
         self.normalise_Button = QtWidgets.QPushButton(self.centralwidget)
         self.normalise_Button.setGeometry(QtCore.QRect(20, 890, 131, 21))
         self.normalise_Button.setObjectName("normalise_Button")
+        self.label_2 = QtWidgets.QLabel(self.centralwidget)
+        self.label_2.setGeometry(QtCore.QRect(0, 110, 51, 21))
+        font = QtGui.QFont()
+        font.setFamily("CMU Serif")
+        font.setPointSize(12)
+        font.setBold(True)
+        font.setWeight(75)
+        self.label_2.setFont(font)
+        self.label_2.setObjectName("label_2")
         analyse_Window.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(analyse_Window)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 1453, 37))
@@ -154,6 +163,7 @@ class Ui_analyse_Window(object):
         item = self.table_Widget.horizontalHeaderItem(12)
         item.setText(_translate("analyse_Window", "Viscocity / Pa⋅ s "))
         self.normalise_Button.setText(_translate("analyse_Window", "Normalise Voltages"))
+        self.label_2.setText(_translate("analyse_Window", "Average "))
 
 
 if __name__ == "__main__":

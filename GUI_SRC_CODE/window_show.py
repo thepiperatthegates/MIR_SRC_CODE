@@ -182,7 +182,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
    ############calculation constant##############################################################
     
         # self.FRICTION_COEFFICIENT = 14.05e-9  	# in Nm / (rad /s)
-        self.FRICTION_COEFFICIENT = 0  	# in Nm / (rad /s)
+        self.FRICTION_COEFFICIENT = 5.8965e-9  	# in Nm / (rad /s)
+        # self.FRICTION_COEFFICIENT = 0  	# in Nm / (rad /s)
         self.COIL_CONSTANT = 3.097e-3		# in T / A
         self.DIPOLE_MOMENT = 8.594e-3		# in A m^2
         self.CALIBRATION_FACTOR = 0.301		# torque calibration no units
@@ -212,6 +213,16 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.shear_stress = None
         self.viscosity = None
     #######################################################################################################
+    
+    #############################################################################
+        self.phase_difference_mean = None
+        self.angular_velocity_mean = None
+        self.total_torque_mean = None
+        self.shear_rate_mean = None
+        self.shear_stress_mean = None
+        self.viscosity_mean = None
+     #############################################################################
+        
 
         self.setWindowTitle("Data analyse")
         
@@ -281,6 +292,11 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.magnitude_current = np.zeros((self.num_rows, 1))
         ###############################################################################
         
+        
+        
+        
+        
+        
         #declare variables to read from the files (already given)
         self.time = self.data[:, 0]
         self.voltage_1 = self.data[:, 1]
@@ -299,6 +315,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.calculate_friction_moment()
         self.calculate_shear_stress()
         self.calculate_viscosity()
+        self.calculate_all_mean()
         
         amf = self.angle_magnetic_field.reshape(-1, 1)
         amag = self.angle_magnet.reshape(-1, 1)
@@ -382,11 +399,15 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             self.num_rows, self.num_column = self.final_data_to_save.shape
             self.table_Widget.setRowCount(self.num_rows)
             self.table_Widget.setColumnCount(self.num_column)
+            
+            
+            self.table_Widget.insertRow(0)
+
 
             for row in range(self.num_rows):
                 for col in range(self.num_column):
                     item = QTableWidgetItem(str(self.final_data_to_save[row, col]))
-                    self.table_Widget.setItem(row, col, item)
+                    self.table_Widget.setItem(row+1, col, item)
                     
                     
                     
@@ -398,12 +419,16 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
             self.table_Widget.setRowCount(self.num_rows)
             self.table_Widget.setColumnCount(self.num_column)
+            
+            
+            self.table_Widget.insertRow(0)
+
 
             self.final_data_to_save = self.data
             for row in range(self.num_rows):
                 for col in range(self.num_column):
                     item = QTableWidgetItem(str(self.final_data_to_save[row, col]))
-                    self.table_Widget.setItem(row, col, item)
+                    self.table_Widget.setItem(row+1, col, item)
                     
             self.save_Button.setDisabled(True)
     
@@ -431,8 +456,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         for row in range( self.num_rows):
             for col in range(1, self.num_column, 4):
         #         #TODO: FIND MATHEMATICAL REASON WHY ATAN2 RESOLVES ANGLE PROBLEM THAT ARISES FROM NORMAL ARCTAN
-                self.angle_magnet[row,0] =  np.arctan2(self.data[row][col], self.data[row][col+1])
-                self.angle_magnetic_field[row,0] = np.arctan2(self.data[row][col+2], self.data[row][col+3])
+                self.angle_magnet[row,0] =  np.arctan2(self.data[row][col+1], self.data[row][col])
+                self.angle_magnetic_field[row,0] = np.arctan2(self.data[row][col+3], self.data[row][col+2])
         # for row in range(self.num_rows):
         #     angle_index = 0  # track column in output array
         #     for col in range(1, self.num_column, 4):
@@ -465,6 +490,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         #calculate the angles 
         self.angle_magnetic_field = np.unwrap(self.angle_magnetic_field, axis=0)
         self.angle_magnet = np.unwrap(self.angle_magnet, axis=0)
+        
+        
         self.phase_difference = self.angle_magnetic_field - self.angle_magnet
     
     
@@ -478,6 +505,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             deriv=1,                      # first derivative
             delta=np.mean(np.diff(self.time))  # time step
             )  # [rad /s] 
+        
+        
   
         
         self.shear_rate =  self.angular_velocity * self.C_SR # [1 / s]
@@ -485,7 +514,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         
     def calculate_friction_moment(self):
-        self.friction_moment = self.shear_rate * self.FRICTION_COEFFICIENT          # [Nm]
+        self.friction_moment = self.angular_velocity * self.FRICTION_COEFFICIENT          # [Nm]
         
         
     def calculate_magnitude_current(self):
@@ -511,6 +540,19 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
     def calculate_viscosity(self):
         self.viscosity = self.shear_stress / self.shear_rate	# [Pa * s]
+        
+        
+        
+    def calculate_all_mean(self):
+    
+        self.phase_difference_mean =     np.mean(self.phase_difference)
+        self.angular_velocity_mean =     np.mean(self.angular_velocity)
+        self.total_torque_mean =         np.mean(self.total_torque)
+        self.shear_rate_mean =           np.mean(self.shear_rate)
+        self.shear_stress_mean =           np.mean(self.shear_stress)
+        self.viscosity_mean =            np.mean(self.viscosity)
+        
+        
                 
     def draw_current_diagrams(self):
 
