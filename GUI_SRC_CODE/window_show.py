@@ -402,6 +402,24 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             
             
             self.table_Widget.insertRow(0)
+            
+            #################################SET DATA FOR MEAN VALUE OF THE FIRST ROW#######################
+            
+            placeholder_none = QTableWidgetItem("-")
+            
+            for col in range(7):  # 7 columns
+                self.table_Widget.setItem(0, col, QTableWidgetItem("-"))
+            self.table_Widget.setItem(0,7, QTableWidgetItem(str(self.phase_difference_mean)))
+            self.table_Widget.setItem(0,8, QTableWidgetItem(str(self.angular_velocity_mean)))
+            self.table_Widget.setItem(0,9, QTableWidgetItem(str(self.total_torque_mean)))
+            self.table_Widget.setItem(0,10, QTableWidgetItem(str(self.shear_rate_mean)))
+            self.table_Widget.setItem(0,11, QTableWidgetItem(str(self.shear_stress_mean)))
+            self.table_Widget.setItem(0,12, QTableWidgetItem(str(self.viscosity_mean)))
+            
+            
+            
+            
+            ################################################################################################
 
 
             for row in range(self.num_rows):
