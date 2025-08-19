@@ -73,6 +73,16 @@
      </item>
      <item>
       <property name="text">
+       <string>Angular velocity diagram</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
+       <string>Torque diagram</string>
+      </property>
+     </item>
+     <item>
+      <property name="text">
        <string>Shear rate diagram</string>
       </property>
      </item>

@@ -557,7 +557,7 @@ class MyGUI(QMainWindow, Ui_Title):
             except OSError as e:
                 print(f"Error deleting file csv: {e}")
         else:
-            print("um ok")
+            print("First measurements")
             
             
         global data_1
@@ -828,10 +828,10 @@ class MyGUI(QMainWindow, Ui_Title):
     #close event to close all the threads
     def closeEvent(self, event):
 
-        #stop all the background processes
-        if self.p_window_data is not None:
-            self.p_window_data.terminate()
-            self.p_window_data.join()
+        # #stop all the background processes
+        # if self.p_window_data is not None:
+        #     self.p_window_data.terminate()
+        #     self.p_window_data.join()
 
         #terminate the other subprocess
         sockets_files.p1.terminate()

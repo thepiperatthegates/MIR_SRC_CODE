@@ -347,6 +347,16 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             self.canvas.show()
             self.draw_phase_diagram()
             
+        elif mode == "Angular velocity diagram":
+            self.table_Widget.hide()
+            self.canvas.show()
+            self.draw_angular_velocity_diagram()
+            
+        elif mode == "Torque diagram":
+            self.table_Widget.hide()
+            self.canvas.show()
+            self.draw_torque_diagram()
+            
         elif mode == "Shear rate diagram":
             self.table_Widget.hide()
             self.canvas.show()
@@ -561,6 +571,29 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         plot_2.set_label(r"Angle of magnet $\phi_m$")
         plot_3.set_label(r"Phase difference $\Delta\phi$")
         self.canvas.axes.legend(loc = 'upper right', bbox_to_anchor=(1,1))
+        self.canvas.axes.grid(True, which='both', linestyle='--', linewidth=0.5)
+        self.canvas.axes.minorticks_on()
+        self.canvas.draw()
+        
+        
+    def draw_angular_velocity_diagram(self):
+        
+        self.canvas.axes.cla()  #clear canvas
+        self.canvas.axes.set_title("Angular velocity diagram")
+        self.canvas.axes.set_ylabel(r"Angular velocity $\omega$ / rad$s^{-1}$")
+        self.canvas.axes.set_xlabel(r"Time / $s$")
+        self.canvas.axes.plot(self.time,self.angular_velocity, color ='red')
+        self.canvas.axes.grid(True, which='both', linestyle='--', linewidth=0.5)
+        self.canvas.axes.minorticks_on()
+        self.canvas.draw()
+        
+    def draw_torque_diagram(self):
+        
+        self.canvas.axes.cla()  #clear canvas
+        self.canvas.axes.set_title("Torque diagram")
+        self.canvas.axes.set_ylabel(r"Torque T / Nm")
+        self.canvas.axes.set_xlabel(r"Time / $s$")
+        self.canvas.axes.plot(self.time, self.total_torque, color ='red')
         self.canvas.axes.grid(True, which='both', linestyle='--', linewidth=0.5)
         self.canvas.axes.minorticks_on()
         self.canvas.draw()
