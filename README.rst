@@ -3,7 +3,7 @@
 =============================================================================
 
 
-Source code from Hijazi for his Praxisprojekt and Bachelor-Thesis in Forschungszentrum Jülich in 2024/2025.
+Source code from Hijazi for his Praxisprojekt and Bachelor-Thesis at Forschungszentrum Jülich in 2024/2025.
 
 Contact:
 
