@@ -4,7 +4,7 @@ import packet_transmission
 
 import numpy as np
 import os
-
+import sys
 import threading
 import time
 import multiprocessing
@@ -12,10 +12,7 @@ import serial
 from live_graphing import plot_live 
 
 
-port_name = '/dev/tty.usbmodem3776345D32331'   #for mac1
-# port_name = '/dev/tty.usbmodem355A357631331'       
-    
-# port_name = 'COM6'       for windows 
+
 baud_rate = 128000
 
 append_payload =0 
@@ -23,6 +20,9 @@ append_payload =0
 q_to_process = multiprocessing.Queue()
 q_to_graph = multiprocessing.Queue()
 q_to_csv = multiprocessing.Queue()
+
+offset_1 = 0
+offset_2 = 0
 
 current_time = None
 file_name = ' '
@@ -37,9 +37,16 @@ tot_count_accumulate_recv = 1250
 # q = multiprocessing.Queue()
 
 ##########################################################################
-#start socket connection for TCP 
+#start socket connection for USB 
 ##########################################################################
 def socket_start_connect():
+    
+    if sys.platform == 'darwin':        #hijazi's laptop
+        port_name = '/dev/tty.usbmodem3776345D32331'   #for mac1
+        # port_name = '/dev/tty.usbmodem355A357631331'       
+    elif sys.platform == 'win32':       #simon's laptop
+        port_name = 'COM5'       #for windows 
+
     try:
         ser = serial.Serial(port=port_name, baudrate=baud_rate,timeout=None)
         print(ser)
@@ -120,11 +127,21 @@ def backend_rx_countdown(received_payload):
     print("Done!")
 
 
+def get_offset(get_offset1, get_offset2):
+    global offset_1, offset_2
+    
+    
+    offset_1 = get_offset1
+    offset_2 = get_offset2
+    
+
 
 ##########################################################################
 #thread for TCP Tx
 ##########################################################################
 def send_thread(ser1):
+    
+    
     flag_send = packet_transmission.send_transmission_event_getter()
     if flag_send == 1:
         data_send_1 = packet_transmission.data_1_getter()    #for run time
@@ -159,6 +176,7 @@ def file_name_change_set(prefix, extension=".csv"):
 def save_to_csv(cleaned_buffer, num_columns=4, time_increment=0.0001):
     
     global file_name, current_time
+    global offset_1, offset_2
 
     data = np.array(cleaned_buffer)
     # Reshape the data to have 'num_columns' columns per row
@@ -191,8 +209,8 @@ def save_to_csv(cleaned_buffer, num_columns=4, time_increment=0.0001):
     time_column = np.arange(current_time, current_time + (time_increment * num_rows), time_increment).reshape(-1, 1)
     current_time += time_increment * num_rows   
 
-    # Insert the time column as the fifth column
     final_data = np.hstack((time_column, reshaped_data))
+    
 
     try:
         if not os.path.exists(file_name):

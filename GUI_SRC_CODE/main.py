@@ -19,7 +19,7 @@ import sockets_files
 from sockets_files import q_to_graph
 
 import packet_transmission
-from window_show import main_2, main_3, AnalyseWindow
+from window_show import main_2, main_3
 
 
 # GLOBAL VARIABLES
@@ -238,8 +238,13 @@ class MyGUI(QMainWindow, Ui_Title):
         super().__init__()
         self.setupUi(self)
         
-        self.save_button.setIcon(QtGui.QIcon("GUI_SRC_CODE/save_icon.png"))
-        self.button_cal_constant.setIcon(QtGui.QIcon("GUI_SRC_CODE/calibrate.png"))
+
+        if sys.platform ==  'darwin':
+            self.save_button.setIcon(QtGui.QIcon("GUI_SRC_CODE/save_icon.png"))
+            self.button_cal_constant.setIcon(QtGui.QIcon("GUI_SRC_CODE/calibrate.png"))
+        elif sys.platform == 'win32':
+            self.save_button.setIcon(QtGui.QIcon("save_icon.png"))
+            self.button_cal_constant.setIcon(QtGui.QIcon("calibrate.png"))
 
         self.setWindowTitle("Mini rheometer")
         
@@ -264,16 +269,15 @@ class MyGUI(QMainWindow, Ui_Title):
         self.mean_hall_1_400_A = None
         self.mean_hall_2_0_A = None
         
-        self.worker_AnalyseWindow = None
 
         #########################################################################################
         #placeholder text for textboxes################################################
         self.textbox_time.setPlaceholderText("Enter time in seconds")
         self.textbox_frequency.setPlaceholderText("Enter frequency for coil currents")
         self.textbox_amplitude1.setPlaceholderText("Enter amplitude from 0 to 500mA")
-        self.textbox_offset1.setPlaceholderText("Enter offset from 0 to +-500mA")
+        self.textbox_offset1.setPlaceholderText("Enter offset +-500mA")
         self.textbox_amplitude2.setPlaceholderText("Enter amplitude from 0 to 500mA")
-        self.textbox_offset2.setPlaceholderText("Enter offset from 0 to +-500mA")
+        self.textbox_offset2.setPlaceholderText("Enter offset +-500mA")
         self.k_b_label.setText(f"k_b_1 = {packet_transmission.k_b_1}           k_b_2 = {packet_transmission.k_b_2}")
         #################################################################################################
 
@@ -318,6 +322,8 @@ class MyGUI(QMainWindow, Ui_Title):
         self.button_auto_range.clicked.connect(self.auto_range_event)
         
         self.save_button.clicked.connect(self.save_button_event)
+        
+    
 
     
 
@@ -326,10 +332,6 @@ class MyGUI(QMainWindow, Ui_Title):
         self.worker_socket = SocketThread()
         self.worker_DataUpdate = DataUpdate(self)
         
-        #just to send offset 1 and offset 2 to window_show
-        self.worker_AnalyseWindow = AnalyseWindow()
- 
-
 
         self.worker_socket.start()
         self.worker_DataUpdate.start()
@@ -540,10 +542,7 @@ class MyGUI(QMainWindow, Ui_Title):
         packet_transmission.send_transmission_event(1)            #SET flag for Tx
         packet_transmission.start_flag_send_event(1)
         
-        
-        
-        self.worker_AnalyseWindow.get_offset(data_4, data_6)
-        
+
         self.status_label.setStyleSheet("color: #32a83a;")
         self.status_label.setText("Data sent!")
     
@@ -570,7 +569,14 @@ class MyGUI(QMainWindow, Ui_Title):
         global data_8
         
         data_1 = self.textbox_time.text()
-        data_2 = self.textbox_frequency.text()
+        data_2 =self.textbox_frequency.text()
+        data_2 = packet_transmission.calculate_running_frequency(float(data_2))
+        data_3 = self.textbox_amplitude1.text()
+        data_4 =  self.textbox_offset1.text()
+        data_5 = self.textbox_amplitude2.text()
+        data_6 = self.textbox_offset2.text()  
+        
+        packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9)
     
         packet_transmission.stop_button_event(0)            #goto sockets_files and stop the loop for receiving
         packet_transmission.running_time_event(1)
@@ -583,14 +589,16 @@ class MyGUI(QMainWindow, Ui_Title):
 
 
         self.queue_file_name.put("dummy") #Send file name to another process
-
-  
+        
+        
+        
+        
+        
+        
 
         #start the process at the initialisation
         #FOR NOW, LETS NOT DO ACQUISTION WINDOW
-        self.p_window_data = multiprocessing.Process(target=main_2, args=(self.queue_file_name,))
-        # self.p_window_data.start()
-        
+
 
 
         self.worker_sleep = SleepThread()
@@ -832,6 +840,9 @@ class MyGUI(QMainWindow, Ui_Title):
         # if self.p_window_data is not None:
         #     self.p_window_data.terminate()
         #     self.p_window_data.join()
+        
+        self.p_analyse.terminate()
+        self.p_analyse.join()
 
         #terminate the other subprocess
         sockets_files.p1.terminate()
@@ -869,6 +880,8 @@ class MainGUI(QMainWindow, Ui_MainWindow):
         
         if mode == "Control shear rate":
                 self.window.show()
+                
+                        
                 self.close()
     
 
@@ -876,8 +889,11 @@ class MainGUI(QMainWindow, Ui_MainWindow):
 def main():
     
     app_main_window = QApplication(sys.argv)
-        
-    app_main_window.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/fzj.png"))
+    
+    if sys.platform == 'darwin':
+        app_main_window.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/fzj.png"))
+    elif sys.platform == 'win32':
+        app_main_window.setWindowIcon(QtGui.QIcon("fzj.png"))
     
     first_window = MainGUI()
     first_window.show()

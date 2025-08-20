@@ -112,7 +112,7 @@
    <widget class="QPushButton" name="save_Button">
     <property name="geometry">
      <rect>
-      <x>580</x>
+      <x>540</x>
       <y>20</y>
       <width>121</width>
       <height>41</height>
@@ -224,19 +224,6 @@
      <string/>
     </property>
    </widget>
-   <widget class="QPushButton" name="normalise_Button">
-    <property name="geometry">
-     <rect>
-      <x>20</x>
-      <y>890</y>
-      <width>131</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>Normalise Voltages</string>
-    </property>
-   </widget>
    <widget class="QLabel" name="label_2">
     <property name="geometry">
      <rect>
@@ -256,6 +243,70 @@
     </property>
     <property name="text">
      <string>Average </string>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="textbox_offset1">
+    <property name="geometry">
+     <rect>
+      <x>690</x>
+      <y>50</y>
+      <width>51</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="toolTip">
+     <string extracomment="in ms"/>
+    </property>
+   </widget>
+   <widget class="QLineEdit" name="textbox_offset2">
+    <property name="geometry">
+     <rect>
+      <x>810</x>
+      <y>50</y>
+      <width>51</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="toolTip">
+     <string extracomment="in ms"/>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_3">
+    <property name="geometry">
+     <rect>
+      <x>660</x>
+      <y>20</y>
+      <width>111</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>CMU Serif</family>
+      <pointsize>13</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>Insert offset 1 (mA)</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_4">
+    <property name="geometry">
+     <rect>
+      <x>800</x>
+      <y>20</y>
+      <width>111</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>CMU Serif</family>
+      <pointsize>13</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>Insert offset 2 (mA)</string>
     </property>
    </widget>
   </widget>
