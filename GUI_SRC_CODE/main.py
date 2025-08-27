@@ -130,7 +130,11 @@ class DataUpdate(QThread):
                 store_array3 =  -packet_transmission.change_current_adc(i1_slice)               #convert col3 (in mA)
                 store_array4  = packet_transmission.change_current_adc(i2_slice)               #convert col4 (in mA)
                 
-            
+                
+                #calibration for current sensor 
+                store_array3 = packet_transmission.calibration_input_coil_1(store_array3)
+                store_array4 = packet_transmission.calibration_input_coil_2(store_array4)
+                
 
                 #Calibrate process starts
                 if self.flag_calibrate:
@@ -139,6 +143,7 @@ class DataUpdate(QThread):
                 #Calibrated hall sensors
                 store_array1 = packet_transmission.calibrated_hall_sensors1(store_array1, store_array3/1000)  
                 store_array2 = packet_transmission.calibrated_hall_sensors2(store_array2, store_array4/1000)
+                
                 
                  #this is normalising step (still do not know whether i want to do it immidiately or not)
                 if self.flag_normalise == True:
@@ -841,8 +846,7 @@ class MyGUI(QMainWindow, Ui_Title):
         #     self.p_window_data.terminate()
         #     self.p_window_data.join()
         
-        self.p_analyse.terminate()
-        self.p_analyse.join()
+
 
         #terminate the other subprocess
         sockets_files.p1.terminate()

@@ -61,6 +61,19 @@ k_b_1 = 0.083597946
 k_b_2 = 0.084535931
 
 
+#first sensor coefficient
+CURRENT_COEFF_FIRST_SENSOR_A = -4.61934
+CURRENT_COEFF_FIRST_SENSOR_B = 0.99182
+CURRENT_COEFF_FIRST_SENSOR_C =  -4.24388e-6
+CURRENT_COEFF_FIRST_SENSOR_D =  -5.40711e-8
+
+#second sensor coefficient 
+CURRENT_COEFF_SECOND_SENSOR_A = 3.86547
+CURRENT_COEFF_SECOND_SENSOR_B = 0.98655
+CURRENT_COEFF_SECOND_SENSOR_C = 3.02401e-6
+CURRENT_COEFF_SECOND_SENSOR_D = -3.98871e-8
+
+
 
 
 
@@ -254,7 +267,17 @@ def calculate_running_frequency(input):
     C_SR = 37.099
     running_frequency = input/(2*pi*C_SR)
     return running_frequency
-        
+
+def calibration_input_coil_1(input):
+    
+    output = CURRENT_COEFF_FIRST_SENSOR_A + CURRENT_COEFF_FIRST_SENSOR_B * input + CURRENT_COEFF_FIRST_SENSOR_C * pow(input, 2) + CURRENT_COEFF_FIRST_SENSOR_D * pow(input, 3)
+    return output   
+
+
+def calibration_input_coil_2(input):
+    
+    output = CURRENT_COEFF_SECOND_SENSOR_A + CURRENT_COEFF_SECOND_SENSOR_B * input + CURRENT_COEFF_SECOND_SENSOR_C * pow(input, 2) + CURRENT_COEFF_SECOND_SENSOR_D * pow(input, 3)
+    return output   
 
 
 # def angle_calculate(x1, x2):

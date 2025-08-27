@@ -25,6 +25,7 @@ but the IDE is very slow in this case.
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "dsp/statistics_functions.h"
 #include "stm32h7xx_hal_gpio.h"  //HAL header files
 #include "usb_device.h"         //USB driver header files
 
@@ -67,10 +68,23 @@ but the IDE is very slow in this case.
 #define res_16b 0xFFFF
 
 #define A_MAX (double) 500  // Maximum amplifier output current (miliampere)
-#define A_MIN (double)-500 // Minimum amplifier output current	(miliampere)
+#define A_MIN (double) -500 // Minimum amplifier output current	(miliampere)
 
 
 #define OFFSET_LINEAR_ERROR_DAC 28
+
+
+//Curve calibration for first coil
+#define A_COEFFICIENT_FIRST_SPULE (double) -1.27499 
+#define B_COEFFICIENT_FIRST_SPULE (double) 1.01651
+#define C_COEFFICIENT_FIRST_SPULE (double) -1.81293e-5
+#define D_COEFFICIENT_FIRST_SPULE (double) -2.40361e-9
+
+//Curve calibration for second coil
+#define A_COEFFICIENT_SECOND_SPULE (double) 0.82962
+#define B_COEFFICIENT_SECOND_SPULE (double) 1.01741
+#define C_COEFFICIENT_SECOND_SPULE (double) 1.62677e-5
+#define D_COEFFICIENT_SECOND_SPULE (double) 1.04469e-8
 
 
 #ifndef HSEM_ID_0
@@ -117,12 +131,9 @@ static void MX_TIM4_Init(void);
 
 //Functions declaration
 
-void sin_cos_generator(uint32_t amplitude_1, uint32_t amplitude_2, int offset_1, int offset_2, uint32_t direction);
+void sin_cos_generator(float32_t amplitude_1, float32_t amplitude_2, float32_t offset_1, float32_t offset_2, uint32_t direction);
 void dac_start(void);
 void adc_start(void);
-void inital_setup(float32_t dac_frequency, uint32_t running_time, uint32_t amplitude_1,
-                  int offset_1, uint32_t amplitude_2, int offset_2, uint32_t direction,
-				  uint32_t mode_button_flag, uint32_t reset_mcu_flag);
 void myTimerChangeDAC(float want_frequency_dac);
 void myTimerSetupADC(void);
 void timers_Start(void);
@@ -133,8 +144,9 @@ void filter_function_half(void);
 void filter_function_complete(void);
 void combining_transmission_total(void);
 void combining_transmission_total_filter(void);
-void dc_generator(uint32_t amplitude_1, uint32_t amplitude_2);
-
+void dc_generator(float32_t amplitude_1, float32_t amplitude_2);
+double current_calibration_1(double input);
+double current_calibration_2(double input);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -210,8 +222,7 @@ typedef struct
 {
   uint32_t incoming_packetUINT[INCOMING_PACKET_UINT];
   int incoming_packetINT[INCOMING_PACKET_INT];
-  float incoming_packetFLOAT;
-
+  float32_t incoming_packetFLOAT[INCOMING_PACKET_FLOAT];
 } rx_separate_data;
 
 
@@ -816,19 +827,19 @@ void rx_function(void)
 
   // Change BYTES Data to integer to use it
   my_rx_separate_data.incoming_packetUINT[0] = COMBINE_BYTES(my_rx_data.first_ascii[0], my_rx_data.first_ascii[1], my_rx_data.first_ascii[2], my_rx_data.first_ascii[3]); // RUN TIME
-  memcpy(&my_rx_separate_data.incoming_packetFLOAT, my_rx_data.second_ascii, sizeof(my_rx_separate_data.incoming_packetFLOAT));
-  my_rx_separate_data.incoming_packetUINT[1] = COMBINE_BYTES(my_rx_data.third_ascii[0], my_rx_data.third_ascii[1], my_rx_data.third_ascii[2], my_rx_data.third_ascii[3]);         // AMPLITUDE DAC 1
-  my_rx_separate_data.incoming_packetINT[0] = COMBINE_BYTES(my_rx_data.fourth_ascii[0], my_rx_data.fourth_ascii[1], my_rx_data.fourth_ascii[2], my_rx_data.fourth_ascii[3]);      // offset 1
-  my_rx_separate_data.incoming_packetUINT[2] = COMBINE_BYTES(my_rx_data.fifth_ascii[0], my_rx_data.fifth_ascii[1], my_rx_data.fifth_ascii[2], my_rx_data.fifth_ascii[3]);         // amplitude2
-  my_rx_separate_data.incoming_packetINT[1] = COMBINE_BYTES(my_rx_data.sixth_ascii[0], my_rx_data.sixth_ascii[1], my_rx_data.sixth_ascii[2], my_rx_data.sixth_ascii[3]);          // OFFSET DAC2
-  my_rx_separate_data.incoming_packetUINT[3] = COMBINE_BYTES(my_rx_data.seventh_ascii[0], my_rx_data.seventh_ascii[1], my_rx_data.seventh_ascii[2], my_rx_data.seventh_ascii[3]); // ROTATION DIRECTION
-  my_rx_separate_data.incoming_packetUINT[4] = COMBINE_BYTES(my_rx_data.eight_ascii[0], my_rx_data.eight_ascii[1], my_rx_data.eight_ascii[2], my_rx_data.eight_ascii[3]); // decides to use filter or not
-  my_rx_separate_data.incoming_packetUINT[5] = COMBINE_BYTES(my_rx_data.ninth_ascii[0], my_rx_data.ninth_ascii[1], my_rx_data.ninth_ascii[2], my_rx_data.ninth_ascii[3]);
+  memcpy(&my_rx_separate_data.incoming_packetFLOAT[0], my_rx_data.second_ascii, sizeof(float32_t));            //ROTATION FREQUENCY FOR ROTOR
+  memcpy(&my_rx_separate_data.incoming_packetFLOAT[1], my_rx_data.third_ascii, sizeof(float32_t));         // AMPLITUDE DAC 1
+  memcpy(&my_rx_separate_data.incoming_packetFLOAT[2], my_rx_data.fourth_ascii, sizeof(float32_t));    // offset 1
+  memcpy(&my_rx_separate_data.incoming_packetFLOAT[3], my_rx_data.fifth_ascii, sizeof(float32_t));         // amplitude2
+  memcpy(&my_rx_separate_data.incoming_packetFLOAT[4], my_rx_data.sixth_ascii, sizeof(float32_t));           // OFFSET DAC2
+  my_rx_separate_data.incoming_packetUINT[1] = COMBINE_BYTES(my_rx_data.seventh_ascii[0], my_rx_data.seventh_ascii[1], my_rx_data.seventh_ascii[2], my_rx_data.seventh_ascii[3]); // ROTATION DIRECTION
+  my_rx_separate_data.incoming_packetUINT[2] = COMBINE_BYTES(my_rx_data.eight_ascii[0], my_rx_data.eight_ascii[1], my_rx_data.eight_ascii[2], my_rx_data.eight_ascii[3]); // decides to use filter or not
+  my_rx_separate_data.incoming_packetUINT[3] = COMBINE_BYTES(my_rx_data.ninth_ascii[0], my_rx_data.ninth_ascii[1], my_rx_data.ninth_ascii[2], my_rx_data.ninth_ascii[3]);
 
 
-  inital_setup(my_rx_separate_data.incoming_packetFLOAT, my_rx_separate_data.incoming_packetUINT[0], my_rx_separate_data.incoming_packetUINT[1],
-               my_rx_separate_data.incoming_packetINT[0], my_rx_separate_data.incoming_packetUINT[2], my_rx_separate_data.incoming_packetINT[1],
-               my_rx_separate_data.incoming_packetUINT[3], my_rx_separate_data.incoming_packetUINT[4], my_rx_separate_data.incoming_packetUINT[5]);
+  inital_setup(my_rx_separate_data.incoming_packetFLOAT[0], my_rx_separate_data.incoming_packetUINT[0], my_rx_separate_data.incoming_packetFLOAT[1],
+    my_rx_separate_data.incoming_packetFLOAT[2], my_rx_separate_data.incoming_packetFLOAT[3], my_rx_separate_data.incoming_packetFLOAT[4],
+               my_rx_separate_data.incoming_packetUINT[1], my_rx_separate_data.incoming_packetUINT[2], my_rx_separate_data.incoming_packetUINT[3]);
 
   // LETS DO THIS LATER TO SEE IF I CAN SEND JEVEYRTHING IN FLOAT INSTEAD OF USING MAPPING FUNCTION
 }
@@ -849,8 +860,8 @@ else if (mode_button_flag == 3) if the calibration process starts.
 
 */
 
-void inital_setup(float32_t dac_frequency, uint32_t running_time, uint32_t amplitude_1,
-                  int offset_1, uint32_t amplitude_2, int offset_2, uint32_t direction, uint32_t mode_button_flag, uint32_t reset_mcu_flag)
+void inital_setup(float32_t dac_frequency, uint32_t running_time, float32_t amplitude_1,
+              float32_t offset_1, float32_t amplitude_2, float32_t offset_2, uint32_t direction, uint32_t mode_button_flag, uint32_t reset_mcu_flag)
 {
 
   measure_flag = mode_button_flag;			//1,2,3 values are used
@@ -888,61 +899,103 @@ void inital_setup(float32_t dac_frequency, uint32_t running_time, uint32_t ampli
 
 }
 
-void sin_cos_generator(uint32_t amplitude_1, uint32_t amplitude_2,
-                       int offset_1, int offset_2, uint32_t direction) /// sine wave for DAC
+void sin_cos_generator(float32_t amplitude_1, float32_t amplitude_2,
+          float32_t offset_1, float32_t offset_2, uint32_t direction) /// sine wave for DAC
 {
-
+    double a_amp1, a_amp2;
+    double scale = (double)res_12b / (A_MAX - A_MIN);
 
 		if (direction == 1)
-		{ // clockwise rotation
+		{ // anticlockwise rotation
 		for (int i = 0; i < SAMPLE_DAC; i++)
 		{
-		  // Generate sine wave with configurable amplitude
-		  double a_amp1 = amplitude_1 * cos(i * 2 * PI / SAMPLE_DAC) + offset_1;
-		  double a_amp2 = amplitude_2 * sin(i * 2 * PI / SAMPLE_DAC) + offset_2;
 
+      // Generate sine wave with configurable amplitude
+      if(amplitude_1 == 0)
+      {
+        a_amp1 = offset_1;
+        a_amp1 = current_calibration_1(a_amp1);
+      }
+      else {
+        a_amp1 = amplitude_1 * cos(i * 2 * PI / SAMPLE_DAC) + offset_1;
+        // a_amp1 = current_calibration_1(a_amp1);
+      }
+
+      if(amplitude_2 == 0)
+      {
+        a_amp2 = offset_2;
+        a_amp2 = current_calibration_2(a_amp2);
+      }
+      else{
+        a_amp2 = amplitude_2 * sin(i * 2 * PI / SAMPLE_DAC) + offset_2;
+        a_amp2 = current_calibration_2(a_amp2);
+      }
+      
 		  // Convert to DAC value using derived formula
-		  sinVal_1[i] = (uint16_t)((A_MAX - a_amp1) * (res_12b / (A_MAX - A_MIN)));
+		  sinVal_1[i] = -(uint16_t)((A_MAX - a_amp1) * scale);
 		  // Convert to DAC value using derived formula
-		  sinVal_2[i] = (uint16_t)((A_MAX - a_amp2) * (res_12b / (A_MAX - A_MIN)));
+		  sinVal_2[i] = (uint16_t)((A_MAX - a_amp2) * scale);
+
+		  // // Convert to DAC value using derived formula
+		  // sinVal_1[i] = (uint16_t)round((a_amp1 - A_MAX) * scale);
+		  // // Convert to DAC value using derived formula
+		  // sinVal_2[i] = (uint16_t)round((a_amp2 - a_amp2) * scale);
+
+
 
 		  // combine it into one buffer
-		  dac_dma_combine[i] = ((uint32_t)sinVal_1[i] << 16) | sinVal_2[i];
+		  dac_dma_combine[i] = ((uint32_t)sinVal_2[i] << 16) | sinVal_1[i];
 		}
-		}
-		else if (direction == 2)
-		{ // anti-clockwise rotation
-		for (int i = 0; i < SAMPLE_DAC; i++)
-		{
-		  // Generate sine wave with configurable amplitude
-		  double a_amp1 = amplitude_1 * cos(i * 2 * PI / SAMPLE_DAC) + offset_1;
-		  double a_amp2 = amplitude_2 * (-sin(i * 2 * PI / SAMPLE_DAC)) + offset_2;
-		  // Convert to DAC value using derived formula
-		  sinVal_1[i] = (uint16_t)((A_MAX - a_amp1) * (res_12b / (A_MAX - A_MIN)));
-		  // Convert to DAC value using derived formula
-		  sinVal_2[i] = (uint16_t)((A_MAX - a_amp2) * (res_12b / (A_MAX - A_MIN)));
-		  // combine it into one buffer
-		  dac_dma_combine[i] = ((uint32_t)sinVal_1[i] << 16) | sinVal_2[i];
-		}
-		}
-
-
-  if (amplitude_1 == 0)
-  {
-	  uint16_t dc1 = (uint16_t)((A_MAX - amplitude_1) * (res_12b / (A_MAX - A_MIN)));
-	  uint16_t dc2 = (uint16_t)((A_MAX - amplitude_2) * (res_12b / (A_MAX - A_MIN)));
-	  	 for (int i = 0; i < SAMPLE_DAC; i++)
-	  	 {
-	  		dac_dma_combine[i] = ((uint32_t)dc2 << 16 | dc1);
-	  	   }
   }
+
+		else if (direction == 2)
+		{ // clockwise rotation
+      for (int i = 0; i < SAMPLE_DAC; i++)
+      {
+  
+        // Generate sine wave with configurable amplitude
+        if(amplitude_1 == 0)
+        {
+          a_amp1 = offset_1;
+          a_amp1 = current_calibration_1(a_amp1);
+        }
+        else {
+          a_amp1 = amplitude_1 * cos(i * 2 * PI / SAMPLE_DAC) + offset_1;
+          a_amp1 = current_calibration_1(a_amp1);
+        }
+  
+        if(amplitude_2 == 0)
+        {
+          a_amp2 = offset_2;
+          a_amp2 = current_calibration_2(a_amp2);
+        }
+        else{
+          a_amp2 = amplitude_2 * -sin(i * 2 * PI / SAMPLE_DAC) + offset_2;
+          a_amp2 = current_calibration_2(a_amp2);
+        }
+        
+
+            
+		  // Convert to DAC value using derived formula
+		  sinVal_1[i] = -(uint16_t)((A_MAX - a_amp1) * scale);
+		  // Convert to DAC value using derived formula
+		  sinVal_2[i] = (uint16_t)((A_MAX - a_amp2) * scale);
+
+		  // // Convert to DAC value using derived formula
+		  // sinVal_1[i] = (uint16_t)round((a_amp1 - A_MAX) * scale);
+		  // // Convert to DAC value using derived formula
+		  // sinVal_2[i] = (uint16_t)round((a_amp2 - a_amp2) * scale);
+  
+        // combine it into one buffer
+        dac_dma_combine[i] = ((uint32_t)sinVal_2[i] << 16) | sinVal_1[i];
+      }
+		}
 }
 
-void dc_generator(uint32_t amplitude_1, uint32_t amplitude_2)
+void dc_generator(float32_t amplitude_1, float32_t amplitude_2)
 {
 
-
-    uint16_t dc1 = (uint16_t)((A_MAX - amplitude_1) * (res_12b / (A_MAX - A_MIN)));
+    uint16_t dc1 = -(uint16_t)((A_MAX - amplitude_1) * (res_12b / (A_MAX - A_MIN)));
     uint16_t dc2 = (uint16_t)((A_MAX - amplitude_2) * (res_12b / (A_MAX - A_MIN)));
 	 for (int i = 0; i < SAMPLE_DAC; i++)
 	 {
@@ -1079,7 +1132,7 @@ void combining_transmission_total(void)
   {
     send_flag_raw = 0;
     uint8_t *ptr = (uint8_t *) combined_transmission_buffer;
-    for (int32_t i = 0; i < DMA_ADC_BUFF_SIZE; i++)
+
     for (int32_t i = 0; i < DMA_ADC_BUFF_SIZE; i++)
     {
         // 1) Copy hall_1 (1 byte)
@@ -1101,9 +1154,20 @@ void combining_transmission_total(void)
             *ptr++ = src16[0];  // low byte
             *ptr++ = src16[1];  // high byte
         }
+        
+
+        // 7) Copy current_2 (1 byte)
+        *ptr++ = current_1; // ptr might now be odd
+
+        // 8) Copy send_back_4[i] (2 bytes):
+        {
+            uint8_t *src16 = (uint8_t *)&adc_buff_fourth[i];
+            *ptr++ = src16[0];  // low byte
+            *ptr++ = src16[1];  // high byte
+        }
 
         // 5) Copy current_1 (1 byte)
-        *ptr++ = current_1; // ptr might now be odd
+        *ptr++ = current_2; // ptr might now be odd
 
         // 6) Copy send_back_3[i] (2 bytes):
         {
@@ -1112,15 +1176,6 @@ void combining_transmission_total(void)
             *ptr++ = src16[1];  // high byte
         }
 
-        // 7) Copy current_2 (1 byte)
-        *ptr++ = current_2; // ptr might now be odd
-
-        // 8) Copy send_back_4[i] (2 bytes):
-        {
-            uint8_t *src16 = (uint8_t *)&adc_buff_fourth[i];
-            *ptr++ = src16[0];  // low byte
-            *ptr++ = src16[1];  // high byte
-        }
     }
   CDC_Transmit_FS( (uint8_t *) combined_transmission_buffer, MAX_TOTAL_TRANSMISSION_BUFFER);
   }
@@ -1137,8 +1192,6 @@ void combining_transmission_total_filter(void)
       {
           // 1) Copy hall_1 (1 byte)
           *ptr++ = hall_1;   // ptr might now be odd
-
-          // 2) Copy send_back_1[i] (2 bytes) as two STRB instructions
           {
               uint8_t *src16 = (uint8_t *)&send_back_1[i];
               *ptr++ = src16[0];  // low byte
@@ -1155,27 +1208,27 @@ void combining_transmission_total_filter(void)
               *ptr++ = src16[1];  // high byte
           }
 
-          // 5) Copy current_1 (1 byte)
+          // 5) Copy current_2 (1 byte)
           *ptr++ = current_1; // ptr might now be odd
 
-          // 6) Copy send_back_3[i] (2 bytes):
+          // 6) Copy send_back_4[i] (2 bytes):
+          {
+              uint8_t *src16 = (uint8_t *)&send_back_4[i];
+              *ptr++ = src16[0];  // low byte
+              *ptr++ = src16[1];  // high byte
+          }
+
+          // 7) Copy current_1 (1 byte)
+          *ptr++ = current_2; // ptr might now be odd
+
+          // 8) Copy send_back_3[i] (2 bytes):
           {
               uint8_t *src16 = (uint8_t *)&send_back_3[i];
               *ptr++ = src16[0];  // low byte
               *ptr++ = src16[1];  // high byte
           }
 
-          // 7) Copy current_2 (1 byte)
-          *ptr++ = current_2; // ptr might now be odd
-
-          // 8) Copy send_back_4[i] (2 bytes):
-          {
-              uint8_t *src16 = (uint8_t *)&send_back_4[i];
-              *ptr++ = src16[0];  // low byte
-              *ptr++ = src16[1];  // high byte
-          }
       }
-
       CDC_Transmit_FS((uint8_t *) combined_transmission_buffer, MAX_TOTAL_TRANSMISSION_BUFFER);
   }
 }
@@ -1406,10 +1459,23 @@ void filter_function_complete(void)
   send_flag_filter = 1;
 }
 //
+
+double current_calibration_1(double input)
+{
+    double output_calibrated = A_COEFFICIENT_FIRST_SPULE + B_COEFFICIENT_FIRST_SPULE*input + C_COEFFICIENT_FIRST_SPULE*(pow(input, 2)) + D_COEFFICIENT_FIRST_SPULE*(pow(input, 3));
+    return output_calibrated;
+}
+
+double current_calibration_2(double input)
+{
+    double output_calibrated = A_COEFFICIENT_SECOND_SPULE + B_COEFFICIENT_SECOND_SPULE*input + C_COEFFICIENT_SECOND_SPULE*(pow(input, 2)) + D_COEFFICIENT_SECOND_SPULE*(pow(input, 3));
+    return output_calibrated;
+}
+
+
 /* USER CODE END 4 */
 
  /* MPU Configuration */
-
 void MPU_Config(void)
 {
   MPU_Region_InitTypeDef MPU_InitStruct = {0};
