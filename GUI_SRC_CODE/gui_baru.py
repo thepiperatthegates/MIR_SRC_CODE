@@ -342,7 +342,7 @@ class Ui_Title(object):
         self.button_cal_constant.setText(_translate("Title", "Calibrate Hall "))
         self.normalise_button.setText(_translate("Title", "Normalise Voltage"))
         self.label_time.setText(_translate("Title", "Time acquisition / s"))
-        self.label_frequency.setText(_translate("Title", "Shear rate γ̇ / Hz"))
+        self.label_frequency.setText(_translate("Title", "Shear rate γ̇ / 1/s"))
         self.label_amplitude_1.setText(_translate("Title", "Current amplitude 1 / mA"))
         self.label_offset_1.setText(_translate("Title", "Current offset 1 / mA"))
         self.label_amplitude_2.setText(_translate("Title", "Current amplitude 2 / mA"))

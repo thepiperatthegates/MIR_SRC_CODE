@@ -626,7 +626,7 @@ class MyGUI(QMainWindow, Ui_Title):
         packet_transmission.k_b_2 = 0
         
         if input_current == False:
-            input_current = 1
+            input_current = -400
             
         
         print(input_current)

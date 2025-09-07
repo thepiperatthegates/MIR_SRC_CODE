@@ -202,11 +202,11 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
    ############calculation constant##############################################################
     
         # self.FRICTION_COEFFICIENT = 14.05e-9  	# in Nm / (rad /s)
-        self.FRICTION_COEFFICIENT = 6.2246e-9  	# in Nm / (rad /s)
+        self.FRICTION_COEFFICIENT = 19.548755e-9  	# in Nm / (rad /s)
         # self.FRICTION_COEFFICIENT = 0  	# in Nm / (rad /s)
         self.COIL_CONSTANT = 3.097e-3		# in T / A
         self.DIPOLE_MOMENT = 8.594e-3		# in A m^2
-        self.CALIBRATION_FACTOR = 0.301		# torque calibration no units
+        self.CALIBRATION_FACTOR = 1		# torque calibration no units (K)
 
     ############geometry constants################################################################
         self.C_SS = 11160103			# conversion factor to stress in Pa / Nm
@@ -580,7 +580,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         
     def calculate_friction_moment(self):
-        self.friction_moment = self.angular_velocity * self.FRICTION_COEFFICIENT          # [Nm]
+        self.friction_moment = self.CALIBRATION_FACTOR * self.angular_velocity * self.FRICTION_COEFFICIENT          # [Nm]
         
         
     def calculate_magnitude_current(self):

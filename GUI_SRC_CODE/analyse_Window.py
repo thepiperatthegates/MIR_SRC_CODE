@@ -166,7 +166,7 @@ class Ui_analyse_Window(object):
         item = self.table_Widget.horizontalHeaderItem(4)
         item.setText(_translate("analyse_Window", "Current 2 / mA"))
         item = self.table_Widget.horizontalHeaderItem(5)
-        item.setText(_translate("analyse_Window", "Angle of permanent magnet Φ_B / rad"))
+        item.setText(_translate("analyse_Window", "Angle of magnetic field Φ_B / rad"))
         item = self.table_Widget.horizontalHeaderItem(6)
         item.setText(_translate("analyse_Window", "Angle of permanent magnet  Φ_m / rad"))
         item = self.table_Widget.horizontalHeaderItem(7)
