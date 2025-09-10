@@ -15,10 +15,10 @@ from main_window_test import Ui_MainWindow
 
 
 
-import sockets_files
+import sockets_files as sockets_files
 from sockets_files import q_to_graph
 
-import packet_transmission
+import packet_transmission as packet_transmission
 from window_show import main_2, main_3
 
 
@@ -245,8 +245,8 @@ class MyGUI(QMainWindow, Ui_Title):
         
 
         if sys.platform ==  'darwin':
-            self.save_button.setIcon(QtGui.QIcon("GUI_SRC_CODE/save_icon.png"))
-            self.button_cal_constant.setIcon(QtGui.QIcon("GUI_SRC_CODE/calibrate.png"))
+            self.save_button.setIcon(QtGui.QIcon("GUI_SRC_CODE/src/save_icon.png"))
+            self.button_cal_constant.setIcon(QtGui.QIcon("GUI_SRC_CODE/src/calibrate.png"))
         elif sys.platform == 'win32':
             self.save_button.setIcon(QtGui.QIcon("save_icon.png"))
             self.button_cal_constant.setIcon(QtGui.QIcon("calibrate.png"))
@@ -895,7 +895,7 @@ def main():
     app_main_window = QApplication(sys.argv)
     
     if sys.platform == 'darwin':
-        app_main_window.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/fzj.png"))
+        app_main_window.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/src/fzj.png"))
     elif sys.platform == 'win32':
         app_main_window.setWindowIcon(QtGui.QIcon("fzj.png"))
     

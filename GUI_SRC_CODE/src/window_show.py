@@ -9,7 +9,7 @@ import sys
 
 from button_tekan_window import Ui_data_capture_Window
 from analyse_Window import Ui_analyse_Window
-import packet_transmission
+import packet_transmission as packet_transmission
 
 from scipy.signal import savgol_filter
 import pandas 
@@ -174,7 +174,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.setupUi(self)
         
         if sys.platform == 'darwin':
-            self.save_Button.setIcon(QtGui.QIcon("save_icon.png"))
+            self.save_Button.setIcon(QtGui.QIcon("GUI_SRC_CODE/src/save_icon.png"))
         elif sys.platform == 'win32':
             self.save_Button.setIcon(QtGui.QIcon("save_icon.png"))
             
@@ -766,7 +766,7 @@ def main_3():
     app3 = QApplication([])
     
     if sys.platform == 'darwin':
-        app3.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/fzj.png"))
+        app3.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/src/fzj.png"))
     elif sys.platform == 'win32':
         app3.setWindowIcon(QtGui.QIcon("fzj.png"))
     window3 = AnalyseWindow()

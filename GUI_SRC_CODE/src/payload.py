@@ -2,7 +2,7 @@ from collections import deque
 import numpy as np
 import os
 from datetime import datetime
-import packet_transmission
+import packet_transmission as packet_transmission
 import struct
 
 

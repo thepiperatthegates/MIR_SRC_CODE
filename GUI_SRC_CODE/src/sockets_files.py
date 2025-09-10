@@ -1,6 +1,6 @@
 #functions for socket
 
-import packet_transmission
+import packet_transmission as packet_transmission
 
 import numpy as np
 import os
