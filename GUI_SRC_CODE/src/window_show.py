@@ -176,7 +176,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         if sys.platform == 'darwin':
             self.save_Button.setIcon(QtGui.QIcon("GUI_SRC_CODE/src/save_icon.png"))
         elif sys.platform == 'win32':
-            self.save_Button.setIcon(QtGui.QIcon("save_icon.png"))
+            self.save_Button.setIcon(QtGui.QIcon("GUI_SRC_CODE/src/save_icon.png"))
             
         
     ############################init variables for this class###############################
@@ -768,7 +768,7 @@ def main_3():
     if sys.platform == 'darwin':
         app3.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/src/fzj.png"))
     elif sys.platform == 'win32':
-        app3.setWindowIcon(QtGui.QIcon("fzj.png"))
+        app3.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/src/fzj.png"))
     window3 = AnalyseWindow()
     window3.show()
     app3.exec_()
