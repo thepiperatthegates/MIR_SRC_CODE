@@ -248,8 +248,8 @@ class MyGUI(QMainWindow, Ui_Title):
             self.save_button.setIcon(QtGui.QIcon("GUI_SRC_CODE/src/save_icon.png"))
             self.button_cal_constant.setIcon(QtGui.QIcon("GUI_SRC_CODE/src/calibrate.png"))
         elif sys.platform == 'win32':
-            self.save_button.setIcon(QtGui.QIcon("save_icon.png"))
-            self.button_cal_constant.setIcon(QtGui.QIcon("calibrate.png"))
+            self.save_button.setIcon(QtGui.QIcon("GUI_SRC_CODE/src/save_icon.png"))
+            self.button_cal_constant.setIcon(QtGui.QIcon("GUI_SRC_CODE/src/calibrate.png"))
 
         self.setWindowTitle("Mini rheometer")
         
@@ -897,7 +897,7 @@ def main():
     if sys.platform == 'darwin':
         app_main_window.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/src/fzj.png"))
     elif sys.platform == 'win32':
-        app_main_window.setWindowIcon(QtGui.QIcon("fzj.png"))
+        app_main_window.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/src/fzj.png"))
     
     first_window = MainGUI()
     first_window.show()
