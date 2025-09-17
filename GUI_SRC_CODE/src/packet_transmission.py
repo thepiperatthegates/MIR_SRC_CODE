@@ -276,7 +276,7 @@ def calibration_input_coil_1(input):
 
 
 def calibration_input_coil_2(input):
-    
+  
     output = CURRENT_COEFF_SECOND_SENSOR_A + CURRENT_COEFF_SECOND_SENSOR_B * input + CURRENT_COEFF_SECOND_SENSOR_C * pow(input, 2) + CURRENT_COEFF_SECOND_SENSOR_D * pow(input, 3)
     return output   
 

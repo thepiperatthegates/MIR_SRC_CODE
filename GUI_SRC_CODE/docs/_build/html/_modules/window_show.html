@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>window_show &#8212; MIR Python Documentation 1.0.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=27fed22d" />
+    <script src="../_static/documentation_options.js?v=8d563738"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for window_show</h1><div class="highlight"><pre>
+<span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">PyQt5</span><span class="w"> </span><span class="kn">import</span> <span class="n">QtCore</span><span class="p">,</span> <span class="n">QtGui</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">PyQt5</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">PyQt5.QtCore</span><span class="w"> </span><span class="kn">import</span> <span class="n">QThread</span><span class="p">,</span> <span class="n">pyqtSignal</span><span class="p">,</span> <span class="n">QFileInfo</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">PyQt5</span><span class="w"> </span><span class="kn">import</span> <span class="n">uic</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">PyQt5.QtWidgets</span><span class="w"> </span><span class="kn">import</span> <span class="o">*</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
+
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">button_tekan_window</span><span class="w"> </span><span class="kn">import</span> <span class="n">Ui_data_capture_Window</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">analyse_Window</span><span class="w"> </span><span class="kn">import</span> <span class="n">Ui_analyse_Window</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">packet_transmission</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">packet_transmission</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.signal</span><span class="w"> </span><span class="kn">import</span> <span class="n">savgol_filter</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span> 
+
+
+<span class="c1">#set the icon???????????</span>
+<span class="c1"># import ctypes</span>
+<span class="c1"># myappid = &#39;mycompany.myproduct.subproduct.version&#39; # arbitrary string</span>
+<span class="c1"># ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">rcParams</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;font.size&#39;</span><span class="p">:</span> <span class="mi">14</span><span class="p">})</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">mpl</span>
+
+<span class="n">mpl</span><span class="o">.</span><span class="n">use</span><span class="p">(</span><span class="s1">&#39;Qt5Agg&#39;</span><span class="p">)</span>
+
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib.figure</span><span class="w"> </span><span class="kn">import</span> <span class="n">Figure</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">matplotlib.backends.backend_qt5agg</span><span class="w"> </span><span class="kn">import</span> <span class="n">FigureCanvasQTAgg</span><span class="p">,</span> <span class="n">NavigationToolbar2QT</span>
+
+
+
+
+<span class="n">data_4</span> <span class="o">=</span><span class="mf">0.0</span>
+<span class="n">data_6</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+
+<span class="c1">#MATPLOTLIB CANVAS</span>
+<div class="viewcode-block" id="MatplotlibCanvas">
+<a class="viewcode-back" href="../window_show.html#window_show.MatplotlibCanvas">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MatplotlibCanvas</span><span class="p">(</span><span class="n">FigureCanvasQTAgg</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">height</span><span class="o">=</span><span class="mi">14</span><span class="p">,</span> <span class="n">dpi</span><span class="o">=</span><span class="mi">100</span><span class="p">):</span>
+        <span class="n">fig</span> <span class="o">=</span> <span class="n">Figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="n">width</span><span class="p">,</span> <span class="n">height</span><span class="p">),</span> <span class="n">dpi</span><span class="o">=</span><span class="n">dpi</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">axes</span> <span class="o">=</span> <span class="n">fig</span><span class="o">.</span><span class="n">add_subplot</span><span class="p">(</span><span class="mi">111</span><span class="p">)</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">fig</span><span class="p">)</span></div>
+
+
+
+
+<div class="viewcode-block" id="DataHandler">
+<a class="viewcode-back" href="../window_show.html#window_show.DataHandler">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DataHandler</span><span class="p">(</span><span class="n">QThread</span><span class="p">):</span>
+    <span class="n">data_loaded_signal</span> <span class="o">=</span> <span class="n">QtCore</span><span class="o">.</span><span class="n">pyqtSignal</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span>  <span class="n">interval</span><span class="o">=</span><span class="mi">5000</span><span class="p">,</span> <span class="n">parent</span> <span class="o">=</span> <span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">DataHandler</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filename</span> <span class="o">=</span> <span class="n">filename</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">interval</span> <span class="o">=</span> <span class="n">interval</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="o">=</span> <span class="kc">True</span>
+
+<div class="viewcode-block" id="DataHandler.run">
+<a class="viewcode-back" href="../window_show.html#window_show.DataHandler.run">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">while</span> <span class="bp">self</span><span class="o">.</span><span class="n">running</span><span class="p">:</span>
+            <span class="c1">#TODO: try buat guna numpy array instead of list</span>
+            <span class="c1"># data = np.loadtxt(self.analyse_filename, delimiter=&#39;;&#39;)</span>
+
+            <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">)</span><span class="si">}</span><span class="s2">.csv&quot;</span><span class="p">,</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="p">[]</span>
+                <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">file</span><span class="p">:</span>
+                    <span class="n">row_values</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">float</span><span class="p">,</span> <span class="n">row</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;;&#39;</span><span class="p">)))</span>
+                    <span class="n">data</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">row_values</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data_loaded_signal</span><span class="o">.</span><span class="n">emit</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">msleep</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">interval</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DataHandler.stop">
+<a class="viewcode-back" href="../window_show.html#window_show.DataHandler.stop">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">stop</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">running</span> <span class="o">=</span> <span class="kc">False</span></div>
+</div>
+
+        
+        
+<div class="viewcode-block" id="SaveFile">
+<a class="viewcode-back" href="../window_show.html#window_show.SaveFile">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SaveFile</span><span class="p">(</span><span class="n">QThread</span><span class="p">):</span>
+    
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">parent</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filename</span> <span class="o">=</span> <span class="n">filename</span>
+        
+<div class="viewcode-block" id="SaveFile.run">
+<a class="viewcode-back" href="../window_show.html#window_show.SaveFile.run">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">filename_saving</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">QFileDialog</span><span class="o">.</span><span class="n">getSaveFileName</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;Save File&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;CSV Files (*.csv)&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">filename_saving</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">filename_saving</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;.csv&#39;</span><span class="p">):</span>
+                <span class="n">filename_saving</span> <span class="o">+=</span> <span class="s1">&#39;.csv&#39;</span>
+            <span class="n">data_read</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">loadtxt</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="si">}</span><span class="s2">.csv&quot;</span><span class="p">,</span> <span class="n">delimiter</span><span class="o">=</span><span class="s1">&#39;;&#39;</span><span class="p">)</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">savetxt</span><span class="p">(</span><span class="n">filename_saving</span><span class="p">,</span> <span class="n">data_read</span><span class="p">,</span> <span class="n">delimiter</span><span class="o">=</span><span class="s1">&#39;;&#39;</span><span class="p">)</span></div>
+</div>
+
+
+<div class="viewcode-block" id="AcquisitionWindow">
+<a class="viewcode-back" href="../window_show.html#window_show.AcquisitionWindow">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AcquisitionWindow</span><span class="p">(</span><span class="n">QMainWindow</span><span class="p">,</span> <span class="n">Ui_data_capture_Window</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">filename</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">(</span><span class="n">AcquisitionWindow</span><span class="p">,</span> <span class="bp">self</span><span class="p">)</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">filename</span> <span class="o">=</span> <span class="n">filename</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">setupUi</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">setWindowTitle</span><span class="p">(</span><span class="s2">&quot;Data acquisition&quot;</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_button</span><span class="o">.</span><span class="n">setIcon</span><span class="p">(</span><span class="n">QtGui</span><span class="o">.</span><span class="n">QIcon</span><span class="p">(</span><span class="s2">&quot;save_icon.png&quot;</span><span class="p">))</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">tableWidget</span><span class="o">.</span><span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">250</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tableWidget</span><span class="o">.</span><span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">250</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tableWidget</span><span class="o">.</span><span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">250</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tableWidget</span><span class="o">.</span><span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">250</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tableWidget</span><span class="o">.</span> <span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">250</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stop_button</span><span class="o">.</span><span class="n">clicked</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stop_button_event</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_button</span><span class="o">.</span><span class="n">clicked</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">save_button_event</span><span class="p">)</span>
+
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">tableWidget</span><span class="o">.</span><span class="n">setColumnCount</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_handling</span> <span class="o">=</span> <span class="n">DataHandler</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="mi">5000</span><span class="p">)</span> <span class="c1">#100ms</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_handling</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_handling</span><span class="o">.</span><span class="n">data_loaded_signal</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">update_table</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+    
+<div class="viewcode-block" id="AcquisitionWindow.save_button_event">
+<a class="viewcode-back" href="../window_show.html#window_show.AcquisitionWindow.save_button_event">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_button_event</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_File</span> <span class="o">=</span> <span class="n">SaveFile</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filename</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_File</span><span class="o">.</span><span class="n">start</span><span class="p">()</span></div>
+
+        <span class="c1"># filename_saving, _ = QFileDialog.getSaveFileName(self, &quot;Save File&quot;, &quot;&quot;, &quot;CSV Files (*.csv)&quot;)</span>
+        <span class="c1"># if filename_saving:</span>
+        <span class="c1">#     if not filename_saving.lower().endswith(&#39;.csv&#39;):</span>
+        <span class="c1">#         filename_saving += &#39;.csv&#39;</span>
+        <span class="c1">#     data_read = np.loadtxt(f&quot;{self.filename}.csv&quot;, delimiter=&#39;;&#39;)</span>
+        <span class="c1">#     np.savetxt(filename_saving, data_read, delimiter=&#39;;&#39;)</span>
+            
+            
+            
+        
+<div class="viewcode-block" id="AcquisitionWindow.stop_button_event">
+<a class="viewcode-back" href="../window_show.html#window_show.AcquisitionWindow.stop_button_event">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">stop_button_event</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_handling</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="AcquisitionWindow.update_table">
+<a class="viewcode-back" href="../window_show.html#window_show.AcquisitionWindow.update_table">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">update_table</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">tableWidget</span><span class="o">.</span><span class="n">setRowCount</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">))</span>
+
+        <span class="k">for</span> <span class="n">row_number</span><span class="p">,</span> <span class="n">row_data</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">col_number</span><span class="p">,</span> <span class="n">cell</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">row_data</span><span class="p">):</span>
+                <span class="c1"># Create a QTableWidgetItem with the string representation of the float</span>
+                <span class="n">item</span> <span class="o">=</span> <span class="n">QTableWidgetItem</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">cell</span><span class="p">))</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">tableWidget</span><span class="o">.</span><span class="n">setItem</span><span class="p">(</span><span class="n">row_number</span><span class="p">,</span> <span class="n">col_number</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span></div>
+
+                
+<div class="viewcode-block" id="AcquisitionWindow.closeEvent">
+<a class="viewcode-back" href="../window_show.html#window_show.AcquisitionWindow.closeEvent">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">closeEvent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="c1">#stop threads</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_handling</span><span class="o">.</span><span class="n">data_loaded_signal</span><span class="o">.</span><span class="n">disconnect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">update_table</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_handling</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+        
+        <span class="n">packet_transmission</span><span class="o">.</span><span class="n">running_time_event</span><span class="p">(</span><span class="mi">5</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;tutup&quot;</span><span class="p">)</span>
+
+        <span class="c1">#delete the dummy csv file once the window is closed</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="s2">&quot;dummy.csv&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error deleting file: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">event</span><span class="o">.</span><span class="n">accept</span><span class="p">()</span></div>
+</div>
+
+
+
+
+<div class="viewcode-block" id="main_2">
+<a class="viewcode-back" href="../window_show.html#window_show.main_2">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">main_2</span><span class="p">(</span><span class="n">q_filename</span><span class="p">):</span>
+    <span class="n">filename</span> <span class="o">=</span> <span class="n">q_filename</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+    <span class="n">app2</span> <span class="o">=</span> <span class="n">QApplication</span><span class="p">([])</span>
+    <span class="n">app2</span><span class="o">.</span><span class="n">setWindowIcon</span><span class="p">(</span><span class="n">QtGui</span><span class="o">.</span><span class="n">QIcon</span><span class="p">(</span><span class="s1">&#39;fzj.png&#39;</span><span class="p">))</span>
+    <span class="n">window2</span> <span class="o">=</span> <span class="n">AcquisitionWindow</span><span class="p">(</span><span class="n">filename</span><span class="p">)</span>
+    <span class="n">app2</span><span class="o">.</span><span class="n">exec_</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="AnalyseWindow">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AnalyseWindow</span><span class="p">(</span><span class="n">QMainWindow</span><span class="p">,</span> <span class="n">Ui_analyse_Window</span><span class="p">):</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">parent</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">setupUi</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s1">&#39;darwin&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">save_Button</span><span class="o">.</span><span class="n">setIcon</span><span class="p">(</span><span class="n">QtGui</span><span class="o">.</span><span class="n">QIcon</span><span class="p">(</span><span class="s2">&quot;GUI_SRC_CODE/src/save_icon.png&quot;</span><span class="p">))</span>
+        <span class="k">elif</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s1">&#39;win32&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">save_Button</span><span class="o">.</span><span class="n">setIcon</span><span class="p">(</span><span class="n">QtGui</span><span class="o">.</span><span class="n">QIcon</span><span class="p">(</span><span class="s2">&quot;GUI_SRC_CODE/src/save_icon.png&quot;</span><span class="p">))</span>
+            
+        
+    <span class="c1">############################init variables for this class###############################</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">analyse_filename</span> <span class="o">=</span> <span class="s1">&#39; &#39;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">final_data_to_save</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">final_data_to_show</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_rows</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_column</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">total_torque</span> <span class="o">=</span> <span class="kc">None</span>     
+    <span class="c1">#######################################################################################################</span>
+
+        
+        <span class="c1">#placeholder for the offsets input</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">textbox_offset1</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="s2">&quot;0&quot;</span><span class="p">)</span>  <span class="c1"># default value 0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">textbox_offset2</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="s2">&quot;0&quot;</span><span class="p">)</span>  <span class="c1"># default value 0</span>
+    
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">offset_1</span> <span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">textbox_offset1</span><span class="o">.</span><span class="n">text</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">offset_2</span> <span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">textbox_offset2</span><span class="o">.</span><span class="n">text</span><span class="p">())</span>       
+    
+    
+   <span class="c1">############calculation constant##############################################################</span>
+    
+        <span class="c1"># self.FRICTION_COEFFICIENT = 14.05e-9  	# in Nm / (rad /s)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">FRICTION_COEFFICIENT</span> <span class="o">=</span> <span class="mf">19.548755e-9</span>  	<span class="c1"># in Nm / (rad /s)</span>
+        <span class="c1"># self.FRICTION_COEFFICIENT = 0  	# in Nm / (rad /s)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">COIL_CONSTANT</span> <span class="o">=</span> <span class="mf">3.097e-3</span>		<span class="c1"># in T / A</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">DIPOLE_MOMENT</span> <span class="o">=</span> <span class="mf">8.594e-3</span>		<span class="c1"># in A m^2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">CALIBRATION_FACTOR</span> <span class="o">=</span> <span class="mi">1</span>		<span class="c1"># torque calibration no units (K)</span>
+
+    <span class="c1">############geometry constants################################################################</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">C_SS</span> <span class="o">=</span> <span class="mi">11160103</span>			<span class="c1"># conversion factor to stress in Pa / Nm</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">C_SR</span> <span class="o">=</span> <span class="mf">37.099</span>			<span class="c1"># conversion factor to shear rate in s^-1 / s^-1</span>
+    <span class="c1">#######################################################################################################</span>
+      
+      
+    <span class="c1">################################variables to save#####################################</span>
+        <span class="c1">#ready up variables </span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_1</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_2</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">voltage_1</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">voltage_2</span> <span class="o">=</span> <span class="kc">None</span>
+        
+        
+        
+        
+        <span class="c1">#declare bunch of important variable stuffs</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">angle_magnetic_field</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">angle_magnet</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">phase_difference</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">angular_velocity</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">friction_moment</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">magnitude_current</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shear_rate</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">total_torque</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shear_stress</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">viscosity</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="c1">#######################################################################################################</span>
+    
+    <span class="c1">#############################################################################</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">phase_difference_mean</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">angular_velocity_mean</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">total_torque_mean</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shear_rate_mean</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shear_stress_mean</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">viscosity_mean</span> <span class="o">=</span> <span class="kc">None</span>
+        
+     <span class="c1">#############################################################################</span>
+        
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">setWindowTitle</span><span class="p">(</span><span class="s2">&quot;Data analyse&quot;</span><span class="p">)</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_show_comboBox</span><span class="o">.</span><span class="n">setCurrentIndex</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">5</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">6</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">9</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">11</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setColumnWidth</span><span class="p">(</span><span class="mi">12</span><span class="p">,</span> <span class="mi">200</span><span class="p">)</span>
+        
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setColumnCount</span><span class="p">(</span><span class="mi">13</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span> <span class="o">=</span> <span class="n">MatplotlibCanvas</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mlp_layout</span><span class="o">.</span><span class="n">addWidget</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mpl_toolbar</span> <span class="o">=</span> <span class="n">NavigationToolbar2QT</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">centralwidget</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">hide</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">horizontalLayout</span><span class="o">.</span><span class="n">addWidget</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mpl_toolbar</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">csv_Button</span><span class="o">.</span><span class="n">clicked</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">find_filename_button_pressed</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_show_comboBox</span><span class="o">.</span><span class="n">setDisabled</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">save_Button</span><span class="o">.</span><span class="n">setDisabled</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+        
+
+<div class="viewcode-block" id="AnalyseWindow.find_filename_button_pressed">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.find_filename_button_pressed">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">find_filename_button_pressed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">analyse_filename</span> <span class="o">=</span> <span class="n">QFileDialog</span><span class="o">.</span><span class="n">getOpenFileName</span><span class="p">(</span><span class="nb">filter</span><span class="o">=</span><span class="s2">&quot;csv (*.csv)&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">label_file</span><span class="o">.</span><span class="n">setText</span><span class="p">(</span><span class="n">QFileInfo</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">analyse_filename</span><span class="p">)</span><span class="o">.</span><span class="n">fileName</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_show_comboBox</span><span class="o">.</span><span class="n">setDisabled</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data_show_comboBox</span><span class="o">.</span><span class="n">activated</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">choose_option</span><span class="p">)</span></div>
+
+        
+        
+        
+
+<div class="viewcode-block" id="AnalyseWindow.choose_option">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.choose_option">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">choose_option</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        
+            
+        <span class="n">mode</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data_show_comboBox</span><span class="o">.</span><span class="n">currentText</span><span class="p">()</span>
+        
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">analyse_filename</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;;&quot;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
+        
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_rows</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_column</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span>
+
+
+        <span class="c1">#############################################################################</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_rows</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_rows</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_rows</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">voltage_1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_rows</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">voltage_2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_rows</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">angle_magnetic_field</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_rows</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">angle_magnet</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_rows</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">phase_difference</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">num_rows</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">angular_velocity</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">num_rows</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shear_rate</span> <span class="o">=</span>  <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">num_rows</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">friction_moment</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">num_rows</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">total_torque</span> <span class="o">=</span>  <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">num_rows</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">magnitude_current</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">num_rows</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span>
+        <span class="c1">###############################################################################</span>
+        
+        
+        
+        
+        
+        
+        <span class="c1">#declare variables to read from the files (already given)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">voltage_1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">voltage_2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">3</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">current_2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">4</span><span class="p">]</span>
+        
+        
+        
+        
+         <span class="c1">#call normalise function </span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">normalise_voltage_event</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">calculate_angle</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">calculate_magnitude_current</span><span class="p">()</span>
+        <span class="c1"># calculate rotation velocity</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">calculate_shear_rate</span><span class="p">()</span>
+        
+        <span class="c1">#calculate friction moment from shear rate</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">calculate_friction_moment</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">calculate_shear_stress</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">calculate_viscosity</span><span class="p">()</span>
+
+        
+        
+        <span class="n">amf</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">angle_magnetic_field</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">amag</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">angle_magnet</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">pd</span>  <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">phase_difference</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">angv</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">angular_velocity</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">trq</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_torque</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">sr1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shear_rate</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">ss2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shear_stress</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">vis</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">viscosity</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        
+                
+        <span class="n">N</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">angle_magnetic_field</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># number of rows</span>
+
+        <span class="c1"># make empty string columns</span>
+        <span class="n">off1</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">((</span><span class="n">N</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">)</span>
+        <span class="n">off2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">((</span><span class="n">N</span><span class="p">,</span> <span class="mi">1</span><span class="p">),</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">object</span><span class="p">)</span>
+
+        <span class="c1"># put user input only in the first row</span>
+        <span class="n">off1</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">offset_1</span><span class="p">)</span>
+        <span class="n">off2</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">offset_2</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">offset_1</span><span class="p">)</span>
+            
+                        
+                
+        <span class="bp">self</span><span class="o">.</span><span class="n">final_data_to_save</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">hstack</span><span class="p">((</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">,</span>
+            <span class="n">amf</span><span class="p">,</span>
+            <span class="n">amag</span><span class="p">,</span>
+            <span class="n">pd</span><span class="p">,</span>
+            <span class="n">angv</span><span class="p">,</span>
+            <span class="n">trq</span><span class="p">,</span>
+            <span class="n">sr1</span><span class="p">,</span>
+            <span class="n">ss2</span><span class="p">,</span>
+            <span class="n">vis</span><span class="p">,</span>
+            <span class="n">off1</span><span class="p">,</span> 
+            <span class="n">off2</span>
+        <span class="p">))</span>
+
+        <span class="c1">#find the number of rows and column AGAIN</span>
+
+        <span class="c1">#first mode</span>
+        <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;Data table&quot;</span><span class="p">:</span>
+            <span class="c1">#HIDE THE TABLE WIDGET </span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">hide</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">data_mode_function</span><span class="p">()</span>
+            
+        <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;Currents diagram&quot;</span><span class="p">:</span>
+            <span class="c1">#HIDE THE TABLE WIDGET </span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">hide</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">draw_current_diagrams</span><span class="p">()</span>
+            
+            
+        <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;Voltage diagram&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">hide</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">draw_voltage_diagrams</span><span class="p">()</span>
+            
+        <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;Phase diagram&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">hide</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">draw_phase_diagram</span><span class="p">()</span>
+            
+        <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;Angular velocity diagram&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">hide</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">draw_angular_velocity_diagram</span><span class="p">()</span>
+            
+        <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;Torque diagram&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">hide</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">draw_torque_diagram</span><span class="p">()</span>
+            
+        <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;Shear rate diagram&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">hide</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">draw_shear_rate_diagram</span><span class="p">()</span>
+
+
+        <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;Shear stress diagram&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">hide</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">draw_shear_stress_diagram</span><span class="p">()</span>
+
+        <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;Viscosity diagram&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">hide</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">draw_viscosity_diagram</span><span class="p">()</span></div>
+
+            
+            
+            
+
+
+<div class="viewcode-block" id="AnalyseWindow.data_mode_function">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.data_mode_function">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">data_mode_function</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span>  <span class="bp">self</span><span class="o">.</span><span class="n">num_column</span> <span class="o">==</span> <span class="mi">5</span><span class="p">:</span>
+            
+            <span class="bp">self</span><span class="o">.</span><span class="n">calculate_all_mean</span><span class="p">()</span>
+
+            <span class="c1"># remove last two columns</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">final_data_to_show</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">final_data_to_save</span><span class="p">[:,</span> <span class="p">:</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span>
+
+            <span class="c1"># set row and column count</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setRowCount</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">final_data_to_show</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setColumnCount</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">final_data_to_show</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+            
+            <span class="c1"># insert mean row at the top</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">insertRow</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+            <span class="c1"># fill the table starting from row 1</span>
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">final_data_to_show</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+                <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">final_data_to_show</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+                    <span class="n">item</span> <span class="o">=</span> <span class="n">QTableWidgetItem</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">final_data_to_show</span><span class="p">[</span><span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">]))</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setItem</span><span class="p">(</span><span class="n">row</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>  <span class="c1"># shift by 1</span>
+
+
+                                
+            <span class="bp">self</span><span class="o">.</span><span class="n">save_Button</span><span class="o">.</span><span class="n">setDisabled</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">save_Button</span><span class="o">.</span><span class="n">clicked</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">save_button_event</span><span class="p">)</span>
+            
+            
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_column</span> <span class="o">==</span> <span class="mi">15</span><span class="p">:</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">calculate_all_mean_after_save</span><span class="p">()</span>
+            
+            
+            <span class="bp">self</span><span class="o">.</span><span class="n">final_data_to_show</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="p">:</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span>
+            
+            
+            <span class="c1"># set row and column count</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setRowCount</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">final_data_to_show</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setColumnCount</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">final_data_to_show</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
+            
+            
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">insertRow</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">final_data_to_show</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+                <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">final_data_to_show</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+                    <span class="n">item</span> <span class="o">=</span> <span class="n">QTableWidgetItem</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">final_data_to_show</span><span class="p">[</span><span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">]))</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setItem</span><span class="p">(</span><span class="n">row</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>  <span class="c1"># shift by 1</span>
+                    
+            <span class="bp">self</span><span class="o">.</span><span class="n">save_Button</span><span class="o">.</span><span class="n">setDisabled</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+            
+            
+        <span class="c1">#################################SET DATA FOR MEAN VALUE OF THE FIRST ROW#######################</span>
+        
+        
+        <span class="c1"># first 7 columns with &quot;-&quot;</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">7</span><span class="p">):</span>
+            <span class="n">item</span> <span class="o">=</span> <span class="n">QTableWidgetItem</span><span class="p">(</span><span class="s2">&quot;-&quot;</span><span class="p">)</span>
+            <span class="n">item</span><span class="o">.</span><span class="n">setBackground</span><span class="p">(</span><span class="n">QtGui</span><span class="o">.</span><span class="n">QColor</span><span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setItem</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">col</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span>
+
+        <span class="c1"># remaining columns with actual mean values</span>
+        <span class="n">values</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">phase_difference_mean</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">angular_velocity_mean</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">total_torque_mean</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">shear_rate_mean</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">shear_stress_mean</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">viscosity_mean</span><span class="p">,</span>
+        <span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">7</span><span class="p">):</span>
+            <span class="n">item</span> <span class="o">=</span> <span class="n">QTableWidgetItem</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">val</span><span class="p">))</span>
+            <span class="n">item</span><span class="o">.</span><span class="n">setBackground</span><span class="p">(</span><span class="n">QtGui</span><span class="o">.</span><span class="n">QColor</span><span class="p">(</span><span class="mi">255</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table_Widget</span><span class="o">.</span><span class="n">setItem</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">item</span><span class="p">)</span></div>
+
+
+
+        
+        <span class="c1">##############################################################################################</span>
+        
+
+        
+    
+<div class="viewcode-block" id="AnalyseWindow.normalise_voltage_event">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.normalise_voltage_event">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">normalise_voltage_event</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># #read column 2 and column 3 for the hall voltage</span>
+        <span class="n">amplitude_voltage_1</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]))</span><span class="o">/</span><span class="mf">2.0</span>
+        <span class="n">zero_offset_voltage_1</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">])</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]))</span><span class="o">/</span><span class="mf">2.0</span>
+
+        <span class="n">amplitude_voltage_2</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">])</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]))</span><span class="o">/</span><span class="mf">2.0</span>
+        <span class="n">zero_offset_voltage_2</span> <span class="o">=</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">])</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]))</span><span class="o">/</span><span class="mf">2.0</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span><span class="o">-</span> <span class="n">zero_offset_voltage_1</span> <span class="p">)</span><span class="o">/</span><span class="n">amplitude_voltage_1</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">2</span><span class="p">]</span><span class="o">-</span>  <span class="n">zero_offset_voltage_2</span> <span class="p">)</span><span class="o">/</span><span class="n">amplitude_voltage_2</span></div>
+
+
+    
+<div class="viewcode-block" id="AnalyseWindow.save_button_event">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.save_button_event">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">save_button_event</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">filename</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">QFileDialog</span><span class="o">.</span><span class="n">getSaveFileName</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="s2">&quot;Save File&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;CSV Files (*.csv)&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">filename</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">filename</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s1">&#39;.csv&#39;</span><span class="p">):</span>
+                <span class="n">filename</span> <span class="o">+=</span> <span class="s1">&#39;.csv&#39;</span>
+            
+            <span class="c1"># Save with pandas</span>
+            <span class="n">df</span> <span class="o">=</span> <span class="n">pandas</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">final_data_to_save</span><span class="p">)</span>
+            <span class="n">df</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">sep</span><span class="o">=</span><span class="s2">&quot;;&quot;</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span></div>
+
+                
+<div class="viewcode-block" id="AnalyseWindow.calculate_angle">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.calculate_angle">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_angle</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_rows</span><span class="p">):</span>
+            <span class="c1"># angle from 2nd and 3rd columns (index 1 and 2)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">angle_magnet</span><span class="p">[</span><span class="n">row</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">row</span><span class="p">,</span> <span class="mi">2</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">row</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+            
+            <span class="c1"># angle from 4th and 5th columns (index 3 and 4)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">angle_magnetic_field</span><span class="p">[</span><span class="n">row</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arctan2</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">row</span><span class="p">,</span> <span class="mi">4</span><span class="p">],</span> <span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[</span><span class="n">row</span><span class="p">,</span> <span class="mi">3</span><span class="p">])</span>
+
+                    
+                    
+                    
+        <span class="c1">#calculate the angles </span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">angle_magnetic_field</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unwrap</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">angle_magnetic_field</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">angle_magnet</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unwrap</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">angle_magnet</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">phase_difference</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">angle_magnetic_field</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">angle_magnet</span></div>
+
+    
+    
+    
+<div class="viewcode-block" id="AnalyseWindow.calculate_shear_rate">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.calculate_shear_rate">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_shear_rate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">angular_velocity</span> <span class="o">=</span> <span class="n">savgol_filter</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">angle_magnet</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span>      <span class="c1"># your noisy angle signal</span>
+            <span class="n">window_length</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span>            <span class="c1"># try 51, 101, etc. depending on how smooth you want</span>
+            <span class="n">polyorder</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>                  <span class="c1"># 2 or 3 works well</span>
+            <span class="n">deriv</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>                      <span class="c1"># first derivative</span>
+            <span class="n">delta</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">))</span>  <span class="c1"># time step</span>
+            <span class="p">)</span>  <span class="c1"># [rad /s] </span>
+        
+        
+  
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">shear_rate</span> <span class="o">=</span>  <span class="bp">self</span><span class="o">.</span><span class="n">angular_velocity</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">C_SR</span> <span class="c1"># [1 / s]</span></div>
+
+        
+        
+        
+<div class="viewcode-block" id="AnalyseWindow.calculate_friction_moment">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.calculate_friction_moment">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_friction_moment</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">friction_moment</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">CALIBRATION_FACTOR</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">angular_velocity</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">FRICTION_COEFFICIENT</span>          <span class="c1"># [Nm]</span></div>
+
+        
+        
+<div class="viewcode-block" id="AnalyseWindow.calculate_magnitude_current">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.calculate_magnitude_current">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_magnitude_current</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">offset_1</span> <span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">textbox_offset1</span><span class="o">.</span><span class="n">text</span><span class="p">())</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">offset_2</span> <span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">textbox_offset2</span><span class="o">.</span><span class="n">text</span><span class="p">())</span>   
+        <span class="c1"># print(self.offset_1)</span>
+        <span class="c1"># print(self.offset_2)</span>
+        <span class="n">power_of_2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">current_1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">offset_1</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">power</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">current_2</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">offset_2</span><span class="p">),</span> <span class="mi">2</span><span class="p">)</span>
+        <span class="c1"># power_of_2 = np.power(self.current_1, 2) + np.power(self.current_2, 2)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">magnitude_current</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">power_of_2</span><span class="p">)</span></div>
+
+        
+        
+<div class="viewcode-block" id="AnalyseWindow.calculate_shear_stress">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.calculate_shear_stress">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_shear_stress</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">total_torque</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">CALIBRATION_FACTOR</span>                <span class="c1"># dimensionslos</span>
+        <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">DIPOLE_MOMENT</span>                    <span class="c1"># [A·m²]</span>
+        <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">COIL_CONSTANT</span>                    <span class="c1"># [T/A]</span>
+        <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">magnitude_current</span> <span class="o">/</span> <span class="mi">1000</span>         <span class="c1"># mA -&gt; A, [A]</span>
+        <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">phase_difference</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span>   <span class="c1"># dimensionless</span>
+        <span class="p">)</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">friction_moment</span>                <span class="c1"># [Nm]</span>
+        
+        
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">shear_stress</span> <span class="o">=</span>  <span class="bp">self</span><span class="o">.</span><span class="n">total_torque</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">C_SS</span>	<span class="c1"># [Pa]</span></div>
+
+
+<div class="viewcode-block" id="AnalyseWindow.calculate_viscosity">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.calculate_viscosity">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_viscosity</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">viscosity</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shear_stress</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">shear_rate</span>	<span class="c1"># [Pa * s]</span></div>
+
+        
+        
+        
+<div class="viewcode-block" id="AnalyseWindow.calculate_all_mean">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.calculate_all_mean">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_all_mean</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    
+        <span class="bp">self</span><span class="o">.</span><span class="n">phase_difference_mean</span> <span class="o">=</span>     <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">phase_difference</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">phase_difference_mean</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">angular_velocity_mean</span> <span class="o">=</span>     <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">angular_velocity</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">total_torque_mean</span> <span class="o">=</span>         <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">total_torque</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shear_rate_mean</span> <span class="o">=</span>           <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shear_rate</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shear_stress_mean</span> <span class="o">=</span>           <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shear_stress</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">viscosity_mean</span> <span class="o">=</span>            <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">viscosity</span><span class="p">)</span></div>
+
+        
+        
+<div class="viewcode-block" id="AnalyseWindow.calculate_all_mean_after_save">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.calculate_all_mean_after_save">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">calculate_all_mean_after_save</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    
+        <span class="bp">self</span><span class="o">.</span><span class="n">phase_difference_mean</span> <span class="o">=</span>     <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">7</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">angular_velocity_mean</span> <span class="o">=</span>     <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">8</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">total_torque_mean</span> <span class="o">=</span>         <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">9</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shear_rate_mean</span> <span class="o">=</span>           <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span><span class="mi">10</span> <span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shear_stress_mean</span> <span class="o">=</span>           <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">11</span><span class="p">])</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">viscosity_mean</span> <span class="o">=</span>            <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="p">[:,</span> <span class="mi">12</span><span class="p">])</span></div>
+
+        
+        
+        
+                
+<div class="viewcode-block" id="AnalyseWindow.draw_current_diagrams">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.draw_current_diagrams">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">draw_current_diagrams</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+
+        <span class="c1">#read current, 2nd and 3rd columns</span>
+        <span class="n">time</span> <span class="o">=</span>  <span class="bp">self</span><span class="o">.</span><span class="n">time</span>
+        <span class="n">current1</span> <span class="o">=</span>  <span class="bp">self</span><span class="o">.</span><span class="n">current_1</span>
+        <span class="n">current2</span> <span class="o">=</span>  <span class="bp">self</span><span class="o">.</span><span class="n">current_2</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">cla</span><span class="p">()</span>  <span class="c1">#clear canvas</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Current sensors&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Current / mA&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Time / s&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+        <span class="n">plot_1</span><span class="p">,</span> <span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">current1</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;g&#39;</span><span class="p">)</span>
+        <span class="n">plot_2</span><span class="p">,</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">current2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;#FFB6C1&#39;</span><span class="p">)</span>
+        <span class="n">plot_3</span><span class="p">,</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">magnitude_current</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;r&#39;</span><span class="p">)</span>
+        <span class="n">plot_1</span><span class="o">.</span><span class="n">set_label</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Current 1 $I_1$&quot;</span><span class="p">)</span>
+        <span class="n">plot_2</span><span class="o">.</span><span class="n">set_label</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Current 2 $I_2$&quot;</span><span class="p">)</span>
+        <span class="n">plot_3</span><span class="o">.</span><span class="n">set_label</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Magnitude $\hat I$&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span> <span class="o">=</span> <span class="s1">&#39;upper right&#39;</span><span class="p">,</span> <span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">),</span> <span class="n">fontsize</span> <span class="o">=</span> <span class="mi">15</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">which</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">minorticks_on</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">draw</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="AnalyseWindow.draw_voltage_diagrams">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.draw_voltage_diagrams">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">draw_voltage_diagrams</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">time</span>
+        <span class="n">voltage1</span>    <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">voltage_1</span>
+        <span class="n">voltage2</span>  <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">voltage_2</span>
+
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">cla</span><span class="p">()</span>  <span class="c1">#clear canvas</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Voltage sensors&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Voltage /  V&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Time / s&quot;</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">20</span><span class="p">)</span>
+        <span class="n">plot_1</span><span class="p">,</span> <span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">voltage1</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;#890304&#39;</span><span class="p">)</span>
+        <span class="n">plot_2</span><span class="p">,</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">voltage2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;#00113a&#39;</span><span class="p">)</span>
+        <span class="n">plot_1</span><span class="o">.</span><span class="n">set_label</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Hall sensors 1 $U_1$&quot;</span><span class="p">)</span>
+        <span class="n">plot_2</span><span class="o">.</span><span class="n">set_label</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Hall sensors 2 $U_2$&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span> <span class="o">=</span> <span class="s1">&#39;upper right&#39;</span><span class="p">,</span> <span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">which</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">minorticks_on</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">draw</span><span class="p">()</span></div>
+
+        
+        
+        
+<div class="viewcode-block" id="AnalyseWindow.draw_phase_diagram">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.draw_phase_diagram">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">draw_phase_diagram</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        
+        <span class="n">time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">time</span>
+        <span class="n">phase_magnetic_field</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">angle_magnetic_field</span>
+        <span class="n">phase_magnet</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">angle_magnet</span>
+        <span class="n">phase_difference</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">phase_difference</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">cla</span><span class="p">()</span>  <span class="c1">#clear canvas</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Phase diagramm&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Angle $\phi$ / rad&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Time / $s$&quot;</span><span class="p">)</span>
+        <span class="n">plot_1</span><span class="p">,</span> <span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">phase_magnetic_field</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;#890304&#39;</span><span class="p">)</span>
+        <span class="n">plot_2</span><span class="p">,</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">phase_magnet</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;#00113a&#39;</span><span class="p">)</span> 
+        <span class="n">plot_3</span><span class="p">,</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">phase_difference</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;#7294D4&#39;</span><span class="p">)</span>
+        <span class="n">plot_1</span><span class="o">.</span><span class="n">set_label</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Angle of magnetic field $\phi_B$&quot;</span><span class="p">)</span>
+        <span class="n">plot_2</span><span class="o">.</span><span class="n">set_label</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Angle of magnet $\phi_m$&quot;</span><span class="p">)</span>
+        <span class="n">plot_3</span><span class="o">.</span><span class="n">set_label</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Phase difference $\Delta\phi$&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">loc</span> <span class="o">=</span> <span class="s1">&#39;upper right&#39;</span><span class="p">,</span> <span class="n">bbox_to_anchor</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">which</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">minorticks_on</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">draw</span><span class="p">()</span></div>
+
+        
+        
+<div class="viewcode-block" id="AnalyseWindow.draw_angular_velocity_diagram">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.draw_angular_velocity_diagram">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">draw_angular_velocity_diagram</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">cla</span><span class="p">()</span>  <span class="c1">#clear canvas</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Angular velocity diagram&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Angular velocity $\omega$ / rad$s^{-1}$&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Time / $s$&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">angular_velocity</span><span class="p">,</span> <span class="n">color</span> <span class="o">=</span><span class="s1">&#39;red&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">which</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">minorticks_on</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">draw</span><span class="p">()</span></div>
+
+        
+<div class="viewcode-block" id="AnalyseWindow.draw_torque_diagram">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.draw_torque_diagram">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">draw_torque_diagram</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">cla</span><span class="p">()</span>  <span class="c1">#clear canvas</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Torque diagram&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Torque T / Nm&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Time / $s$&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_torque</span><span class="p">,</span> <span class="n">color</span> <span class="o">=</span><span class="s1">&#39;red&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">which</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">minorticks_on</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">draw</span><span class="p">()</span></div>
+
+        
+<div class="viewcode-block" id="AnalyseWindow.draw_shear_rate_diagram">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.draw_shear_rate_diagram">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">draw_shear_rate_diagram</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        
+        
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">cla</span><span class="p">()</span>  <span class="c1">#clear canvas</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Shear rate diagram&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Shear rate $\dot\gamma$ / $s^{-1}$&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Time / $s$&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">,</span><span class="bp">self</span><span class="o">.</span><span class="n">shear_rate</span><span class="p">,</span> <span class="n">color</span> <span class="o">=</span><span class="s1">&#39;red&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">which</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">minorticks_on</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">draw</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="AnalyseWindow.draw_shear_stress_diagram">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.draw_shear_stress_diagram">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">draw_shear_stress_diagram</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">cla</span><span class="p">()</span>  <span class="c1"># clear canvas</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Shear stress diagram&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Shear stress $\tau$ / Pa&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Time / $s$&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">shear_stress</span> <span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;red&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">which</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">minorticks_on</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">draw</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="AnalyseWindow.draw_viscosity_diagram">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.draw_viscosity_diagram">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">draw_viscosity_diagram</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">cla</span><span class="p">()</span>  <span class="c1"># clear canvas</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="s2">&quot;Viscosity diagram&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Viscosity $\eta$&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;Time / $s$&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">viscosity</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;red&#39;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">which</span><span class="o">=</span><span class="s1">&#39;both&#39;</span><span class="p">,</span> <span class="n">linestyle</span><span class="o">=</span><span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mf">0.5</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">axes</span><span class="o">.</span><span class="n">minorticks_on</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">canvas</span><span class="o">.</span><span class="n">draw</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="AnalyseWindow.closeEvent">
+<a class="viewcode-back" href="../window_show.html#window_show.AnalyseWindow.closeEvent">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">closeEvent</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+        <span class="n">event</span><span class="o">.</span><span class="n">accept</span><span class="p">()</span></div>
+</div>
+
+        
+
+<div class="viewcode-block" id="main_3">
+<a class="viewcode-back" href="../window_show.html#window_show.main_3">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">main_3</span><span class="p">():</span>
+    <span class="n">app3</span> <span class="o">=</span> <span class="n">QApplication</span><span class="p">([])</span>
+    
+    <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s1">&#39;darwin&#39;</span><span class="p">:</span>
+        <span class="n">app3</span><span class="o">.</span><span class="n">setWindowIcon</span><span class="p">(</span><span class="n">QtGui</span><span class="o">.</span><span class="n">QIcon</span><span class="p">(</span><span class="s2">&quot;GUI_SRC_CODE/src/fzj.png&quot;</span><span class="p">))</span>
+    <span class="k">elif</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s1">&#39;win32&#39;</span><span class="p">:</span>
+        <span class="n">app3</span><span class="o">.</span><span class="n">setWindowIcon</span><span class="p">(</span><span class="n">QtGui</span><span class="o">.</span><span class="n">QIcon</span><span class="p">(</span><span class="s2">&quot;GUI_SRC_CODE/src/fzj.png&quot;</span><span class="p">))</span>
+    <span class="n">window3</span> <span class="o">=</span> <span class="n">AnalyseWindow</span><span class="p">()</span>
+    <span class="n">window3</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+    <span class="n">app3</span><span class="o">.</span><span class="n">exec_</span><span class="p">()</span></div>
+
+
+<span class="k">if</span> <span class="vm">__name__</span> <span class="o">==</span> <span class="s1">&#39;__main__&#39;</span><span class="p">:</span>
+    <span class="n">main_3</span><span class="p">()</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">MIR Python Documentation</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  <li><a href="index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, Hijazi Hakkim.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

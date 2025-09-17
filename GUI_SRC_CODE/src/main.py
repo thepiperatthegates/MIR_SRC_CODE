@@ -872,7 +872,14 @@ class MyGUI(QMainWindow, Ui_Title):
 
 
 
-class MainGUI(QMainWindow, Ui_MainWindow):   
+class MainGUI(QMainWindow, Ui_MainWindow): 
+    """MainGUI _summary_
+
+    :param QMainWindow: _description_
+    :type QMainWindow: _type_
+    :param Ui_MainWindow: _description_
+    :type Ui_MainWindow: _type_
+    """    
     def __init__(self):
         super().__init__()
         self.setupUi(self)
@@ -895,7 +902,14 @@ class MainGUI(QMainWindow, Ui_MainWindow):
 
 
 def main():
-    
+    """
+    Entry point for the application.
+
+    Initializes the Qt application, sets the window icon depending on the platform,
+    creates and shows the main GUI window, and starts the Qt event loop.
+
+    :return: None
+    """
     app_main_window = QApplication(sys.argv)
     
     if sys.platform == 'darwin':
