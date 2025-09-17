@@ -16,7 +16,7 @@ from main_window_test import Ui_MainWindow
 
 
 import sockets_files as sockets_files
-from sockets_files import q_to_graph
+from sockets_files import q_to_graph, q_get_mir_mode
 
 import packet_transmission as packet_transmission
 from window_show import main_2, main_3
@@ -36,7 +36,7 @@ data_6 = 0      #offset 2
 data_7 = 0
 data_8 = 0
 data_9 = 0
-
+data_10 = 0    #mir mode
 
 time_slice = np.array([], dtype=np.float32)
 v1_slice   = np.array([], dtype=np.uint16)
@@ -519,6 +519,7 @@ class MyGUI(QMainWindow, Ui_Title):
         global data_7        #checkbox for direction
         global data_8
         global data_9
+        global data_10
     
         data_1 = 65534
         data_2 =self.textbox_frequency.text()
@@ -542,7 +543,7 @@ class MyGUI(QMainWindow, Ui_Title):
             data_8 = 2
         
         
-        packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9)
+        packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
         #send all the data to be packed
         packet_transmission.send_transmission_event(1)            #SET flag for Tx
         packet_transmission.start_flag_send_event(1)
@@ -572,6 +573,8 @@ class MyGUI(QMainWindow, Ui_Title):
         global data_6
         global data_7
         global data_8
+        global data_9
+        global data_10
         
         data_1 = self.textbox_time.text()
         data_2 =self.textbox_frequency.text()
@@ -581,7 +584,7 @@ class MyGUI(QMainWindow, Ui_Title):
         data_5 = self.textbox_amplitude2.text()
         data_6 = self.textbox_offset2.text()  
         
-        packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9)
+        packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
     
         packet_transmission.stop_button_event(0)            #goto sockets_files and stop the loop for receiving
         packet_transmission.running_time_event(1)
@@ -620,6 +623,7 @@ class MyGUI(QMainWindow, Ui_Title):
         global data_7
         global data_8
         global data_9
+        global data_10
         
         
         packet_transmission.k_b_1 = 0
@@ -649,7 +653,7 @@ class MyGUI(QMainWindow, Ui_Title):
         data_9= 0
 
         
-        packet_transmission.send_function(30 , data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9)
+        packet_transmission.send_function(30 , data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
         # send all the data to be packed
         packet_transmission.send_transmission_event(this_flag_send=1)            #SET flag for Tx
         packet_transmission.start_flag_send_event(1)
@@ -790,7 +794,7 @@ class MyGUI(QMainWindow, Ui_Title):
         global data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9
         
         data_9 = 1
-        packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9)
+        packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
         packet_transmission.send_transmission_event(1)            #SET flag for Tx
         packet_transmission.start_flag_send_event(1)
         data_9 = 0
@@ -868,8 +872,7 @@ class MyGUI(QMainWindow, Ui_Title):
 
 
 
-class MainGUI(QMainWindow, Ui_MainWindow):
-    
+class MainGUI(QMainWindow, Ui_MainWindow):   
     def __init__(self):
         super().__init__()
         self.setupUi(self)
@@ -877,15 +880,16 @@ class MainGUI(QMainWindow, Ui_MainWindow):
         
         
         #declare the window first without showing it 
-        self.window = MyGUI()
+        self.shear_constant_mode_window = MyGUI()
         
     def choose_window(self):
+        global data_10
         mode = self.choose_experiment_comboBox.currentText()
         
         if mode == "Control shear rate":
-                self.window.show()
-                
-                        
+                data_10 = 1
+                q_get_mir_mode.put(data_10)
+                self.shear_constant_mode_window.show()
                 self.close()
     
 

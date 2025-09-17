@@ -9,8 +9,7 @@ import threading
 import time
 import multiprocessing
 import serial
-from live_graphing import plot_live 
-
+import struct
 
 
 baud_rate = 128000
@@ -20,6 +19,8 @@ append_payload =0
 q_to_process = multiprocessing.Queue()
 q_to_graph = multiprocessing.Queue()
 q_to_csv = multiprocessing.Queue()
+
+q_get_mir_mode = multiprocessing.Queue()
 
 offset_1 = 0
 offset_2 = 0
@@ -81,6 +82,11 @@ def thread_start():
     
 
 def timer_monitor(ser1):
+    
+    
+    #get mir_mode
+    
+    
     global flag_for_process, p1, tot_count_accumulate_recv
 
     count = 0
@@ -104,7 +110,11 @@ def timer_monitor(ser1):
                 
                 data_flag = packet_transmission.running_time_getter()
                 if data_flag == 1:
-                    backend_rx_countdown(data_send) #send already-unpacked to be saved in csv
+                    if data_send:
+                        save_to_csv(received_payload)
+                        received_payload = None
+                print("Done writing once!")
+
                     
             except Exception as e:
                 print(f"Here 1: {e}")
@@ -112,19 +122,6 @@ def timer_monitor(ser1):
             print(f"Here 2: {e}")
             time.sleep(0.1)
 
-##########################################################################
-#write to csv
-##########################################################################
-
-def backend_rx_countdown(received_payload):
-    if received_payload:
-        # print("Processing received_payload:", received_payload)
-        # p4 = multiprocessing.Process(target=save_to_csv, args=(received_payload))
-        # p4.start()
-        # p4.join()
-        save_to_csv(received_payload)
-        received_payload = None  
-    print("Done!")
 
 
 def get_offset(get_offset1, get_offset2):
@@ -155,7 +152,7 @@ def send_thread(ser1):
         data_send_8 = packet_transmission.get_stop_button_data()
         data_send_9 = packet_transmission.data_hardware_reset_getter()
         combined_send = packet_transmission.combine_bytes_for_buffer(data_send_1, data_send_2, data_send_3, data_send_4, 
-                                                                     data_send_5, data_send_6, data_send_7, data_send_8, data_send_9)
+                                                                    data_send_5, data_send_6, data_send_7, data_send_8, data_send_9)
         packet_transmission.send_transmission_event(0)
         try:
             ser1.write(combined_send)
@@ -165,6 +162,40 @@ def send_thread(ser1):
         time.sleep(1)
         
         
+        
+def plot_live(queue1, q_to_graph, q_to_csv): #q_to_graph to graph (main file)
+    start_process_live_graph(queue1, q_to_graph, q_to_csv)
+
+    
+
+def start_process_live_graph(queue1, q_to_graph, q_to_csv):
+
+    identifier_bits =  {b'H', b'I', b'J', b'K'}
+     
+    while True:
+        recv_buffer = queue1.get()
+        if recv_buffer:
+            tot_chunks = []
+            i = 0 
+            
+            while i < len(recv_buffer):
+                if bytes([recv_buffer[i]]) in identifier_bits:
+                    if i + 2 < len(recv_buffer):
+                        chunk = recv_buffer[i+1:i+3]    #take the second and third, list slicing works by setting the first and the last array(which it doesnt take)
+                        integer_value = struct.unpack('<H', chunk)[0]
+                        tot_chunks.append(integer_value)
+                    # Skip past the identifier and 2-byte chunk
+                    i+= 3
+                else:
+                    i+=1
+            q_to_graph.put(tot_chunks)
+            q_to_csv.put(tot_chunks)
+            
+            
+##########################################################################
+#write to csv
+##########################################################################     
+        
 def file_name_change_set(prefix, extension=".csv"):
     
     global file_name
@@ -173,14 +204,19 @@ def file_name_change_set(prefix, extension=".csv"):
     file_name = f"{prefix}{extension}"
     
 
-def save_to_csv(cleaned_buffer, num_columns=4, time_increment=0.0001):
+def save_to_csv(cleaned_buffer, time_increment, num_columns=4, tot_average = 50):
     
+    if(q_get_mir_mode.get() == 1):
+        time_increment = 0.005  #s #i will change this so it can be accessed from main 
     global file_name, current_time
     global offset_1, offset_2
 
     data = np.array(cleaned_buffer)
     # Reshape the data to have 'num_columns' columns per row
     reshaped_data = np.array(data).reshape(-1, num_columns)
+    
+    
+    reshaped_data = reshaped_data.astype(float)
     
     col1 = reshaped_data[:, 0]                  #take first column (U1)
     col2 = reshaped_data[:, 1]                  #take second column (U2)
@@ -201,12 +237,20 @@ def save_to_csv(cleaned_buffer, num_columns=4, time_increment=0.0001):
     
     col3_converted = packet_transmission.calibration_input_coil_1(col3_converted)
     col4_converted = packet_transmission.calibration_input_coil_2(col4_converted)
+    
+    #Average values to reduce amount of data saved 
+    ####FOR CONSTANT SHEAR RATE 
+    col1_after_average = average_values(col1_converted, tot_average)
+    col2_after_average = average_values(col2_converted, tot_average)
 
-    reshaped_data = reshaped_data.astype(float)
-    reshaped_data[:, 0] = col1_converted
-    reshaped_data[:, 1] = col2_converted
-    reshaped_data[:, 2] = col3_converted
-    reshaped_data[:, 3] = col4_converted
+    col3_after_average = average_values(col3_converted, tot_average)
+    col4_after_average = average_values(col4_converted, tot_average)
+
+    
+    reshaped_data[:, 0] = col1_after_average
+    reshaped_data[:, 1] = col2_after_average
+    reshaped_data[:, 2] = col3_after_average
+    reshaped_data[:, 3] = col4_after_average
 
     num_rows = reshaped_data.shape[0]
     time_column = np.arange(current_time, current_time + (time_increment * num_rows), time_increment).reshape(-1, 1)
@@ -225,8 +269,11 @@ def save_to_csv(cleaned_buffer, num_columns=4, time_increment=0.0001):
         print("The fuck?: {e}")
 
         
-        
-            
+#for decreasing data size for csv purposes 
+def average_values (col, N):
+
+    average_val = col.reshape(-1, N).mean(axis=1).reshape(-1, 1)
+    return average_val
 
     
     
