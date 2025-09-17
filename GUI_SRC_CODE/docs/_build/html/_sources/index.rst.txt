@@ -14,7 +14,7 @@ Below are the important codes for the MIR GUI written in Python.
    :caption: List of source codes:
 
    main
-   socket_files
+   sockets_files
    packet_transmission
    window_show
 
