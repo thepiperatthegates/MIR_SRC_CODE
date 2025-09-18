@@ -1,3 +1,12 @@
+"""
+Main entry point for GUI_SRC_CODE.
+
+Responsibilities:
+#. Manage GUI-related classes and functions.
+#. Handle live data plotting.
+#. Provide USB transmission functionality.
+
+"""
 import numpy as np
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5 import *
@@ -284,6 +293,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.textbox_amplitude2.setPlaceholderText("Enter amplitude from 0 to 500mA")
         self.textbox_offset2.setPlaceholderText("Enter offset +-500mA")
         self.k_b_label.setText( f"k<sub>b1</sub> = {packet_transmission.k_b_1}" f" &nbsp;&nbsp;&nbsp; "  f"k<sub>b2</sub> = {packet_transmission.k_b_2}")
+        self.label_frequency.setText("Shear rate γ̇ / s<sup>-1</sup>")     
         #################################################################################################
 
         #######################################################validator############################################################################
@@ -317,6 +327,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         #normalise button
         self.normalise_button.clicked.connect(self.start_normalise_event)
+        #friction coefficient rechnung gedrückt
+        self.button_fr_constant.clicked.connect(self.start_friction_coeff_event)
 
         self.stop_default_state = 1
         self.graph_stop_button.clicked.connect(self.graph_stop_event)
@@ -328,7 +340,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         self.save_button.clicked.connect(self.save_button_event)
         
-    
+
 
     
 
@@ -667,9 +679,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         QtCore.QTimer.singleShot(1000, lambda: self.after_stabilise(count_recursion))
         
 
-        
-        
-        
     def after_stabilise(self, count_recursion):
         self.worker_sleep = SleepThread()
         self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_calibrating(value, count_recursion))
@@ -735,6 +744,28 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 self.k_b_label.setText(a0=f"k_b_1 = {packet_transmission.k_b_1}           k_b_2 = {packet_transmission.k_b_2}")
                 
                 self.popout_window_calibration()
+                
+                
+    def start_friction_coeff_event(self):
+        global data_1
+        global data_2
+        global data_3
+        global data_4
+        global data_5
+        global data_6
+        global data_7
+        global data_8
+        global data_9
+        global data_10
+        
+        data_1 = str(1) #seconds
+        data_2 = str(3) # Hz
+        data_3 = str(input_current)# mA
+        data_4 = str(0)
+        data_5 = str(input_current)  # mA
+        data_6 = str(0)  # mA 
+        
+        
 
     def stop_button_push_event(self):
         # packet_transmission.stop_button_event(1)            #goto sockets_files and stop the loop for receiving
@@ -914,7 +945,7 @@ def main():
     app_main_window = QApplication(sys.argv)
     
     if sys.platform == 'darwin':
-        app_main_window.setWindowIcon(QtGui.QIcon("fzj.png"))
+        app_main_window.setWindowIcon(QtGui.QIcon("../pics/fzj.png"))
     elif sys.platform == 'win32':
         app_main_window.setWindowIcon(QtGui.QIcon("fzj.png"))
     
