@@ -235,7 +235,7 @@ class SocketThread(QThread):
     
 
 
-class MyGUI(QMainWindow, Ui_Title):
+class ConstShearGUI(QMainWindow, Ui_Title):
 
     queue_file_name = multiprocessing.Queue()
 
@@ -245,11 +245,11 @@ class MyGUI(QMainWindow, Ui_Title):
         
 
         if sys.platform ==  'darwin':
-            self.save_button.setIcon(QtGui.QIcon("GUI_SRC_CODE/src/save_icon.png"))
-            self.button_cal_constant.setIcon(QtGui.QIcon("GUI_SRC_CODE/src/calibrate.png"))
+            self.save_button.setIcon(QtGui.QIcon("save_icon.png"))
+            self.button_cal_constant.setIcon(QtGui.QIcon("calibrate.png"))
         elif sys.platform == 'win32':
-            self.save_button.setIcon(QtGui.QIcon("GUI_SRC_CODE/src/save_icon.png"))
-            self.button_cal_constant.setIcon(QtGui.QIcon("GUI_SRC_CODE/src/calibrate.png"))
+            self.save_button.setIcon(QtGui.QIcon("save_icon.png"))
+            self.button_cal_constant.setIcon(QtGui.QIcon("calibrate.png"))
 
         self.setWindowTitle("Mini rheometer")
         
@@ -283,7 +283,7 @@ class MyGUI(QMainWindow, Ui_Title):
         self.textbox_offset1.setPlaceholderText("Enter offset +-500mA")
         self.textbox_amplitude2.setPlaceholderText("Enter amplitude from 0 to 500mA")
         self.textbox_offset2.setPlaceholderText("Enter offset +-500mA")
-        self.k_b_label.setText(f"k_b_1 = {packet_transmission.k_b_1}           k_b_2 = {packet_transmission.k_b_2}")
+        self.k_b_label.setText( f"k<sub>b1</sub> = {packet_transmission.k_b_1}" f" &nbsp;&nbsp;&nbsp; "  f"k<sub>b2</sub> = {packet_transmission.k_b_2}")
         #################################################################################################
 
         #######################################################validator############################################################################
@@ -732,7 +732,7 @@ class MyGUI(QMainWindow, Ui_Title):
                 print(k_b_1)
                 print(k_b_2)
                 
-                self.k_b_label.setText(f"k_b_1 = {packet_transmission.k_b_1}           k_b_2 = {packet_transmission.k_b_2}")
+                self.k_b_label.setText(a0=f"k_b_1 = {packet_transmission.k_b_1}           k_b_2 = {packet_transmission.k_b_2}")
                 
                 self.popout_window_calibration()
 
@@ -887,7 +887,7 @@ class MainGUI(QMainWindow, Ui_MainWindow):
         
         
         #declare the window first without showing it 
-        self.shear_constant_mode_window = MyGUI()
+        self.shear_constant_mode_window = ConstShearGUI()
         
     def choose_window(self):
         global data_10
@@ -910,12 +910,13 @@ def main():
 
     :return: None
     """
+    multiprocessing.freeze_support()
     app_main_window = QApplication(sys.argv)
     
     if sys.platform == 'darwin':
-        app_main_window.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/src/fzj.png"))
+        app_main_window.setWindowIcon(QtGui.QIcon("fzj.png"))
     elif sys.platform == 'win32':
-        app_main_window.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/src/fzj.png"))
+        app_main_window.setWindowIcon(QtGui.QIcon("fzj.png"))
     
     first_window = MainGUI()
     first_window.show()

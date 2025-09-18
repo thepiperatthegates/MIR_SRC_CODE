@@ -26,6 +26,7 @@ offset_1 = 0
 offset_2 = 0
 
 current_time = None
+status_connection = None
 file_name = ' '
 
 flag_for_process = None
@@ -42,6 +43,8 @@ tot_count_accumulate_recv = 1250
 ##########################################################################
 def socket_start_connect():
     
+
+    
     if sys.platform == 'darwin':        #hijazi's laptop
         port_name = '/dev/tty.usbmodem3776345D32331'   #for mac1
         # port_name = '/dev/tty.usbmodem355A357631331'       
@@ -53,9 +56,13 @@ def socket_start_connect():
         print(ser)
         print("Connecting to the board")
         print("Successful connection")
+        
+        status_connection = True
     except Exception as e:
         print("Cannot connect with USB serial port!:", e)
         socket_start_connect()  #RECURSIVE TO TRY AGAIN
+        
+        status_connection = False
         
     return ser
 
