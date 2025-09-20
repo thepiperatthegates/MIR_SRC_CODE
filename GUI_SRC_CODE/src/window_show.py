@@ -201,9 +201,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
     
    ############calculation constant##############################################################
     
-        # self.FRICTION_COEFFICIENT = 14.05e-9  	# in Nm / (rad /s)
-        self.FRICTION_COEFFICIENT = 19.548755e-9  	# in Nm / (rad /s)
-        # self.FRICTION_COEFFICIENT = 0  	# in Nm / (rad /s)
+        self.FRICTION_COEFFICIENT = packet_transmission.f_R
         self.COIL_CONSTANT = 3.097e-3		# in T / A
         self.DIPOLE_MOMENT = 8.594e-3		# in A m^2
         self.CALIBRATION_FACTOR = 1		# torque calibration no units (K)
@@ -521,6 +519,18 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
     
     def normalise_voltage_event(self):
+        """
+        Normalize Hall sensor voltage data.
+
+        This method reads the Hall voltage data from `self.data` (columns 1 and 2),
+        calculates the amplitude and zero offset, and then normalizes the voltage
+        so that it is centered around 0 and scaled by its amplitude.
+
+        After normalization, the voltage data in `self.data[:, 1]` and
+        `self.data[:, 2]` will be in the range [-1, 1].
+
+        :return: None
+        """
         # #read column 2 and column 3 for the hall voltage
         amplitude_voltage_1 = (np.max(self.data[:, 1]) - np.min(self.data[:, 1]))/2.0
         zero_offset_voltage_1 = (np.max(self.data[:, 1]) + np.min(self.data[:, 1]))/2.0
@@ -543,6 +553,20 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             df.to_csv(filename, sep=";", index=False, header=False)
                 
     def calculate_angle(self):
+        """
+        Calculate magnet and magnetic field angles and their phase difference.
+
+        This method computes the angles for the magnet and the magnetic field
+        from the Hall voltage data stored in `self.data`. 
+
+        - The magnet angle is calculated using columns 2 and 3 (`self.data[:, 1]` and `self.data[:, 2]`).
+        - The magnetic field angle is calculated using columns 4 and 5 (`self.data[:, 3]` and `self.data[:, 4]`).
+        - Angles are unwrapped along axis 0 to remove discontinuities.
+        - The phase difference between the magnetic field and the magnet is stored
+        in `self.phase_difference`.
+
+        :return: None
+        """
         for row in range(self.num_rows):
             # angle from 2nd and 3rd columns (index 1 and 2)
             self.angle_magnet[row, 0] = np.arctan2(self.data[row, 2], self.data[row, 1])
@@ -594,7 +618,6 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         
     def calculate_shear_stress(self):
-        
         
         self.total_torque = (
         self.CALIBRATION_FACTOR                # dimensionslos

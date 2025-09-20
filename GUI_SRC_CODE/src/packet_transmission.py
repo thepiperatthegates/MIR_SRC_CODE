@@ -14,6 +14,7 @@ data_6 = 0
 data_7 = 0
 data_8 = 0
 data_9 = 0
+data_10 = 0
 
 
 #for button event flag 
@@ -56,29 +57,44 @@ MIN_V_BEFORE_HALL = 2.5   #or y-intercept
 MAX_V_AFTER_HALL = 3.3
 MIN_V_AFTER_HALL = 0.0
 
-# # default k_b
+#default calibration factor k_b
 k_b_1 = 0.083597946
 k_b_2 = 0.084535931
 
-
-#first sensor coefficient
-CURRENT_COEFF_FIRST_SENSOR_A = -4.61934
-CURRENT_COEFF_FIRST_SENSOR_B = 0.99182
-CURRENT_COEFF_FIRST_SENSOR_C =  -4.24388e-6
-CURRENT_COEFF_FIRST_SENSOR_D =  -5.40711e-8
-
-#second sensor coefficient 
-CURRENT_COEFF_SECOND_SENSOR_A = 3.86547
-CURRENT_COEFF_SECOND_SENSOR_B = 0.98655
-CURRENT_COEFF_SECOND_SENSOR_C = 3.02401e-6
-CURRENT_COEFF_SECOND_SENSOR_D = -3.98871e-8
+#default friction coefficient 
+f_R = 19.548755e-9 # in Nm / (rad /s)
 
 
+#flag for electronics type
+ELECTRONICS_FLAG = None
 
 
+#first sensor coefficient version 1
+CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 = -4.61934
+CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 = 0.99182
+CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 =  -4.24388e-6
+CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 =  -5.40711e-8
+
+#second sensor coefficient version 1
+CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 = 3.86547
+CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 = 0.98655
+CURRENT_COEFF_SECOND_SENSOR_C_VERSION1= 3.02401e-6
+CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 = -3.98871e-8
+
+#first sensor coefficient version 2
+CURRENT_COEFF_FIRST_SENSOR_A_VERSION2 = 0
+CURRENT_COEFF_FIRST_SENSOR_B_VERSION2 = 0
+CURRENT_COEFF_FIRST_SENSOR_C_VERSION2 =  0
+CURRENT_COEFF_FIRST_SENSOR_D_VERSION2 =  0
+
+#second sensor coefficient version 2
+CURRENT_COEFF_SECOND_SENSOR_A_VERSION2 = 0
+CURRENT_COEFF_SECOND_SENSOR_B_VERSION2 = 0
+CURRENT_COEFF_SECOND_SENSOR_C_VERSION2= 0
+CURRENT_COEFF_SECOND_SENSOR_D_VERSION2 = 0
 
 
-def send_function(this_data_1, this_data_2, this_data_3, this_data_4, this_data_5, this_data_6, this_data_7, this_data_8, this_data_9):
+def send_function(this_data_1, this_data_2, this_data_3, this_data_4, this_data_5, this_data_6, this_data_7, this_data_8, this_data_9, this_data_10):
     global data_1
     global data_2
     global data_3
@@ -88,6 +104,7 @@ def send_function(this_data_1, this_data_2, this_data_3, this_data_4, this_data_
     global data_7
     global data_8
     global data_9
+    global data_10
 
     data_1 = this_data_1                 #set and getter
     data_2 = this_data_2
@@ -98,11 +115,12 @@ def send_function(this_data_1, this_data_2, this_data_3, this_data_4, this_data_
     data_7 = this_data_7
     data_8 = this_data_8
     data_9 = this_data_9
+    data_10 = this_data_10
 
     
     
 def send_function_getter():
-    return data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9
+    return data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10
 
 
 def data_1_getter():
@@ -240,6 +258,12 @@ def change_current_adc(digital_current_values):
     analogue_current_after_impedance_matching = 500/5.0 * analogue_voltage_after_impedance_matching
     return analogue_current_after_impedance_matching
 
+
+def gradient_calculate(y_intercept, y_axis, x_axis):
+     
+    gradient =  (y_axis - y_intercept)/x_axis
+    return float(gradient)
+
 def calibrated_hall_sensors1(hall_voltage, actual_current):
     
     global k_b_1
@@ -253,15 +277,6 @@ def calibrated_hall_sensors2(hall_voltage, actual_current):
     return calibrated_voltage
 
 
-def gradient_calculate(y_intercept, y_axis, x_axis):
-     
-    gradient =  (y_axis - y_intercept)/x_axis
-    
-    return float(gradient)
-
-
-
-
 
 def calculate_running_frequency(input):
     
@@ -271,13 +286,18 @@ def calculate_running_frequency(input):
 
 def calibration_input_coil_1(input):
     
-    output = CURRENT_COEFF_FIRST_SENSOR_A + CURRENT_COEFF_FIRST_SENSOR_B * input + CURRENT_COEFF_FIRST_SENSOR_C * pow(input, 2) + CURRENT_COEFF_FIRST_SENSOR_D * pow(input, 3)
+    if ELECTRONICS_FLAG == 1:
+        output = CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 + CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 * input + CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 * pow(input, 2) +  CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 * pow(input, 3)
+    elif ELECTRONICS_FLAG == 2:
+        output = CURRENT_COEFF_FIRST_SENSOR_A_VERSION2 + CURRENT_COEFF_FIRST_SENSOR_B_VERSION2 * input + CURRENT_COEFF_FIRST_SENSOR_C_VERSION2 * pow(input, 2) +  CURRENT_COEFF_FIRST_SENSOR_D_VERSION2 * pow(input, 3)
     return output   
 
 
 def calibration_input_coil_2(input):
-  
-    output = CURRENT_COEFF_SECOND_SENSOR_A + CURRENT_COEFF_SECOND_SENSOR_B * input + CURRENT_COEFF_SECOND_SENSOR_C * pow(input, 2) + CURRENT_COEFF_SECOND_SENSOR_D * pow(input, 3)
+    if ELECTRONICS_FLAG == 1:
+        output = CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 + CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 * input + CURRENT_COEFF_SECOND_SENSOR_C_VERSION1 * pow(input, 2) + CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 * pow(input, 3)
+    elif ELECTRONICS_FLAG == 2:
+        output = CURRENT_COEFF_SECOND_SENSOR_A_VERSION2 + CURRENT_COEFF_SECOND_SENSOR_B_VERSION2 * input + CURRENT_COEFF_SECOND_SENSOR_C_VERSION2 * pow(input, 2) +  CURRENT_COEFF_SECOND_SENSOR_D_VERSION2 * pow(input, 3)
     return output   
 
 

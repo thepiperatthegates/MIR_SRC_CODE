@@ -646,7 +646,7 @@ background-color: rgb(255, 170, 127);</string>
 background-color: rgb(255, 152, 222);</string>
          </property>
          <property name="text">
-          <string>f_R rechen</string>
+          <string>f_R rechnen</string>
          </property>
         </widget>
        </widget>
@@ -781,7 +781,7 @@ background-color: rgb(255, 170, 0);</string>
      <x>0</x>
      <y>0</y>
      <width>1540</width>
-     <height>37</height>
+     <height>21</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuRestart">
