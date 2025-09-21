@@ -922,7 +922,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.lcdNumber.display(val)
 
         if val != 0:
-            #TODO: Change the disabled logic buttons here
+      
             self.button_send.setDisabled(True)
             self.button_start.setDisabled(True)
             self.button_stop.setDisabled(False)
@@ -974,6 +974,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
                 #calculate final fR
                 self.calculate_final_fR =  np.polyfit(self.calculated_angular_velocity, self.calculated_torque, 1)
+                
                 #enable the button again
                 self.button_send.setDisabled(False)
                 self.button_start.setDisabled(False)
@@ -1230,7 +1231,7 @@ def main():
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     # construct icon path
-    icon_path = os.path.join(project_root, "pics", "fzj.png")
+    icon_path = os.path.join(project_root, "pics", "fzj.ico")
 
     # set window icon
     app_main_window.setWindowIcon(QtGui.QIcon(icon_path))
