@@ -273,14 +273,16 @@ class ConstShearGUI(QMainWindow, Ui_Title):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        
 
-        if sys.platform ==  'darwin':
-            self.save_button.setIcon(QtGui.QIcon("save_icon.png"))
-            self.button_cal_constant.setIcon(QtGui.QIcon("calibrate.png"))
-        elif sys.platform == 'win32':
-            self.save_button.setIcon(QtGui.QIcon("save_icon.png"))
-            self.button_cal_constant.setIcon(QtGui.QIcon("calibrate.png"))
+        # get absolute path of project root (folder containing 'src' and 'pics')
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+        # construct icon path
+        save_icon_path = os.path.join(project_root, "pics", "save_icon.png")
+        calib_icon_path = os.path.join(project_root, "pics", "calibrate.png")
+        
+        self.save_button.setIcon(QtGui.QIcon(save_icon_path))
+        self.button_cal_constant.setIcon(QtGui.QIcon(calib_icon_path))
 
         self.setWindowTitle("Mini rheometer")
         
@@ -373,6 +375,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         ### friction coefficient rechnung gedrückt
         self.button_fr_constant.clicked.connect(lambda value: self.start_friction_coeff_event (1, 1, 0))
         self.button_fr_constant.clicked.connect(lambda  value: self.popout_window(arg=3))
+        
+        
+        
+        ### clicked to open analyse data window
+        self.analyse_button.clicked.connect(self.analyse_button_event)
 
         self.stop_default_state = 1
         self.graph_stop_button.clicked.connect(self.graph_stop_event)
@@ -1219,10 +1226,14 @@ def main():
     multiprocessing.freeze_support()
     app_main_window = QApplication(sys.argv)
     
-    if sys.platform == 'darwin':
-        app_main_window.setWindowIcon(QtGui.QIcon("../pics/fzj.png"))
-    elif sys.platform == 'win32':
-        app_main_window.setWindowIcon(QtGui.QIcon("fzj.png"))
+    # get absolute path of project root (folder containing 'src' and 'pics')
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    # construct icon path
+    icon_path = os.path.join(project_root, "pics", "fzj.png")
+
+    # set window icon
+    app_main_window.setWindowIcon(QtGui.QIcon(icon_path))
     
     first_window = MainGUI()
     first_window.show()

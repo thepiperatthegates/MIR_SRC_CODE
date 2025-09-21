@@ -97,7 +97,7 @@ class AcquisitionWindow(QMainWindow, Ui_data_capture_Window):
 
         self.setWindowTitle("Data acquisition")
         
-        self.save_button.setIcon(QtGui.QIcon("save_icon.png"))
+        self.save_button.setIcon(QtGui.QIcon("../pics/fzj.png"))
 
         self.tableWidget.setColumnWidth(0, 250)
         self.tableWidget.setColumnWidth(1, 250)
@@ -162,7 +162,7 @@ class AcquisitionWindow(QMainWindow, Ui_data_capture_Window):
 def main_2(q_filename):
     filename = q_filename.get()
     app2 = QApplication([])
-    app2.setWindowIcon(QtGui.QIcon('fzj.png'))
+    app2.setWindowIcon(QtGui.QIcon('../pics/fzj.png'))
     window2 = AcquisitionWindow(filename)
     app2.exec_()
 
@@ -173,10 +173,11 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         self.setupUi(self)
         
-        if sys.platform == 'darwin':
-            self.save_Button.setIcon(QtGui.QIcon("GUI_SRC_CODE/src/save_icon.png"))
-        elif sys.platform == 'win32':
-            self.save_Button.setIcon(QtGui.QIcon("GUI_SRC_CODE/src/save_icon.png"))
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+        # construct icon path
+        save_icon_path = os.path.join(project_root, "pics", "save_icon.png")
+        self.save_Button.setIcon(QtGui.QIcon(save_icon_path))
             
         
     ############################init variables for this class###############################
@@ -788,10 +789,12 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 def main_3():
     app3 = QApplication([])
     
-    if sys.platform == 'darwin':
-        app3.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/src/fzj.png"))
-    elif sys.platform == 'win32':
-        app3.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/src/fzj.png"))
+    # get absolute path of project root (folder containing 'src' and 'pics')
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+    # construct icon path
+    fzj_icon_path = os.path.join(project_root, "pics", "fzj.ico")
+    app3.setWindowIcon(QtGui.QIcon(fzj_icon_path))
     window3 = AnalyseWindow()
     window3.show()
     app3.exec_()
