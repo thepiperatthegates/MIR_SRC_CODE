@@ -566,7 +566,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
         self.angular_velocity = savgol_filter(
             self.angle_magnet[:, 0],      # your noisy angle signal
-            window_length=400,            # try 51, 101, etc. depending on how smooth you want
+            window_length=51,            # try 51, 101, etc. depending on how smooth you want
             polyorder=3,                  # 2 or 3 works well
             deriv=1,                      # first derivative
             delta=np.mean(np.diff(self.time))  # time step

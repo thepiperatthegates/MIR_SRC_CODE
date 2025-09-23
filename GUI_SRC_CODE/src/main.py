@@ -207,7 +207,7 @@ class SleepThread(QThread):
         #TODO: implement a way to kill the thread when stop button is pressed !
         global data_1     #data for run time
         # packet_transmission.running_time_event(1)
-        local_data_1 = int(data_1)       #data for run time
+        local_data_1 = int(data_1)-1       #data for run time
         while local_data_1 >=0:
             if self.running:
                 time.sleep(1)
@@ -311,8 +311,25 @@ class MyGUI(QMainWindow, Ui_Title):
         self.button_stop.clicked.connect(self.stop_button_push_event)
         self.button_stop.clicked.connect(self.popout_window)
         
+<<<<<<< Updated upstream
         #calibration button
         self.button_cal_constant.clicked.connect(self.start_calibration_event)
+=======
+        ### normalise button
+        self.normalise_button.clicked.connect(self.start_normalise_event)
+        
+        ### calibration button
+        self.button_cal_constant.clicked.connect(lambda value: self.start_calibration_event(input_current=-400, count_recursion = 0))
+        self.button_cal_constant.clicked.connect(lambda  value: self.popout_window(1))
+
+        ### friction coefficient rechnung gedrückt
+        self.button_fr_constant.clicked.connect(lambda value: self.start_friction_coeff_event (1, 1, 0, 30))
+        self.button_fr_constant.clicked.connect(lambda  value: self.popout_window(arg=3))
+        
+        
+        
+        ### clicked to open analyse data window
+>>>>>>> Stashed changes
         self.analyse_button.clicked.connect(self.analyse_button_event)
         
         #normalise button
@@ -541,6 +558,8 @@ class MyGUI(QMainWindow, Ui_Title):
             data_8 = 0
         else:
             data_8 = 2
+            
+        data_10 =1
         
         
         packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
@@ -584,10 +603,20 @@ class MyGUI(QMainWindow, Ui_Title):
         data_5 = self.textbox_amplitude2.text()
         data_6 = self.textbox_offset2.text()  
         
+        data_10 = 10
+        
         packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
     
         packet_transmission.stop_button_event(0)            #goto sockets_files and stop the loop for receiving
         packet_transmission.running_time_event(1)
+        
+        
+        ### get the desired sampling frequency
+        
+        sampling_frequency = float(self.textbox_sample_frequency.text())
+        sockets_files.time_increment = 1.0/sampling_frequency
+        sockets_files.tot_average = int(10000.0/ sampling_frequency)
+        print("tot_average", sockets_files.tot_average)
         
         sockets_files.file_name_change_set("dummy")        #set file name from gui
         sockets_files.current_time = 0.0
@@ -598,6 +627,7 @@ class MyGUI(QMainWindow, Ui_Title):
 
         self.queue_file_name.put("dummy") #Send file name to another process
         
+<<<<<<< Updated upstream
         
         
         
@@ -605,6 +635,8 @@ class MyGUI(QMainWindow, Ui_Title):
         
 
         #start the process at the initialisation
+=======
+>>>>>>> Stashed changes
         #FOR NOW, LETS NOT DO ACQUISTION WINDOW
 
 
@@ -651,6 +683,7 @@ class MyGUI(QMainWindow, Ui_Title):
             
         data_8 = 3          #mode 3 to the board
         data_9= 0
+        data_10 = q_get_mir_mode.get()
 
         
         packet_transmission.send_function(30 , data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
@@ -664,7 +697,11 @@ class MyGUI(QMainWindow, Ui_Title):
         self.status_label.setStyleSheet("color: #32a83a;")
         self.status_label.setText("Calibrating!...............")
         
+<<<<<<< Updated upstream
         QtCore.QTimer.singleShot(1000, lambda: self.after_stabilise(count_recursion))
+=======
+        QtCore.QTimer.singleShot(10000, lambda: self.after_stabilise_calibration(count_recursion))
+>>>>>>> Stashed changes
         
 
         
@@ -734,7 +771,271 @@ class MyGUI(QMainWindow, Ui_Title):
                 
                 self.k_b_label.setText(f"k_b_1 = {packet_transmission.k_b_1}           k_b_2 = {packet_transmission.k_b_2}")
                 
+<<<<<<< Updated upstream
                 self.popout_window_calibration()
+=======
+                self.popout_window(2)
+                #enable the button again
+                self.button_send.setDisabled(False)
+                self.button_start.setDisabled(False)
+                self.button_stop.setDisabled(True)
+                    
+    def set_constant(self, get_accumulate_hall_1, get_accumulate_hall_2, get_accumulate_current_1, get_accumulate_current2):
+        """
+        Set accumulated measurement values for Hall sensors and current sensors.
+
+        This method updates the internal state variables that store accumulated
+        readings for two Hall sensors and two current sensors. It is shared by
+        both ``update_time_counter_fR_measurement`` and
+        ``update_time_counter_calibrating``.
+        
+        Shared by function update_time_counter_fR_measurement and update_time_counter_calibrating
+
+        :param float get_accumulate_hall_1: Accumulated value from Hall sensor 1.
+        :param float get_accumulate_hall_2: Accumulated value from Hall sensor 2.
+        :param float get_accumulate_current_1: Accumulated value from current sensor 1.
+        :param float get_accumulate_current2: Accumulated value from current sensor 2.
+        """
+        
+        
+        self.accumulate_hall_1 = get_accumulate_hall_1
+        self.accumulate_hall_2 = get_accumulate_hall_2
+        self.accumulate_current_1 = get_accumulate_current_1
+        self.accumulate_current_2 = get_accumulate_current2
+
+    def start_friction_coeff_event(self, running_frequency = 1,  rotation_direction =  1, count_recursion = 0, input_current = 30):
+        global data_1
+        global data_2
+        global data_3
+        global data_4
+        global data_5
+        global data_6
+        global data_7
+        global data_8
+        global data_9
+        global data_10
+        
+        packet_transmission.f_R = 0
+        
+        ###calculate running time for 10 rotation
+        
+        data_1 = str(self.running_time_10_rotation(running_frequency))
+        print(data_1)
+        data_2 = str(running_frequency) # Hz
+        data_3 = str(input_current)# mA
+        data_4 = self.textbox_offset2.text()  #mA
+        data_5 = str(input_current)  # mA
+        data_6 = self.textbox_offset2.text()    # mA 
+        
+        #determines the rotation direction
+        # 1 = anti-clockwise
+        # 2 = clockwise
+        data_7 = rotation_direction
+            
+        if self.filter_checkbox.isChecked():
+            data_8 = 0
+        else:
+            data_8 = 2
+            
+        data_9= 0
+        data_10 = 1
+        
+        #########TODO: NOTE THAT DATA_1 IS NOT ACTUALLY USED AT AL!!! I NEED TO CHANGE THIS
+        
+        packet_transmission.send_function(int(data_1) , data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
+        # send all the data to be packed
+        packet_transmission.send_transmission_event(this_flag_send=1)            #SET flag for Tx
+        packet_transmission.start_flag_send_event(1)
+        
+    
+        # send flag for calibration in the thread
+        self.worker_DataUpdate.flag_special_event(flag_1=False, flag_2=True)
+
+        self.status_label.setStyleSheet("color: #32a83a;")
+        self.status_label.setText("f<sub>R</sub> begins!...............")
+        
+        QtCore.QTimer.singleShot(int(data_1)*1000, lambda: self.after_stabilise_fR_measurement(count_recursion, running_frequency, input_current))
+    
+    # def wait(self, val, count_recursion, running_frequency, input_current):
+    #     #5 seconds interval
+    #     QtCore.QTimer.singleShot(10000, lambda: self.after_stabilise_fR_measurement(val, count_recursion, running_frequency, input_current))
+        
+    def after_stabilise_fR_measurement(self, count_recursion, running_frequency, input_current):
+        self.worker_sleep = SleepThread()
+        self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_fR_measurement( value, count_recursion, running_frequency, input_current))
+        self.worker_sleep.start()
+        
+        
+    def running_time_10_rotation(self, running_frequency):
+        running_time = 10/running_frequency 
+        
+        return float(running_time)
+    
+    def update_time_counter_fR_measurement(self, val, count_recursion, running_frequency, input_current):
+        """
+        Update the time counter and process data during friction coefficient measurement.
+
+        This method is called repeatedly during a friction coefficient experiment.
+        It performs the following operations:
+
+        1. Updates the LCD display with the current value `val`.
+        2. Enables or disables the send/start/stop buttons depending on whether the
+        measurement thread is running (`val != 0`) or stopped (`val == 0`).
+        3. Resets internal flags via `worker_DataUpdate` to ensure data integrity.
+        4. Computes the mean currents and Hall voltages from accumulated measurements.
+        5. Calculates torque and angular velocity for the current measurement step
+        and stores them in `calculated_torque` and `calculated_angular_velocity`.
+        6. Handles recursion logic:
+        - For `count_recursion < 10`: negative frequency (anticlockwise rotation)
+        - For `10 <= count_recursion < 19`: positive frequency (clockwise rotation)
+        - Increments `running_frequency` and updates `rotation_direction`.
+        7. Recursively triggers the next measurement step via 
+        `start_friction_coeff_event`.
+        8. When the last measurement (`count_recursion == 19`) is reached:
+        - Computes the final friction coefficient slope using `np.polyfit`.
+        - Re-enables the buttons for user interaction.
+
+        :param val: Current measurement value from the thread (0 if stopped, non-zero if running).
+        :type val: float or int
+        :param count_recursion: Index of the current measurement step.
+        :type count_recursion: int
+        """
+
+        self.lcdNumber.display(val)
+
+        if val != 0:
+      
+            self.button_send.setDisabled(True)
+            self.button_start.setDisabled(True)
+            self.button_stop.setDisabled(False)
+
+        elif val== 0:  #when val is 0 and the thread is stops already         
+            #reset flags (so that accumulate does not change here )(data integrity reason here)
+            self.worker_DataUpdate.flag_special_event(False, False)
+            
+            
+            self.mean_current1_fR = np.mean(self.accumulate_current_1[1000:])
+            self.mean_current2_fR= np.mean(self.accumulate_current_2[1000:])
+            self.mean_hall1_fR = np.mean(self.accumulate_hall_1[1000:])
+            self.mean_hall2_fR= np.mean(self.accumulate_hall_2[1000:])
+            
+            self.calculated_torque[count_recursion] = self.calculate_torque_fR(self.mean_current1_fR, self.mean_current2_fR, self.mean_hall1_fR, 
+                                                    self.mean_hall2_fR)
+            
+            
+            if 0 <= count_recursion < 19:
+                if  0 <= count_recursion < 10:
+                    ### anticlockwise first 
+                        
+                        
+                    #negative frequency
+                    self.calculated_angular_velocity[count_recursion] = -self.calculate_radial_frequency(running_frequency)
+                    running_frequency+= 1       #Hz
+                        
+                        
+                    
+                    rotation_direction = 1 
+                elif 10 <=  count_recursion  < 19:
+                    #positive frequency
+                    self.calculated_angular_velocity[count_recursion] = self.calculate_radial_frequency(running_frequency)
+                    ### increment by one
+                    running_frequency+= 1
+                    
+                    if count_recursion == 10:
+                        #reset to 1Hz (since the negative frequency part, i.e. anti-clockwise part, is done)
+                        running_frequency = 1
+                    
+                    rotation_direction = 2
+                count_recursion = count_recursion + 1
+                print("recursion is", count_recursion)
+                if count_recursion == 1:  #Hz
+                    input_current = 40 #mA
+                elif count_recursion == 2:
+                    input_current = 45 
+                elif running_frequency == 3:
+                    input_current = 50
+                elif running_frequency == 4:
+                    input_current = 50
+                elif running_frequency == 5:
+                    input_current = 60 
+                elif running_frequency == 6:
+                    input_current = 60
+                elif running_frequency == 7:
+                    input_current = 70
+                elif running_frequency == 8:
+                    input_current = 80
+                elif running_frequency == 9:
+                    input_current = 90
+                
+                ###recursion to the main function occurs
+                print("running frquency is ", running_frequency)
+                self.start_friction_coeff_event(running_frequency, rotation_direction, count_recursion, input_current)
+            
+            ### measurement is done
+            elif count_recursion == 19:
+                # calculate the last angular velocity
+                self.calculated_angular_velocity[count_recursion] = self.calculate_radial_frequency(running_frequency)
+                
+
+                #calculate final fR
+                self.calculate_final_fR =  np.polyfit(self.calculated_angular_velocity, self.calculated_torque, 1)
+                
+                #enable the button again
+                self.button_send.setDisabled(False)
+                self.button_start.setDisabled(False)
+                self.button_stop.setDisabled(True)
+    
+                
+            
+                
+    def calculate_torque_fR(self, current_1, current_2, hall_1, hall_2):
+        """
+        Calculate the torque based on Hall sensor and current measurements.
+
+        This method computes the applied torque using the phase difference between
+        the magnetic field (from the current coils) and the magnet (from
+        the Hall sensors). It applies calibration factors, coil constants,
+        and the dipole moment to convert the measured currents to torque.
+
+        :param current_1: First component of the current measurement.
+        :type current_1: float or np.ndarray
+        :param current_2: Second component of the current measurement.
+        :type current_2: float or np.ndarray
+        :param hall_1: First Hall sensor reading.
+        :type hall_1: float or np.ndarray
+        :param hall_2: Second Hall sensor reading.
+        :type hall_2: float or np.ndarray
+
+        :return: Calculated torque.
+        :rtype: float or np.ndarray
+        """
+        
+        global data_4, data_6
+        offset_1 =float(data_4)
+        offset_2 =float(data_6)
+        
+        #magnetic field angle - magnet angle
+        phase_difference = np.arctan2(current_2, current_1) - np.arctan2(hall_2, hall_1)
+
+        power_of_2 = np.power((current_1 - offset_1), 2) + np.power((current_2 - offset_2), 2)
+        
+        magnitude_current = np.sqrt(power_of_2)
+        
+        total_torque = (
+        self.CALIBRATION_FACTOR                # dimensionslos
+        * self.DIPOLE_MOMENT                    # [A·m²]
+        * self.COIL_CONSTANT                    # [T/A]
+        * magnitude_current / 1000         # mA; -> A, [A]
+        * np.sin(phase_difference)   # dimensionless
+        )
+        
+        return total_torque
+    
+    def calculate_radial_frequency(self, running_frequency):
+        
+        return float(2 * np.pi * running_frequency)
+        
+>>>>>>> Stashed changes
 
     def stop_button_push_event(self):
         # packet_transmission.stop_button_event(1)            #goto sockets_files and stop the loop for receiving
@@ -883,6 +1184,17 @@ class MainGUI(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
+<<<<<<< Updated upstream
+=======
+        # disable experiment combobox initially
+        self.choose_experiment_comboBox.setEnabled(False)
+
+
+        # connect electronic combobox signal at init
+        self.choose_electronic_comboBox.currentIndexChanged.connect(self.enable_choose_experiment)
+
+        # connect experiment combobox signal at init
+>>>>>>> Stashed changes
         self.choose_experiment_comboBox.activated.connect(self.choose_window)
         
         
@@ -894,11 +1206,21 @@ class MainGUI(QMainWindow, Ui_MainWindow):
         mode = self.choose_experiment_comboBox.currentText()
         
         if mode == "Control shear rate":
+<<<<<<< Updated upstream
                 data_10 = 1
                 q_get_mir_mode.put(data_10)
                 self.shear_constant_mode_window.show()
                 self.close()
     
+=======
+            
+            q_get_mir_mode.put(1)
+            # declare the window first without showing it 
+            self.shear_constant_mode_window = ConstShearGUI()
+            self.shear_constant_mode_window.show()
+            self.close()      
+        
+>>>>>>> Stashed changes
 
 
 def main():

@@ -200,6 +200,13 @@ def get_stop_button_data():
     
     return int(data_8)
 
+def get_electronic_num():
+    
+    global data_10 
+    
+    return data_10
+
+
 def combine_bytes_for_buffer(send_1, send_2, send_3, send_4, send_5, send_6, send_7, send_8, send_9, send_10):
            
     #ARM Microcontroller is Little Endian, for integer we will be shifting the 
@@ -271,15 +278,30 @@ def calculate_running_frequency(input):
 
 def calibration_input_coil_1(input):
     
+<<<<<<< Updated upstream
     output = CURRENT_COEFF_FIRST_SENSOR_A + CURRENT_COEFF_FIRST_SENSOR_B * input + CURRENT_COEFF_FIRST_SENSOR_C * pow(input, 2) + CURRENT_COEFF_FIRST_SENSOR_D * pow(input, 3)
+=======
+    if ELECTRONICS_FLAG == 1:
+        output = CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 + CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 * input + CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 * pow(input, 2) +  CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 * pow(input, 3)
+    elif ELECTRONICS_FLAG == 2:
+        output = CURRENT_COEFF_FIRST_SENSOR_A_VERSION2 + CURRENT_COEFF_FIRST_SENSOR_B_VERSION2 * input + CURRENT_COEFF_FIRST_SENSOR_C_VERSION2 * pow(input, 2) +  CURRENT_COEFF_FIRST_SENSOR_D_VERSION2 * pow(input, 3)
+        
+>>>>>>> Stashed changes
     return output   
 
 
 def calibration_input_coil_2(input):
+<<<<<<< Updated upstream
   
     output = CURRENT_COEFF_SECOND_SENSOR_A + CURRENT_COEFF_SECOND_SENSOR_B * input + CURRENT_COEFF_SECOND_SENSOR_C * pow(input, 2) + CURRENT_COEFF_SECOND_SENSOR_D * pow(input, 3)
+=======
+    if ELECTRONICS_FLAG == 1:
+        output = CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 + CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 * input + CURRENT_COEFF_SECOND_SENSOR_C_VERSION1 * pow(input, 2) + CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 * pow(input, 3)
+    elif ELECTRONICS_FLAG == 2:
+        output = CURRENT_COEFF_SECOND_SENSOR_A_VERSION2 + CURRENT_COEFF_SECOND_SENSOR_B_VERSION2 * input + CURRENT_COEFF_SECOND_SENSOR_C_VERSION2 * pow(input, 2) +  CURRENT_COEFF_SECOND_SENSOR_D_VERSION2 * pow(input, 3)
+        
+>>>>>>> Stashed changes
     return output   
-
 
 # def angle_calculate(x1, x2):
 #     return numpy.arctan(x1/x2)

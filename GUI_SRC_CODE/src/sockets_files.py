@@ -10,6 +10,7 @@ import time
 import multiprocessing
 import serial
 import struct
+import queue
 
 
 baud_rate = 128000
@@ -20,7 +21,10 @@ q_to_process = multiprocessing.Queue()
 q_to_graph = multiprocessing.Queue()
 q_to_csv = multiprocessing.Queue()
 
-q_get_mir_mode = multiprocessing.Queue()
+q_get_mir_mode = queue.Queue()
+time_increment = None
+tot_average = None
+
 
 offset_1 = 0
 offset_2 = 0
@@ -34,6 +38,9 @@ p1 = None
 
 #for total count receiving from socket (depends if we want 0.5s, 1s or 2s)
 tot_count_accumulate_recv = 1250
+
+
+
 
 # q = multiprocessing.Queue()
 
@@ -82,13 +89,9 @@ def thread_start():
     
 
 def timer_monitor(ser1):
-    
-    
-    #get mir_mode
-    
-    
     global flag_for_process, p1, tot_count_accumulate_recv
 
+        
     count = 0
     while True:
         try:
@@ -106,14 +109,20 @@ def timer_monitor(ser1):
                     p1.start()
                     flag_for_process = True
                 q_to_process.put(received_data) #send to subprocess to be unpacked
-                data_send = q_to_csv.get()
+                
+        
+                #get unpacked data from queue
+                data_Rx = q_to_csv.get()
+                
+                
                 
                 data_flag = packet_transmission.running_time_getter()
+                
                 if data_flag == 1:
-                    if data_send:
-                        save_to_csv(received_payload)
-                        received_payload = None
-                print("Done writing once!")
+                    if data_Rx:
+                        print("Done writing once!")
+                        save_to_csv(data_Rx)
+                        data_Rx = None
 
                     
             except Exception as e:
@@ -141,6 +150,8 @@ def send_thread(ser1):
     
     flag_send = packet_transmission.send_transmission_event_getter()
     if flag_send == 1:
+        
+        ### Getter function 
         data_send_1 = packet_transmission.data_1_getter()    #for run time
         data_send_7 = packet_transmission.data_7_getter()       #for direction
         data_send_3, data_send_4, data_send_5, data_send_6 = packet_transmission.data_current_start()
@@ -151,8 +162,13 @@ def send_thread(ser1):
         
         data_send_8 = packet_transmission.get_stop_button_data()
         data_send_9 = packet_transmission.data_hardware_reset_getter()
+        data_send_10 = packet_transmission.get_electronic_num()
+        
+        ### combine the whole data as a sequence byte 
         combined_send = packet_transmission.combine_bytes_for_buffer(data_send_1, data_send_2, data_send_3, data_send_4, 
-                                                                    data_send_5, data_send_6, data_send_7, data_send_8, data_send_9)
+                                                                    data_send_5, data_send_6, data_send_7, data_send_8, data_send_9, data_send_10)
+        
+        
         packet_transmission.send_transmission_event(0)
         try:
             ser1.write(combined_send)
@@ -204,12 +220,10 @@ def file_name_change_set(prefix, extension=".csv"):
     file_name = f"{prefix}{extension}"
     
 
-def save_to_csv(cleaned_buffer, time_increment, num_columns=4, tot_average = 50):
-    
-    if(q_get_mir_mode.get() == 1):
-        time_increment = 0.005  #s #i will change this so it can be accessed from main 
-    global file_name, current_time
+def save_to_csv(cleaned_buffer, num_columns=4):
+    global file_name, current_time, time_increment, tot_average
     global offset_1, offset_2
+
 
     data = np.array(cleaned_buffer)
     # Reshape the data to have 'num_columns' columns per row
@@ -239,24 +253,26 @@ def save_to_csv(cleaned_buffer, time_increment, num_columns=4, tot_average = 50)
     col4_converted = packet_transmission.calibration_input_coil_2(col4_converted)
     
     #Average values to reduce amount of data saved 
-    ####FOR CONSTANT SHEAR RATE 
-    col1_after_average = average_values(col1_converted, tot_average)
-    col2_after_average = average_values(col2_converted, tot_average)
-
-    col3_after_average = average_values(col3_converted, tot_average)
-    col4_after_average = average_values(col4_converted, tot_average)
-
     
-    reshaped_data[:, 0] = col1_after_average
-    reshaped_data[:, 1] = col2_after_average
-    reshaped_data[:, 2] = col3_after_average
-    reshaped_data[:, 3] = col4_after_average
+    ####FOR CONSTANT SHEAR RATE 
+    col1_after_average = average_values(col1_converted, tot_average).ravel()
+    col2_after_average = average_values(col2_converted, tot_average).ravel()
+    col3_after_average = average_values(col3_converted, tot_average).ravel()
+    col4_after_average = average_values(col4_converted, tot_average).ravel()
 
-    num_rows = reshaped_data.shape[0]
+
+    # Stack them into a new array with 100 rows and 4 columns
+    averaged_data = np.zeros((len(col1_after_average), 4))  # shape (100,4)
+    averaged_data[:, 0] = col1_after_average
+    averaged_data[:, 1] = col2_after_average
+    averaged_data[:, 2] = col3_after_average
+    averaged_data[:, 3] = col4_after_average
+
+    num_rows = averaged_data.shape[0]
     time_column = np.arange(current_time, current_time + (time_increment * num_rows), time_increment).reshape(-1, 1)
     current_time += time_increment * num_rows   
 
-    final_data = np.hstack((time_column, reshaped_data))
+    final_data = np.hstack((time_column, averaged_data))
     
 
     try:
