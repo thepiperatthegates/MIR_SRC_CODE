@@ -218,6 +218,10 @@ def get_stop_button_data():
     
     return int(data_8)
 
+def get_mir_mode():
+    global data_10 
+    
+    return int(data_10)
 def combine_bytes_for_buffer(send_1, send_2, send_3, send_4, send_5, send_6, send_7, send_8, send_9, send_10):
            
     #ARM Microcontroller is Little Endian, for integer we will be shifting the 

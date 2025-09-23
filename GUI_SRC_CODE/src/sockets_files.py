@@ -20,7 +20,6 @@ q_to_process = multiprocessing.Queue()
 q_to_graph = multiprocessing.Queue()
 q_to_csv = multiprocessing.Queue()
 
-q_get_mir_mode = multiprocessing.Queue()
 
 offset_1 = 0
 offset_2 = 0
@@ -36,7 +35,10 @@ p1 = None
 #for total count receiving from socket (depends if we want 0.5s, 1s or 2s)
 tot_count_accumulate_recv = 1250
 
-# q = multiprocessing.Queue()
+
+time_increment = None
+tot_average = None
+
 
 ##########################################################################
 #start socket connection for USB 
@@ -158,8 +160,9 @@ def send_thread(ser1):
         
         data_send_8 = packet_transmission.get_stop_button_data()
         data_send_9 = packet_transmission.data_hardware_reset_getter()
+        data_send_10 = packet_transmission.get_mir_mode()
         combined_send = packet_transmission.combine_bytes_for_buffer(data_send_1, data_send_2, data_send_3, data_send_4, 
-                                                                    data_send_5, data_send_6, data_send_7, data_send_8, data_send_9)
+                                                                    data_send_5, data_send_6, data_send_7, data_send_8, data_send_9, data_send_10)
         packet_transmission.send_transmission_event(0)
         try:
             ser1.write(combined_send)
@@ -211,11 +214,9 @@ def file_name_change_set(prefix, extension=".csv"):
     file_name = f"{prefix}{extension}"
     
 
-def save_to_csv(cleaned_buffer, time_increment, num_columns=4, tot_average = 50):
+def save_to_csv(cleaned_buffer, num_columns=4):
     
-    if(q_get_mir_mode.get() == 1):
-        time_increment = 0.005  #s #i will change this so it can be accessed from main 
-    global file_name, current_time
+    global file_name, current_time, tot_average, time_increment
     global offset_1, offset_2
 
     data = np.array(cleaned_buffer)
@@ -247,23 +248,23 @@ def save_to_csv(cleaned_buffer, time_increment, num_columns=4, tot_average = 50)
     
     #Average values to reduce amount of data saved 
     ####FOR CONSTANT SHEAR RATE 
-    col1_after_average = average_values(col1_converted, tot_average)
-    col2_after_average = average_values(col2_converted, tot_average)
-
-    col3_after_average = average_values(col3_converted, tot_average)
-    col4_after_average = average_values(col4_converted, tot_average)
-
     
-    reshaped_data[:, 0] = col1_after_average
-    reshaped_data[:, 1] = col2_after_average
-    reshaped_data[:, 2] = col3_after_average
-    reshaped_data[:, 3] = col4_after_average
+    col1_after_average = average_values(col1_converted, tot_average).ravel()
+    col2_after_average = average_values(col2_converted, tot_average).ravel()
+    col3_after_average = average_values(col3_converted, tot_average).ravel()
+    col4_after_average = average_values(col4_converted, tot_average).ravel()
+    
+    averaged_data = np.zeros((len(col1_after_average), 4))  # shape (100,4)
+    averaged_data[:, 0] = col1_after_average
+    averaged_data[:, 1] = col2_after_average
+    averaged_data[:, 2] = col3_after_average
+    averaged_data[:, 3] = col4_after_average
 
-    num_rows = reshaped_data.shape[0]
+    num_rows = averaged_data.shape[0]
     time_column = np.arange(current_time, current_time + (time_increment * num_rows), time_increment).reshape(-1, 1)
     current_time += time_increment * num_rows   
 
-    final_data = np.hstack((time_column, reshaped_data))
+    final_data = np.hstack((time_column, averaged_data))
     
 
     try:

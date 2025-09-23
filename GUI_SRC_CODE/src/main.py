@@ -28,7 +28,7 @@ from main_window_test import Ui_MainWindow
 
 
 import sockets_files as sockets_files
-from sockets_files import q_to_graph, q_get_mir_mode
+from sockets_files import q_to_graph
 
 import packet_transmission as packet_transmission
 from window_show import main_3
@@ -597,6 +597,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             data_8 = 0
         else:
             data_8 = 2
+            
+        data_10 = 1
         
         
         packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
@@ -639,11 +641,20 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         data_4 =  self.textbox_offset1.text()
         data_5 = self.textbox_amplitude2.text()
         data_6 = self.textbox_offset2.text()  
-        
+        data_10 = 1
         packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
     
         packet_transmission.stop_button_event(0)            #goto sockets_files and stop the loop for receiving
         packet_transmission.running_time_event(1)
+        
+        
+        ### get the desired sampling frequency
+        
+        
+        sampling_frequency = float(self.textbox_sample_frequency.text())
+        sockets_files.time_increment = 1.0/sampling_frequency
+        sockets_files.tot_average = int(10000.0/ sampling_frequency)
+        print("tot_average", sockets_files.tot_average)
         
         sockets_files.file_name_change_set("dummy")        #set file name from gui
         sockets_files.current_time = 0.0
@@ -732,6 +743,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             
         data_8 = 3          #mode 3 to the board (for dc generator)
         data_9= 0
+        data_10 = 1
 
         
         packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
@@ -831,7 +843,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.accumulate_current_1 = get_accumulate_current_1
         self.accumulate_current_2 = get_accumulate_current2
 
-    def start_friction_coeff_event(self, running_frequency = 1,  rotation_direction =  1, count_recursion = 0):
+    def start_friction_coeff_event(self, running_frequency = 1,  rotation_direction =  1, count_recursion = 0, input_current = 30):
         global data_1
         global data_2
         global data_3
@@ -845,10 +857,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         packet_transmission.f_R = 0
         
-        input_current = 300 #mA
-            
-        data_1 = str(5) #seconds
-        data_2 = str(object=running_frequency) # Hz
+        ###calculate running time for 10 rotation
+        
+        data_1 = str(self.running_time_10_rotation(running_frequency))
+        print(data_1)
+        data_2 = str(running_frequency) # Hz
         data_3 = str(input_current)# mA
         data_4 = self.textbox_offset2.text()  #mA
         data_5 = str(input_current)  # mA
@@ -865,10 +878,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             data_8 = 2
             
         data_9= 0
+        data_10 = 1
         
         #########TODO: NOTE THAT DATA_1 IS NOT ACTUALLY USED AT AL!!! I NEED TO CHANGE THIS
         
-        packet_transmission.send_function(data_1 , data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
+        packet_transmission.send_function(int(data_1) , data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
         # send all the data to be packed
         packet_transmission.send_transmission_event(this_flag_send=1)            #SET flag for Tx
         packet_transmission.start_flag_send_event(1)
@@ -880,16 +894,21 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.status_label.setStyleSheet("color: #32a83a;")
         self.status_label.setText("f<sub>R</sub> begins!...............")
         
-        #5 seconds interval
-        QtCore.QTimer.singleShot(5000, lambda: self.after_stabilise_fR_measurement(count_recursion))
+        QtCore.QTimer.singleShot(int(data_1)*1000, lambda: self.after_stabilise_fR_measurement(count_recursion, running_frequency, input_current))
+    
         
-    def after_stabilise_fR_measurement(self, count_recursion):
+    def after_stabilise_fR_measurement(self, count_recursion, running_frequency, input_current):
         self.worker_sleep = SleepThread()
-        self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_fR_measurement(value, count_recursion))
+        self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_fR_measurement( value, count_recursion, running_frequency, input_current))
         self.worker_sleep.start()
         
+        
+    def running_time_10_rotation(self, running_frequency):
+        running_time = 10/running_frequency 
+        
+        return float(running_time)
     
-    def update_time_counter_fR_measurement(self, val, count_recursion):
+    def update_time_counter_fR_measurement(self, val, count_recursion, running_frequency, input_current):
         """
         Update the time counter and process data during friction coefficient measurement.
 
@@ -942,29 +961,52 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             
             
             if 0 <= count_recursion < 19:
-                
                 if  0 <= count_recursion < 10:
+                    ### anticlockwise first 
+                        
+                        
                     #negative frequency
                     self.calculated_angular_velocity[count_recursion] = -self.calculate_radial_frequency(running_frequency)
-                    running_frequency+= 1
-                    ### anticlockwise first     
+                    running_frequency+= 1       #Hz
+                        
+                        
+                    
                     rotation_direction = 1 
                 elif 10 <=  count_recursion  < 19:
-                    if count_recursion == 10:
-                        #reset to 1Hz (since the negative frequency part, i.e. anti-clockwise part, is done)
-                        running_frequency = 1
                     #positive frequency
                     self.calculated_angular_velocity[count_recursion] = self.calculate_radial_frequency(running_frequency)
                     ### increment by one
                     running_frequency+= 1
                     
-                    #anticlockwise first     
-                    rotation_direction = 2
+                    if count_recursion == 10:
+                        #reset to 1Hz (since the negative frequency part, i.e. anti-clockwise part, is done)
+                        running_frequency = 1
                     
-                count_recursion +=1
+                    rotation_direction = 2
+                count_recursion = count_recursion + 1
+                print("recursion is", count_recursion)
+                if count_recursion == 1:  #Hz
+                    input_current = 40 #mA
+                elif count_recursion == 2:
+                    input_current = 45 
+                elif running_frequency == 3:
+                    input_current = 50
+                elif running_frequency == 4:
+                    input_current = 50
+                elif running_frequency == 5:
+                    input_current = 60 
+                elif running_frequency == 6:
+                    input_current = 60
+                elif running_frequency == 7:
+                    input_current = 70
+                elif running_frequency == 8:
+                    input_current = 80
+                elif running_frequency == 9:
+                    input_current = 90
                 
                 ###recursion to the main function occurs
-                self.start_friction_coeff_event(running_frequency, rotation_direction)
+                print("running frquency is ", running_frequency)
+                self.start_friction_coeff_event(running_frequency, rotation_direction, count_recursion, input_current)
             
             ### measurement is done
             elif count_recursion == 19:
@@ -1158,9 +1200,6 @@ class MainGUI(QMainWindow, Ui_MainWindow):
         # disable experiment combobox initially
         self.choose_experiment_comboBox.setEnabled(False)
 
-        # declare the window first without showing it 
-        self.shear_constant_mode_window = ConstShearGUI()
-
         # connect electronic combobox signal at init
         self.choose_electronic_comboBox.currentIndexChanged.connect(self.enable_choose_experiment)
 
@@ -1207,9 +1246,8 @@ class MainGUI(QMainWindow, Ui_MainWindow):
         mode = self.choose_experiment_comboBox.currentText()
         
         if mode == "Control shear rate":
-            global data_10
-            data_10 = 1
-            q_get_mir_mode.put(data_10)
+            # declare the window first without showing it 
+            self.shear_constant_mode_window = ConstShearGUI()
             self.shear_constant_mode_window.show()
             self.close()      
         
