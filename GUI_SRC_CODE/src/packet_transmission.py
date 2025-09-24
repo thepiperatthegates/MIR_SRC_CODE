@@ -62,7 +62,9 @@ k_b_1 = 0.083597946
 k_b_2 = 0.084535931
 
 #default friction coefficient 
-f_R = 19.548755e-9 # in Nm / (rad /s)
+CALIBRATION_FACTOR = 0.773
+fr1 = 1 # in Nm / (rad /s)
+fr0 = 1 # in Nm / (rad /s)
 
 
 #flag for electronics type
@@ -126,7 +128,7 @@ def send_function_getter():
 def data_1_getter():
 
 
-    return int(data_1)
+    return float(data_1)
 
 def data_7_getter():
     
@@ -227,8 +229,10 @@ def combine_bytes_for_buffer(send_1, send_2, send_3, send_4, send_5, send_6, sen
     #ARM Microcontroller is Little Endian, for integer we will be shifting the 
     #bits ourselves but for float, we need to send it little endian preemptively
     
+    
+    ## TODO: CHANGE BYTE_SEND TO FLOAT 
     print("Frequency of DAC", send_2)
-    byte_send1 = struct.pack('>I', int(send_1))       
+    byte_send1 = struct.pack('<f', float(send_1))       
     byte_send2 = struct.pack('<f', float(send_2))             #running frequency of MCU 
     byte_send3 = struct.pack('<f', float(send_3))              #amplitude1
     byte_send4 = struct.pack('<f', float(send_4))              #offset1

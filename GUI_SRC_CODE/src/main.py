@@ -13,7 +13,7 @@ Change to executables:
 import numpy as np
 from PyQt5 import QtCore, QtGui
 from PyQt5 import *
-from PyQt5.QtCore import QThread, pyqtSignal, QMutex, QRegularExpression
+from PyQt5.QtCore import QThread, pyqtSignal, QMutex, QRegularExpression, QObject, QTimer
 from PyQt5 import uic
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QIntValidator, QRegularExpressionValidator, QDoubleValidator
@@ -68,7 +68,7 @@ angle_permanent_magnet_val = np.array([], dtype=np.float32)
 angle_magnetic_field_val = np.array([], dtype=np.float32)
 phase_difference_val = np.array([], dtype=np.float32)
 
-time_axis =  [i * 0.0001 for i in range(5000)]
+time_axis =  [i * 0.0001 for i in range(1000)]
 
 bytes_to_process = np.array([], dtype=np.uint16)  # Empty NumPy array for incoming data
 
@@ -226,32 +226,51 @@ class DataUpdate(QThread):
         self.running = False
 
         
-class SleepThread(QThread):
+# class SleepThread(QThread):
 
-    update_time_signal = pyqtSignal(int)            #signal for the time counter
+#     update_time_signal = pyqtSignal(float)            #signal for the time counter
+
+#     def __init__(self, parent=None):
+#         super().__init__(parent)
+#         self.running = True
+
+#     def run(self):
+#         global data_1
+#         local_data = float(data_1)  # allow decimals
+#         while local_data >= 0 and self.running:
+#             time.sleep(0.1)  # check every 100 ms
+#             local_data -= 0.1
+#             self.update_time_signal.emit(round(local_data, 1))  # emit float with 1 decimal
+#         packet_transmission.running_time_event(0)
+
+#     def stop(self):
+#         self.running = False
+            
+class SleepTimer(QObject):
+    update_time_signal = pyqtSignal(float)  # emit float countdown values
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.running = True
+        global data_1
+        self.remaining = float(data_1) # get local_data_1 from global
+        self.timer = QTimer(self)
+        self.timer.setInterval(100)  # 100 ms per tick
+        self.timer.timeout.connect(self._tick)
 
-    def run(self):
-        #TODO: implement a way to kill the thread when stop button is pressed !
-        global data_1     #data for run time
-        # packet_transmission.running_time_event(1)
-        local_data_1 = int(data_1)       #data for run time
-        while local_data_1 >=0:
-            if self.running:
-                time.sleep(1)
-                self.update_time_signal.emit(int(local_data_1))
-                local_data_1 -= 1
-            else:
-                break
-        packet_transmission.running_time_event(0)
+    def start(self):
+        self.timer.start()
 
     def stop(self):
-        self.running = False
-            
-    
+        self.timer.stop()
+
+    def _tick(self):
+        self.remaining -= 0.1
+        if self.remaining >= 0:
+            self.update_time_signal.emit(round(self.remaining, 1))
+        else:
+            self.timer.stop()
+            packet_transmission.running_time_event(0)
+
 class SocketThread(QThread):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -298,6 +317,9 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.before2 = None
         self.curve_v1 = self.curve_v2 = self.curve_i1 = self.curve_i2 = self.curve_sigma_b = self.curve_sigma_m = None
         
+        self.flag_fR = False
+        self.flag_K = False
+        
         ####### variables for reference class DataUpdate(QThread) ###########################################        
         self.accumulate_hall_1 = None       #in V
         self.accumulate_hall_2  = None      #in V
@@ -319,7 +341,13 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.mean_hall2_fR = None           #in V 
         self.calculated_torque = np.zeros(20)               #in 
         self.calculated_angular_velocity = np.zeros(20)
-        self.calculate_final_fR = None
+        self.mean_phase = np.zeros(20)
+        self.standard_mean_phase = np.zeros(20)
+        self.standard_mean_torque = np.zeros(20)
+        self.standard_torque = np.zeros(20)
+        self.standard_phase = np.zeros(20)
+        self.calculate_final_fR = 0
+        
         
         self.COIL_CONSTANT = 3.097e-3		# in T / A
         self.DIPOLE_MOMENT = 8.594e-3		# in A m^2
@@ -335,13 +363,21 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.textbox_offset1.setPlaceholderText("Enter offset +-480mA")
         self.textbox_amplitude2.setPlaceholderText("Enter amplitude from 0 to 480mA")
         self.textbox_offset2.setPlaceholderText("Enter offset +-480mA")
-        self.k_b_label.setText( f"k<sub>b1</sub> = {packet_transmission.k_b_1}" f" &nbsp;&nbsp;&nbsp; "  f"k<sub>b2</sub> = {packet_transmission.k_b_2}")
+        self.k_b_label.setText(
+            f"k<sub>b_1</sub> = {packet_transmission.k_b_1}&nbsp;&nbsp;&nbsp;"
+            f"k<sub>b_2</sub> = {packet_transmission.k_b_2}&nbsp;&nbsp;&nbsp;"
+            f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
+            f"f<sub>R</sub> Gleichung = {np.poly1d(self.calculate_final_fR)}"
+        )
         self.label_frequency.setText("Shear rate γ̇ / s<sup>-1</sup>")    
         self.button_fr_constant.setText("Measure f_R")
         #################################################################################################
 
         #######################################################validator############################################################################
-        self.textbox_time.setValidator(QIntValidator())
+        validator = QDoubleValidator(0.0, 1000.0, 1)  # min=0.0, max=1000.0, 2 decimals
+        validator.setNotation(QDoubleValidator.StandardNotation)
+
+        self.textbox_time.setValidator(validator)
         self.textbox_frequency.setValidator(QDoubleValidator())
         
         #ACCEPT ONLY FLOAT FROM 0 TO 480 (unsigned)
@@ -373,8 +409,9 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.button_cal_constant.clicked.connect(lambda  value: self.popout_window(1))
 
         ### friction coefficient rechnung gedrückt
-        self.button_fr_constant.clicked.connect(lambda value: self.start_friction_coeff_event (1, 1, 0))
+        self.button_fr_constant.clicked.connect(lambda value: self.start_friction_coeff_event_initiation (1, 1, 0))
         self.button_fr_constant.clicked.connect(lambda  value: self.popout_window(arg=3))
+        
         
         
         
@@ -417,20 +454,19 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         if hasattr(self, 'timer'):
             self.timer.stop()
 
-        
-
+    
         if mode == "View sensors":
             
             #this is to make sure x-axis is configured properly 
-            if time_interval_var_int == 500:
-                sockets_files.tot_count_accumulate_recv = 1250
-                time_axis = [i * 0.0001 for i in range(5000)]
+            if time_interval_var_int == 100:
+                sockets_files.tot_count_accumulate_recv = 250
+                time_axis = [i * 0.0001 for i in range(1000)]
+            elif time_interval_var_int == 500:
+                sockets_files.tot_count_accumulate_recv = 5*250
+                time_axis = [i * 0.0001 for i in range(5*1000)]
             elif time_interval_var_int == 1000:
-                sockets_files.tot_count_accumulate_recv = 2*1250
-                time_axis = [i * 0.0001 for i in range(2*5000)]
-            elif time_interval_var_int == 2000:
-                sockets_files.tot_count_accumulate_recv = 4*1250
-                time_axis = [i * 0.0001 for i in range(4*5000)]
+                sockets_files.tot_count_accumulate_recv = 10*250
+                time_axis = [i * 0.0001 for i in range(10*1000)]
             
             ######################
             self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Hall sensors")
@@ -466,15 +502,15 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         elif mode == "View angle":
             
             #this is to make sure x-axis is configured properly 
-            if time_interval_var_int == 500:
-                sockets_files.tot_count_accumulate_recv = 1250
-                time_axis = [i * 0.0001 for i in range(5000)]
+            if time_interval_var_int == 100:
+                sockets_files.tot_count_accumulate_recv = 250
+                time_axis = [i * 0.0001 for i in range(1000)]
+            elif time_interval_var_int == 500:
+                sockets_files.tot_count_accumulate_recv = 5*250
+                time_axis = [i * 0.0001 for i in range(5*1000)]
             elif time_interval_var_int == 1000:
-                sockets_files.tot_count_accumulate_recv = 2*1250
-                time_axis = [i * 0.0001 for i in range(2*5000)]
-            elif time_interval_var_int == 2000:
-                sockets_files.tot_count_accumulate_recv = 4*1250
-                time_axis = [i * 0.0001 for i in range(4*5000)]
+                sockets_files.tot_count_accumulate_recv = 10*250
+                time_axis = [i * 0.0001 for i in range(10*5000)]
                 
             self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Permanent magnet angle")
             self.plot1.setLabel('left', 'ϕ_m', units='rad')
@@ -508,15 +544,15 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             
             #this is to make sure x-axis is configured properly 
             #this is to make sure x-axis is configured properly 
-            if time_interval_var_int == 500:
-                sockets_files.tot_count_accumulate_recv = 1250
-                time_axis = [i * 0.0001 for i in range(5000)]
+            if time_interval_var_int == 100:
+                sockets_files.tot_count_accumulate_recv = 250
+                time_axis = [i * 0.0001 for i in range(1000)]
+            elif time_interval_var_int == 500:
+                sockets_files.tot_count_accumulate_recv = 5*250
+                time_axis = [i * 0.0001 for i in range(5*1000)]
             elif time_interval_var_int == 1000:
-                sockets_files.tot_count_accumulate_recv = 2*1250
-                time_axis = [i * 0.0001 for i in range(2*5000)]
-            elif time_interval_var_int == 2000:
-                sockets_files.tot_count_accumulate_recv = 4*1250
-                time_axis = [i * 0.0001 for i in range(4*5000)]
+                sockets_files.tot_count_accumulate_recv = 10*250
+                time_axis = [i * 0.0001 for i in range(10*1000)]
                 
             self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Permanent magnet angle")
             self.plot1.setLabel('left', 'Δϕ', units='rad')
@@ -645,7 +681,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
     
         packet_transmission.stop_button_event(0)            #goto sockets_files and stop the loop for receiving
-        packet_transmission.running_time_event(1)
+        packet_transmission.running_time_event(this_running_time_flag=1)
         
         
         ### get the desired sampling frequency
@@ -668,24 +704,21 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #start the process at the initialisation
         #FOR NOW, LETS NOT DO ACQUISTION WINDOW
 
-        self.worker_sleep = SleepThread()
+        self.worker_sleep = SleepTimer()
         self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
         self.worker_sleep.start()
-        
     def update_time_counter_acquisition(self, val):
         self.lcdNumber.display(val)
-        
-        if val != 0:
+            
+        if val in (0, 0.1):
+            self.button_send.setDisabled(False)
+            self.button_start.setDisabled(False)
+            self.button_stop.setDisabled(True)
+        else:
             self.button_send.setDisabled(True)
             self.button_start.setDisabled(True)
             self.button_stop.setDisabled(False)
 
-        else:
-            self.button_send.setDisabled(False)
-            self.button_start.setDisabled(False)
-            self.button_stop.setDisabled(True)
-            
-    
     def start_normalise_event(self):
         if self.worker_DataUpdate.flag_normalise == False:
             self.worker_DataUpdate.flag_normalise_event(True)
@@ -701,6 +734,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 f"k b 2 = {packet_transmission.k_b_2}")
         elif arg == 3:
             msg.setText(f"Friction coefficient measurement is starting innit")
+        elif arg == 4:
+            msg.setText(f"f_R: {np.poly1d(self.calculate_final_fR)}")
             
         msg.setIcon(QMessageBox.Question)
         
@@ -761,7 +796,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
 
     def after_stabilise_calibration(self, count_recursion):
-        self.worker_sleep = SleepThread()
+        self.worker_sleep = SleepTimer()
         self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_calibrating(value, count_recursion))
         self.worker_sleep.start()
         
@@ -774,7 +809,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.button_start.setDisabled(True)
             self.button_stop.setDisabled(False)
 
-        elif val== 0:  #when val is 0 and the thread is stops already
+        else:  #when val is 0 and the thread is stops already
             
             #reset flags
             self.worker_DataUpdate.flag_special_event(False, False)
@@ -812,7 +847,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 print(k_b_1)
                 print(k_b_2)
                 
-                self.k_b_label.setText(a0=f"k_b_1 = {packet_transmission.k_b_1}           k_b_2 = {packet_transmission.k_b_2}")
+                self.k_b_label.setText(
+                    f"k<sub>b_1</sub> = {packet_transmission.k_b_1}&nbsp;&nbsp;&nbsp;"
+                    f"k<sub>b_2</sub> = {packet_transmission.k_b_2}&nbsp;&nbsp;&nbsp;"
+                    f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
+                    f"f<sub>R</sub> Gleichung = {np.poly1d(self.calculate_final_fR)}"
+                )
                 
                 self.popout_window(2)
                 #enable the button again
@@ -842,6 +882,65 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.accumulate_hall_2 = get_accumulate_hall_2
         self.accumulate_current_1 = get_accumulate_current_1
         self.accumulate_current_2 = get_accumulate_current2
+    
+    
+    #initiation!!!!!
+    def start_friction_coeff_event_initiation(self, running_frequency = 1,  rotation_direction =  1, count_recursion = 0, input_current = 30):
+        global data_1
+        global data_2
+        global data_3
+        global data_4
+        global data_5
+        global data_6
+        global data_7
+        global data_8
+        global data_9
+        global data_10
+        
+        #reset all f_R
+        if self.flag_fR == False:
+            self.flag_fR = True    
+            packet_transmission.f_R = 0
+            self.calculate_final_fR = 0
+
+        #########TODO: NOTE THAT DATA_1 IS NOT ACTUALLY USED AT AL!!! I NEED TO CHANGE THIS
+        data_1 = str(3) #mA
+        print(data_1)
+        data_3 = str(200) #mA
+        data_4 = self.textbox_offset1.text()  #mA
+        data_5 = str(200) #mA
+        data_6 = self.textbox_offset2.text()    # mA 
+            
+        data_2 = str(running_frequency) # Hz
+        
+        #determines the rotation direction
+        # 1 = anti-clockwise
+        # 2 = clockwise
+        data_7 = rotation_direction
+            
+        if self.filter_checkbox.isChecked():
+            data_8 = 0
+        else:
+            data_8 = 2
+            
+        data_9= 0
+        data_10 = 1
+        
+        
+        packet_transmission.send_function(data_1 , data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
+        # send all the data to be packed
+        packet_transmission.send_transmission_event(this_flag_send=1)            #SET flag for Tx
+        packet_transmission.start_flag_send_event(1)
+        
+
+        self.status_label.setStyleSheet("color: #32a83a;")
+        self.status_label.setText("f<sub>R</sub> begins!...............")
+        
+
+        QtCore.QTimer.singleShot(
+            3000,
+            lambda: self.start_friction_coeff_event(running_frequency, rotation_direction, count_recursion, input_current)
+        )
 
     def start_friction_coeff_event(self, running_frequency = 1,  rotation_direction =  1, count_recursion = 0, input_current = 30):
         global data_1
@@ -855,17 +954,14 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         global data_9
         global data_10
         
-        packet_transmission.f_R = 0
-        
-        ###calculate running time for 10 rotation
-        
-        data_1 = str(self.running_time_10_rotation(running_frequency))
+        data_1 = str(10)
         print(data_1)
-        data_2 = str(running_frequency) # Hz
         data_3 = str(input_current)# mA
-        data_4 = self.textbox_offset2.text()  #mA
+        data_4 = self.textbox_offset1.text()  #mA
         data_5 = str(input_current)  # mA
         data_6 = self.textbox_offset2.text()    # mA 
+            
+        data_2 = str(running_frequency) # Hz
         
         #determines the rotation direction
         # 1 = anti-clockwise
@@ -882,7 +978,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         #########TODO: NOTE THAT DATA_1 IS NOT ACTUALLY USED AT AL!!! I NEED TO CHANGE THIS
         
-        packet_transmission.send_function(int(data_1) , data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
+        packet_transmission.send_function(data_1 , data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
         # send all the data to be packed
         packet_transmission.send_transmission_event(this_flag_send=1)            #SET flag for Tx
         packet_transmission.start_flag_send_event(1)
@@ -891,22 +987,18 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         # send flag for calibration in the thread
         self.worker_DataUpdate.flag_special_event(flag_1=False, flag_2=True)
 
-        self.status_label.setStyleSheet("color: #32a83a;")
-        self.status_label.setText("f<sub>R</sub> begins!...............")
         
-        QtCore.QTimer.singleShot(int(data_1)*1000, lambda: self.after_stabilise_fR_measurement(count_recursion, running_frequency, input_current))
+        
+        time_delay = 10 * 1000
+        QtCore.QTimer.singleShot(time_delay, lambda: self.after_stabilise_fR_measurement(count_recursion, running_frequency, input_current))
     
+
         
     def after_stabilise_fR_measurement(self, count_recursion, running_frequency, input_current):
-        self.worker_sleep = SleepThread()
+        self.worker_sleep = SleepTimer()
         self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_fR_measurement( value, count_recursion, running_frequency, input_current))
         self.worker_sleep.start()
         
-        
-    def running_time_10_rotation(self, running_frequency):
-        running_time = 10/running_frequency 
-        
-        return float(running_time)
     
     def update_time_counter_fR_measurement(self, val, count_recursion, running_frequency, input_current):
         """
@@ -940,87 +1032,167 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         self.lcdNumber.display(val)
 
-        if val != 0:
-      
+        if val != 0.1:   # means val != 0 and val != 0.1
             self.button_send.setDisabled(True)
             self.button_start.setDisabled(True)
             self.button_stop.setDisabled(False)
 
-        elif val== 0:  #when val is 0 and the thread is stops already         
+        elif val == 0.1:     # means val == 0 or val == 0.1     
             #reset flags (so that accumulate does not change here )(data integrity reason here)
             self.worker_DataUpdate.flag_special_event(False, False)
             
             
-            self.mean_current1_fR = np.mean(self.accumulate_current_1[1000:])
-            self.mean_current2_fR= np.mean(self.accumulate_current_2[1000:])
-            self.mean_hall1_fR = np.mean(self.accumulate_hall_1[1000:])
-            self.mean_hall2_fR= np.mean(self.accumulate_hall_2[1000:])
+            self.current1_fR = self.accumulate_current_1[2000:]
+            self.current2_fR= self.accumulate_current_2[2000:]
+            self.hall1_fR = self.accumulate_hall_1[2000:]
+            self.hall2_fR= self.accumulate_hall_2[2000:]
             
-            self.calculated_torque[count_recursion] = self.calculate_torque_fR(self.mean_current1_fR, self.mean_current2_fR, self.mean_hall1_fR, 
-                                                    self.mean_hall2_fR)
-            
-            
-            if 0 <= count_recursion < 19:
-                if  0 <= count_recursion < 10:
+
+            if 0 <= count_recursion < 20:               
+
+                if  0 <= count_recursion < 9:
                     ### anticlockwise first 
+                    
+        
+                    self.calculated_angular_velocity[count_recursion] = np.mean(self.calculate_radial_frequency(running_frequency))
+                    before_mean_torque, before_mean_phase = self.calculate_torque_fR(self.current1_fR, self.current2_fR, self.hall1_fR, 
+                                                    self.hall2_fR)
+                    self.calculated_torque[count_recursion] = np.mean(before_mean_torque)
+                    self.mean_phase[count_recursion] = np.mean(before_mean_phase)
+                    self.standard_torque[count_recursion] = np.std(a=before_mean_torque)
+                    self.standard_mean_torque[count_recursion] = np.std(a=before_mean_torque) / np.sqrt(len(before_mean_torque))
+                    self.standard_phase[count_recursion] = np.std(a=before_mean_phase) 
+                    self.standard_mean_phase[count_recursion] = np.std(a=before_mean_phase) / np.sqrt(len(before_mean_phase))
                         
-                        
-                    #negative frequency
-                    self.calculated_angular_velocity[count_recursion] = -self.calculate_radial_frequency(running_frequency)
                     running_frequency+= 1       #Hz
-                        
-                        
+                    rotation_direction = 1
+                    count_recursion = count_recursion + 1 
                     
-                    rotation_direction = 1 
-                elif 10 <=  count_recursion  < 19:
-                    #positive frequency
-                    self.calculated_angular_velocity[count_recursion] = self.calculate_radial_frequency(running_frequency)
-                    ### increment by one
-                    running_frequency+= 1
                     
-                    if count_recursion == 10:
-                        #reset to 1Hz (since the negative frequency part, i.e. anti-clockwise part, is done)
-                        running_frequency = 1
+                elif count_recursion == 9:
+                    #reset to 1Hz (since the negative frequency part, i.e. anti-clockwise part, is done)
                     
+                    self.calculated_angular_velocity[count_recursion] = np.mean(self.calculate_radial_frequency(running_frequency))
+                    before_mean_torque, before_mean_phase = self.calculate_torque_fR(self.current1_fR, self.current2_fR, self.hall1_fR, 
+                                                    self.hall2_fR)
+                    self.calculated_torque[count_recursion] = np.mean(before_mean_torque)
+                    self.mean_phase[count_recursion] = np.mean(before_mean_phase)
+                    self.standard_torque[count_recursion] = np.std(a=before_mean_torque)
+                    self.standard_mean_torque[count_recursion] = np.std(a=before_mean_torque) / np.sqrt(len(before_mean_torque))
+                    self.standard_phase[count_recursion] = np.std(a=before_mean_phase) 
+                    self.standard_mean_phase[count_recursion] = np.std(a=before_mean_phase) / np.sqrt(len(before_mean_phase))
+                    
+                    running_frequency = 1
+                    count_recursion = count_recursion + 1 
                     rotation_direction = 2
-                count_recursion = count_recursion + 1
+                
+                elif 10 <=  count_recursion  < 20 :
+                    #negative frequency
+                    self.calculated_angular_velocity[count_recursion] = -np.mean(self.calculate_radial_frequency(running_frequency))
+                    ### increment by one
+                    before_mean_torque, before_mean_phase= self.calculate_torque_fR(self.current1_fR, self.current2_fR, self.hall1_fR, 
+                                                    self.hall2_fR)
+                    self.calculated_torque[count_recursion] = np.mean(before_mean_torque)
+                    self.mean_phase[count_recursion] = np.mean(before_mean_phase)
+                    self.standard_torque[count_recursion] = np.std(a=before_mean_torque)
+                    self.standard_mean_torque[count_recursion] = np.std(a=before_mean_torque) / np.sqrt(len(before_mean_torque))
+                    self.standard_phase[count_recursion] = np.std(a=before_mean_phase) 
+                    self.standard_mean_phase[count_recursion] = np.std(a=before_mean_phase) / np.sqrt(len(before_mean_phase))
+                
+                    running_frequency+= 1
+                    rotation_direction = 2
+                    count_recursion = count_recursion + 1
                 print("recursion is", count_recursion)
+                
+                #mapping for current {count_recursion:input_current}
                 if count_recursion == 1:  #Hz
                     input_current = 40 #mA
                 elif count_recursion == 2:
                     input_current = 45 
-                elif running_frequency == 3:
+                elif count_recursion == 3:
                     input_current = 50
-                elif running_frequency == 4:
+                elif count_recursion == 4:
                     input_current = 50
-                elif running_frequency == 5:
+                elif count_recursion == 5:
                     input_current = 60 
-                elif running_frequency == 6:
+                elif count_recursion == 6:
                     input_current = 60
-                elif running_frequency == 7:
+                elif count_recursion == 7:
                     input_current = 70
-                elif running_frequency == 8:
+                elif count_recursion == 8:
                     input_current = 80
-                elif running_frequency == 9:
+                elif count_recursion == 9:
                     input_current = 90
-                
+                if count_recursion == 10:  #Hz
+                    input_current = 30 #mA
+                elif count_recursion == 11:
+                    input_current = 40 
+                elif count_recursion == 12:
+                    input_current = 45
+                elif count_recursion == 13:
+                    input_current = 50
+                elif count_recursion == 14:
+                    input_current = 50 
+                elif count_recursion == 15:
+                    input_current = 60
+                elif count_recursion == 16:
+                    input_current = 60
+                elif count_recursion == 17:
+                    input_current = 70
+                elif count_recursion == 18:
+                    input_current = 80
+                elif count_recursion == 19:
+                    input_current = 90
+
+                    
                 ###recursion to the main function occurs
                 print("running frquency is ", running_frequency)
-                self.start_friction_coeff_event(running_frequency, rotation_direction, count_recursion, input_current)
+                self.start_friction_coeff_event_initiation(running_frequency, rotation_direction, count_recursion, input_current)
             
             ### measurement is done
-            elif count_recursion == 19:
-                # calculate the last angular velocity
-                self.calculated_angular_velocity[count_recursion] = self.calculate_radial_frequency(running_frequency)
+            elif count_recursion == 20:
+                # Combine the two arrays column-wise
+                data_to_save = np.column_stack(( self.calculated_angular_velocity, self.calculated_torque, self.standard_mean_torque,
+                                                self.standard_torque, self.mean_phase, self.standard_mean_phase, self.standard_phase))
+                header_text = "angular_velocity  [rad/s];mean_torque [Nm];std_mean_torque [Nm];std_torque [Nm];mean_phase [rad];std_mean_phase [rad];std_phase [rad]"
                 
-
+                
+                if os.path.exists("results_fr.csv"):
+                    os.remove("results_fr.csv")
+                    print("results_fr.csv deleted")
+                # Save to CSV
+                np.savetxt("results_fr.csv", data_to_save, delimiter=";", comments="", fmt="%.12f", header=header_text)
                 #calculate final fR
                 self.calculate_final_fR =  np.polyfit(self.calculated_angular_velocity, self.calculated_torque, 1)
+                self.popout_window(4)
+                
+                packet_transmission.fr1, packet_transmission.fr0 = self.calculate_final_fR
+                
+                #change textbox in the bottom of the GUI 
+                self.k_b_label.setText(
+                    f"k<sub>b_1</sub> = {packet_transmission.k_b_1}&nbsp;&nbsp;&nbsp;"
+                    f"k<sub>b_2</sub> = {packet_transmission.k_b_2}&nbsp;&nbsp;&nbsp;"
+                    f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
+                    f"f<sub>R</sub> Gleichung = {np.poly1d(self.calculate_final_fR)}"
+                )
                 
                 #enable the button again
                 self.button_send.setDisabled(False)
                 self.button_start.setDisabled(False)
                 self.button_stop.setDisabled(True)
+                
+                
+                if val == 0:
+                    #enable the button again
+                    self.button_send.setDisabled(False)
+                    self.button_start.setDisabled(False)
+                    self.button_stop.setDisabled(True)
+                
+        if val == 0:
+            #enable the button again
+            self.button_send.setDisabled(False)
+            self.button_start.setDisabled(False)
+            self.button_stop.setDisabled(True)
     
                 
             
@@ -1036,7 +1208,10 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         :param current_1: First component of the current measurement.
         :type current_1: float or np.ndarray
-        :param current_2: Second component of the current measurement.
+        :param current_2:ray(hall_2, dtype=float)
+        
+        print("current_2:", current_2)
+        global data_4,  Second component of the current measurement.
         :type current_2: float or np.ndarray
         :param hall_1: First Hall sensor reading.
         :type hall_1: float or np.ndarray
@@ -1047,26 +1222,28 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         :rtype: float or np.ndarray
         """
         
-        global data_4, data_6
+        current_1 = np.array(current_1, dtype=float)
+        current_2 = np.array(current_2, dtype=float)
+        hall_1    = np.array(hall_1, dtype=float)
+        hall_2    = np.array(hall_2, dtype=float)
+        
         offset_1 =float(data_4)
         offset_2 =float(data_6)
         
         #magnetic field angle - magnet angle
         phase_difference = np.arctan2(current_2, current_1) - np.arctan2(hall_2, hall_1)
-
+        
         power_of_2 = np.power((current_1 - offset_1), 2) + np.power((current_2 - offset_2), 2)
         
         magnitude_current = np.sqrt(power_of_2)
         
-        total_torque = (
-        self.CALIBRATION_FACTOR                # dimensionslos
-        * self.DIPOLE_MOMENT                    # [A·m²]
-        * self.COIL_CONSTANT                    # [T/A]
+        total_torque = packet_transmission.CALIBRATION_FACTOR * ( self.DIPOLE_MOMENT
+        *self.COIL_CONSTANT                    # [T/A]
         * magnitude_current / 1000         # mA; -> A, [A]
         * np.sin(phase_difference)   # dimensionless
         )
         
-        return total_torque
+        return total_torque, phase_difference
     
     def calculate_radial_frequency(self, running_frequency):
         
@@ -1110,7 +1287,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             
             
     def set_hardware_reset_event(self):
-        global data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9
+        global data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10
         
         data_9 = 1
         packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)

@@ -125,12 +125,12 @@
      <rect>
       <x>260</x>
       <y>940</y>
-      <width>431</width>
+      <width>1251</width>
       <height>41</height>
      </rect>
     </property>
     <property name="text">
-     <string>k_b_1  =                     k_b_2= </string>
+     <string>k_b_1  =                     k_b_2=                                          </string>
     </property>
    </widget>
    <widget class="QSplitter" name="splitter_2">
@@ -691,17 +691,17 @@ border-color: rgb(255, 255, 127);</string>
               </property>
               <item>
                <property name="text">
+                <string>100ms</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
                 <string>500ms</string>
                </property>
               </item>
               <item>
                <property name="text">
                 <string>1000ms</string>
-               </property>
-              </item>
-              <item>
-               <property name="text">
-                <string>2000ms</string>
                </property>
               </item>
              </widget>

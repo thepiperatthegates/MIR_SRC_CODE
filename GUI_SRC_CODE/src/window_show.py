@@ -202,10 +202,11 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
     
    ############calculation constant##############################################################
     
-        self.FRICTION_COEFFICIENT = packet_transmission.f_R
+        self.fr0 = packet_transmission.fr0
+        self.fr1 = packet_transmission.fr1
         self.COIL_CONSTANT = 3.097e-3		# in T / A
         self.DIPOLE_MOMENT = 8.594e-3		# in A m^2
-        self.CALIBRATION_FACTOR = 1		# torque calibration no units (K)
+        self.CALIBRATION_FACTOR = packet_transmission.CALIBRATION_FACTOR		# torque calibration no units (K)
 
     ############geometry constants################################################################
         self.C_SS = 11160103			# conversion factor to stress in Pa / Nm
@@ -221,15 +222,15 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.voltage_1 = None
         self.voltage_2 = None
         
-        
-        
+        self.of1 = None
+        self.of2 = None
         
         #declare bunch of important variable stuffs
         self.angle_magnetic_field = None
         self.angle_magnet = None
         self.phase_difference = None
         self.angular_velocity = None
-        self.friction_moment = None
+        self.fr1on_moment = None
         self.magnitude_current = None
         self.shear_rate = None
         self.total_torque = None
@@ -244,7 +245,6 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.shear_rate_mean = None
         self.shear_stress_mean = None
         self.viscosity_mean = None
-        
      #############################################################################
         
 
@@ -293,97 +293,11 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             
         mode = self.data_show_comboBox.currentText()
         
-        
         self.data = pandas.read_csv(self.analyse_filename, sep=";", header=None).to_numpy()
-        
-        
         self.num_rows, self.num_column = self.data.shape
-
-
-        #############################################################################
-        self.time = np.zeros(( self.num_rows, 1))
-        self.current_1 = np.zeros(( self.num_rows, 1))
-        self.current_2 = np.zeros(( self.num_rows, 1))
-        self.voltage_1 = np.zeros(( self.num_rows, 1))
-        self.voltage_2 = np.zeros(( self.num_rows, 1))
-        self.angle_magnetic_field = np.zeros(( self.num_rows, 1))
-        self.angle_magnet = np.zeros(( self.num_rows, 1))
-        self.phase_difference = np.zeros((self.num_rows, 1))
-        self.angular_velocity = np.zeros((self.num_rows, 1))
-        self.shear_rate =  np.zeros((self.num_rows, 1))
-        self.friction_moment = np.zeros((self.num_rows, 1))
-        self.total_torque =  np.zeros((self.num_rows, 1))
-        self.magnitude_current = np.zeros((self.num_rows, 1))
-        ###############################################################################
         
         
         
-        
-        
-        
-        #declare variables to read from the files (already given)
-        self.time = self.data[:, 0]
-        self.voltage_1 = self.data[:, 1]
-        self.voltage_2 = self.data[:, 2]
-        self.current_1 = self.data[:, 3]
-        self.current_2 = self.data[:, 4]
-        
-        
-        
-        
-         #call normalise function 
-        self.normalise_voltage_event()
-        self.calculate_angle()
-        self.calculate_magnitude_current()
-        # calculate rotation velocity
-        self.calculate_shear_rate()
-        
-        #calculate friction moment from shear rate
-        self.calculate_friction_moment()
-        self.calculate_shear_stress()
-        self.calculate_viscosity()
-
-        
-        
-        amf = self.angle_magnetic_field.reshape(-1, 1)
-        amag = self.angle_magnet.reshape(-1, 1)
-        pd  = self.phase_difference.reshape(-1, 1)
-        angv = self.angular_velocity.reshape(-1,1)
-        trq = self.total_torque.reshape(-1, 1)
-        sr1 = self.shear_rate.reshape(-1, 1)
-        ss2 = self.shear_stress.reshape(-1, 1)
-        vis = self.viscosity.reshape(-1, 1)
-        
-                
-        N = self.angle_magnetic_field.shape[0]  # number of rows
-
-        # make empty string columns
-        off1 = np.full((N, 1), "", dtype=object)
-        off2 = np.full((N, 1), "", dtype=object)
-
-        # put user input only in the first row
-        off1[0, 0] = str(self.offset_1)
-        off2[0, 0] = str(self.offset_2)
-        print(self.offset_1)
-            
-                        
-                
-        self.final_data_to_save = np.hstack((
-            self.data,
-            amf,
-            amag,
-            pd,
-            angv,
-            trq,
-            sr1,
-            ss2,
-            vis,
-            off1, 
-            off2
-        ))
-
-        #find the number of rows and column AGAIN
-
         #first mode
         if mode == "Data table":
             #HIDE THE TABLE WIDGET 
@@ -433,6 +347,93 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             self.table_Widget.hide()
             self.canvas.show()
             self.draw_viscosity_diagram()
+        
+
+
+
+    def calculate_functions(self):
+        #############################################################################
+        self.time = np.zeros(( self.num_rows, 1))
+        self.current_1 = np.zeros(( self.num_rows, 1))
+        self.current_2 = np.zeros(( self.num_rows, 1))
+        self.voltage_1 = np.zeros(( self.num_rows, 1))
+        self.voltage_2 = np.zeros(( self.num_rows, 1))
+        self.angle_magnetic_field = np.zeros(( self.num_rows, 1))
+        self.angle_magnet = np.zeros(( self.num_rows, 1))
+        self.phase_difference = np.zeros((self.num_rows, 1))
+        self.angular_velocity = np.zeros((self.num_rows, 1))
+        self.shear_rate =  np.zeros((self.num_rows, 1))
+        self.fr1on_moment = np.zeros((self.num_rows, 1))
+        self.total_torque =  np.zeros((self.num_rows, 1))
+        self.magnitude_current = np.zeros((self.num_rows, 1))
+        ###############################################################################
+        
+            
+        
+        
+        
+        #declare variables to read from the files (already given)
+        self.time = self.data[:, 0]
+        self.voltage_1 = self.data[:, 1]
+        self.voltage_2 = self.data[:, 2]
+        self.current_1 = self.data[:, 3]
+        self.current_2 = self.data[:, 4]
+        
+                #call normalise function 
+        self.normalise_voltage_event()
+        self.calculate_angle()
+        self.calculate_magnitude_current()
+        # calculate rotation velocity
+        self.calculate_shear_rate()
+        
+        #calculate friction moment from shear rate
+        self.calculate_friction_moment()
+        self.calculate_shear_stress()
+        self.calculate_viscosity()
+
+        
+        
+        amf = self.angle_magnetic_field.reshape(-1, 1)
+        amag = self.angle_magnet.reshape(-1, 1)
+        pd  = self.phase_difference.reshape(-1, 1)
+        angv = self.angular_velocity.reshape(-1,1)
+        trq = self.total_torque.reshape(-1, 1)
+        sr1 = self.shear_rate.reshape(-1, 1)
+        ss2 = self.shear_stress.reshape(-1, 1)
+        vis = self.viscosity.reshape(-1, 1)
+        
+                
+        N = self.angle_magnetic_field.shape[0]  # number of rows
+
+        # make empty string columns
+        self.off1 = np.full((N, 1), "", dtype=object)
+        self.off2 = np.full((N, 1), "", dtype=object)
+
+        # put user input only in the first row
+        self.off1[0, 0] = str(self.offset_1)
+        self.off2[0, 0] = str(self.offset_2)
+        print(self.offset_1)
+            
+                        
+                
+        self.final_data_to_save = np.hstack((
+            self.data,
+            amf,
+            amag,
+            pd,
+            angv,
+            trq,
+            sr1,
+            ss2,
+            vis,
+            self.off1, 
+            self.off2
+        ))
+        
+        #update fr coefficients
+        self.fr0 = packet_transmission.fr0
+        self.fr1 = packet_transmission.fr1
+            
             
             
             
@@ -441,6 +442,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
     def data_mode_function(self):
         if  self.num_column == 5:
             
+            self.calculate_functions()
             self.calculate_all_mean()
 
             # remove last two columns
@@ -468,8 +470,6 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         elif self.num_column == 15:
 
             self.calculate_all_mean_after_save()
-            
-            
             self.final_data_to_show = self.data[:, :-2]
             
             
@@ -484,6 +484,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
                 for col in range(self.final_data_to_show.shape[1]):
                     item = QTableWidgetItem(str(self.final_data_to_show[row, col]))
                     self.table_Widget.setItem(row + 1, col, item)  # shift by 1
+                    
                     
             self.save_Button.setDisabled(True)
             
@@ -507,6 +508,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             self.viscosity_mean,
         ]
 
+        #colour the row with red 
         for i, val in enumerate(values, start=7):
             item = QTableWidgetItem(str(val))
             item.setBackground(QtGui.QColor(255, 0, 0))
@@ -605,7 +607,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         
     def calculate_friction_moment(self):
-        self.friction_moment = self.CALIBRATION_FACTOR * self.angular_velocity * self.FRICTION_COEFFICIENT          # [Nm]
+        self.friction_moment =   self.angular_velocity * self.fr1  - self.fr0 # - y_0        # [Nm]
         
         
     def calculate_magnitude_current(self):
@@ -620,13 +622,12 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
     def calculate_shear_stress(self):
         
-        self.total_torque = (
-        self.CALIBRATION_FACTOR                # dimensionslos
-        * self.DIPOLE_MOMENT                    # [A·m²]
+        self.total_torque = (self.CALIBRATION_FACTOR*            # dimensionslos 
+        self.DIPOLE_MOMENT                    # [A·m²]
         * self.COIL_CONSTANT                    # [T/A]
         * self.magnitude_current / 1000         # mA -> A, [A]
-        * np.sin(self.phase_difference[:, 0])   # dimensionless
-        ) - self.friction_moment                # [Nm]
+        * np.sin(self.phase_difference[:, 0]))   # dimensionless
+        - self.friction_moment              # [Nm]
         
         
         

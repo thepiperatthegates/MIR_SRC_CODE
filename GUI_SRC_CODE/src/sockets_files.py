@@ -33,7 +33,7 @@ flag_for_process = None
 p1 = None
 
 #for total count receiving from socket (depends if we want 0.5s, 1s or 2s)
-tot_count_accumulate_recv = 1250
+tot_count_accumulate_recv = 250
 
 
 time_increment = None
@@ -85,7 +85,7 @@ def thread_start():
             start_flag_send = 0
             thread_send = threading.Thread(target=send_thread, daemon=True, args=(ser1,))
             thread_send.start()
-        time.sleep(0.01)
+        time.sleep(0.001)
             
 
     
@@ -120,9 +120,9 @@ def timer_monitor(ser1):
                 data_flag = packet_transmission.running_time_getter()
                 if data_flag == 1:
                     if data_send:
-                        save_to_csv(received_payload)
-                        received_payload = None
-                print("Done writing once!")
+                        save_to_csv(data_send)
+                        data_send = None
+                    print("Done writing once!")
 
                     
             except Exception as e:
