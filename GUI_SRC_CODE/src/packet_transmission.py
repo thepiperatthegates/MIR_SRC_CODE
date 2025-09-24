@@ -63,8 +63,12 @@ k_b_2 = 0.084535931
 
 #default friction coefficient 
 CALIBRATION_FACTOR = 0.773
-fr1 = 1 # in Nm / (rad /s)
-fr0 = 1 # in Nm / (rad /s)
+fr1 = 0.0 # in Nm / (rad /s)
+fr0 = 0.0 # in Nm / (rad /s)
+
+#offset from main.py
+offset_1 = 0.0
+offset_2 = 0.0
 
 
 #flag for electronics type

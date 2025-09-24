@@ -675,8 +675,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         data_2 = packet_transmission.calculate_running_frequency(float(data_2))
         data_3 = self.textbox_amplitude1.text()
         data_4 =  self.textbox_offset1.text()
+        packet_transmission.offset_1 = float(data_4)
         data_5 = self.textbox_amplitude2.text()
-        data_6 = self.textbox_offset2.text()  
+        data_6 = self.textbox_offset2.text() 
+        packet_transmission.offset_2 = float(data_6) 
+        
         data_10 = 1
         packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
     
@@ -908,8 +911,10 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         print(data_1)
         data_3 = str(200) #mA
         data_4 = self.textbox_offset1.text()  #mA
+        packet_transmission.offset_1 = float(data_4)
         data_5 = str(200) #mA
         data_6 = self.textbox_offset2.text()    # mA 
+        packet_transmission.offset_2 = float(data_6)
             
         data_2 = str(running_frequency) # Hz
         

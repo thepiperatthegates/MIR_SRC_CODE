@@ -189,15 +189,6 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.num_column = None
         self.total_torque = None     
     #######################################################################################################
-
-        
-        #placeholder for the offsets input
-        self.textbox_offset1.setText("0")  # default value 0
-        self.textbox_offset2.setText("0")  # default value 0
-    
-        
-        self.offset_1 =float(self.textbox_offset1.text())
-        self.offset_2 =float(self.textbox_offset2.text())       
     
     
    ############calculation constant##############################################################
@@ -207,6 +198,14 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.COIL_CONSTANT = 3.097e-3		# in T / A
         self.DIPOLE_MOMENT = 8.594e-3		# in A m^2
         self.CALIBRATION_FACTOR = packet_transmission.CALIBRATION_FACTOR		# torque calibration no units (K)
+    
+        
+        self.offset_1 = float(packet_transmission.offset_1)
+        self.offset_2 = float(packet_transmission.offset_2)   
+        
+        #placeholder for the offsets input
+        self.textbox_offset1.setText(str(self.offset_1))  
+        self.textbox_offset2.setText(str(self.offset_2)) 
 
     ############geometry constants################################################################
         self.C_SS = 11160103			# conversion factor to stress in Pa / Nm
@@ -285,15 +284,13 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.data_show_comboBox.setDisabled(False)
         self.data_show_comboBox.activated.connect(self.choose_option)
         
-        
+        =
         
 
     def choose_option(self):
         
-            
-        mode = self.data_show_comboBox.currentText()
-        
         self.data = pandas.read_csv(self.analyse_filename, sep=";", header=None).to_numpy()
+        mode = self.data_show_comboBox.currentText()
         self.num_rows, self.num_column = self.data.shape
         
         
@@ -378,8 +375,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.voltage_2 = self.data[:, 2]
         self.current_1 = self.data[:, 3]
         self.current_2 = self.data[:, 4]
-        
-                #call normalise function 
+        #call normalise function 
         self.normalise_voltage_event()
         self.calculate_angle()
         self.calculate_magnitude_current()
@@ -406,13 +402,23 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         N = self.angle_magnetic_field.shape[0]  # number of rows
 
         # make empty string columns
-        self.off1 = np.full((N, 1), "", dtype=object)
-        self.off2 = np.full((N, 1), "", dtype=object)
-
+        self.off1_to_be_saved = np.full((N, 1), "", dtype=object)
+        self.off2_to_be_saved = np.full((N, 1), "", dtype=object)
+        self.fr0_to_be_saved = np.full((N, 1), "", dtype=object)
+        self.fr1_to_be_saved = np.full((N, 1), "", dtype=object)
+        
         # put user input only in the first row
-        self.off1[0, 0] = str(self.offset_1)
-        self.off2[0, 0] = str(self.offset_2)
-        print(self.offset_1)
+        self.off1_to_be_saved[0, 0] = float(self.offset_1)
+        self.off2_to_be_saved[0, 0] = float(self.offset_2)
+        self.fr0_to_be_saved[0, 0]  = float(packet_transmission.fr0)
+        self.fr1_to_be_saved[0, 0]  = float(packet_transmission.fr1)
+        
+        #update fr coefficients IN SYSTEM 
+        self.fr0 = packet_transmission.fr0
+        self.fr1 = packet_transmission.fr1    
+        #update offset coefficients IN SYSTEM 
+        self.offset_1 = float(packet_transmission.offset_1)
+        self.offset_2 = float(packet_transmission.offset_2)    
             
                         
                 
@@ -426,14 +432,61 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             sr1,
             ss2,
             vis,
-            self.off1, 
-            self.off2
+            self.off1_to_be_saved, 
+            self.off2_to_be_saved,
+            self.fr0_to_be_saved, 
+            self.fr1_to_be_saved
         ))
-        
-        #update fr coefficients
-        self.fr0 = packet_transmission.fr0
-        self.fr1 = packet_transmission.fr1
             
+    def reference_var_for_saved_data(self):
+        #############################################################################
+        self.time = np.zeros(( self.num_rows, 1))
+        self.current_1 = np.zeros(( self.num_rows, 1))
+        self.current_2 = np.zeros(( self.num_rows, 1))
+        self.voltage_1 = np.zeros(( self.num_rows, 1))
+        self.voltage_2 = np.zeros(( self.num_rows, 1))
+        self.angle_magnetic_field = np.zeros(( self.num_rows, 1))
+        self.angle_magnet = np.zeros(( self.num_rows, 1))
+        self.phase_difference = np.zeros((self.num_rows, 1))
+        self.angular_velocity = np.zeros((self.num_rows, 1))
+        self.shear_rate =  np.zeros((self.num_rows, 1))
+        self.fr1on_moment = np.zeros((self.num_rows, 1))
+        self.total_torque =  np.zeros((self.num_rows, 1))
+        self.magnitude_current = np.zeros((self.num_rows, 1))
+        ###############################################################################
+        
+            
+        
+        
+        
+        #declare variables to read from the files (already given)
+        self.time = self.final_data_to_show[:, 0]
+        self.voltage_1 = self.final_data_to_show[:, 1]
+        self.voltage_2 = self.final_data_to_show[:, 2]
+        self.current_1 = self.final_data_to_show[:, 3]
+        self.current_2 = self.final_data_to_show[:, 4]
+        self.angle_magnetic_field = self.final_data_to_show[:, 5]
+        self.angle_magnet = self.final_data_to_show[:, 6]
+        self.phase_difference = self.final_data_to_show[:, 7]
+        self.angular_velocity = self.final_data_to_show[:, 8]
+        self.total_torque = self.final_data_to_show[:, 9]
+        self.shear_rate = self.final_data_to_show[:, 10]
+        self.shear_stress = self.final_data_to_show[:, 11]
+        self.viscosity = self.final_data_to_show[:, 12]
+        
+        self.offset_1 = self.coefficient_saved[0, 0]
+        self.offset_2 = self.coefficient_saved[0, 1]
+        self.fr0 = self.coefficient_saved[0, 2]
+        self.fr1 = self.coefficient_saved[0, 3]
+        
+        self.textbox_offset1.setText(str(self.offset_1))
+        self.textbox_offset1.setText(str(object=self.offset_2))
+        
+        print("Offset 1 from csv:", self.offset_1)
+        print("Offset 2 from csv:", self.offset_2)
+        print("fr0 from csv:", self.fr0)
+        print("fr1 from csv:", self.fr1)
+    
             
             
             
@@ -446,7 +499,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             self.calculate_all_mean()
 
             # remove last two columns
-            self.final_data_to_show = self.final_data_to_save[:, :-2]
+            self.final_data_to_show = self.final_data_to_save[:, :-4]
 
             # set row and column count
             self.table_Widget.setRowCount(self.final_data_to_show.shape[0]+1)
@@ -467,11 +520,15 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             self.save_Button.clicked.connect(self.save_button_event)
             
             
-        elif self.num_column == 15:
+        elif self.num_column == 17:
 
-            self.calculate_all_mean_after_save()
-            self.final_data_to_show = self.data[:, :-2]
             
+            #take all the data up to column 13
+            self.final_data_to_show = self.data[:, :-4]
+            #take all the data 2 from the last column
+            self.coefficient_saved = self.data[:, -4:]
+            self.calculate_all_mean_after_save()
+            self.reference_var_for_saved_data()
             
             # set row and column count
             self.table_Widget.setRowCount(self.final_data_to_show.shape[0]+1)
@@ -546,14 +603,16 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
     
     def save_button_event(self):
-        filename, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv)")
+        
+       
+        filename, _ = QFileDialog.getSaveFileName(parent=self, caption="Save File", directory="", filter="CSV Files (*.csv)")
         if filename:
             if not filename.lower().endswith('.csv'):
                 filename += '.csv'
             
             # Save with pandas
             df = pandas.DataFrame(self.final_data_to_save)
-            df.to_csv(filename, sep=";", index=False, header=False)
+            df.to_csv(filename, sep=";", index=False, header=None)
                 
     def calculate_angle(self):
         """
