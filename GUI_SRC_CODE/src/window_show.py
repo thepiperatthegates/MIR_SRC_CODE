@@ -284,7 +284,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.data_show_comboBox.setDisabled(False)
         self.data_show_comboBox.activated.connect(self.choose_option)
         
-        =
+        
         
 
     def choose_option(self):
