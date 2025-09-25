@@ -211,7 +211,7 @@ class DataUpdate(QThread):
                                     self.accumulate_current_1,
                                     self.accumulate_current_2)
         
-    def flag_special_event(self, flag_1 = False, flag_2 = False):
+    def flag_special_event(self, flag_1, flag_2):
         
         #Set flag for calibration
         self.flag_calibrate = flag_1
@@ -795,44 +795,45 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.status_label.setStyleSheet("color: #32a83a;")
         self.status_label.setText("Calibrating!...............")
         
-        QtCore.QTimer.singleShot(1000, lambda: self.after_stabilise_calibration(count_recursion))
+        QtCore.QTimer.singleShot(1000, lambda: self.after_stabilise_calibration(count_recursion, input_current))
         
 
-    def after_stabilise_calibration(self, count_recursion):
+    def after_stabilise_calibration(self, count_recursion, input_current):
         self.worker_sleep = SleepTimer()
-        self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_calibrating(value, count_recursion))
+        self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_calibrating(value, count_recursion, input_current))
         self.worker_sleep.start()
         
 
-    def update_time_counter_calibrating(self, val, count_recursion):
+    def update_time_counter_calibrating(self, val, count_recursion, input_current):
         self.lcdNumber.display(val)
 
-        if val != 0:
+        if val != 0.1:
             self.button_send.setDisabled(True)
             self.button_start.setDisabled(True)
             self.button_stop.setDisabled(False)
 
-        else:  #when val is 0 and the thread is stops already
+        elif val == 0.1:  #when val is 0 and the thread is stops already
             
             #reset flags
             self.worker_DataUpdate.flag_special_event(False, False)
 
             if count_recursion == 1:
-                self.mean_hall_1_0_A = np.mean(self.accumulate_hall_1[1000:])
-                self.mean_hall_2_0_A = np.mean(self.accumulate_hall_2[1000:])
+                self.mean_hall_1_0_A = np.mean(self.accumulate_hall_1[100:])
+                self.mean_hall_2_0_A = np.mean(self.accumulate_hall_2[100:])
                 
-                self.mean_current_1_0_A = np.mean(self.accumulate_current_1[1000:])
-                self.mean_current_2_0_A = np.mean(self.accumulate_current_2[1000:])
+                self.mean_current_1_0_A = np.mean(self.accumulate_current_1[100:])
+                self.mean_current_2_0_A = np.mean(self.accumulate_current_2[100:])
                 
+                input_current = 400
                 ### second recursion occurs
                 self.start_calibration_event(400, 2)
             elif count_recursion == 2:
-                self.mean_hall_1_400_A = np.mean(self.accumulate_hall_1[1000:])
-                self.mean_hall_2_400_A = np.mean(self.accumulate_hall_2[1000:])
+                self.mean_hall_1_400_A = np.mean(self.accumulate_hall_1[100:])
+                self.mean_hall_2_400_A = np.mean(self.accumulate_hall_2[100:])
                 
                 
-                self.mean_current_1_400_A = np.mean(self.accumulate_current_1[1000:])
-                self.mean_current_2_400_A = np.mean(self.accumulate_current_2[1000:])
+                self.mean_current_1_400_A = np.mean(self.accumulate_current_1[100:])
+                self.mean_current_2_400_A = np.mean(self.accumulate_current_2[100:])
                 
                 
                 k_b_1 = float ((self.mean_hall_1_400_A - self.mean_hall_1_0_A) / ((self.mean_current_1_400_A - self.mean_current_1_0_A)/1000))
@@ -840,12 +841,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 
                 packet_transmission.k_b_1 = k_b_1
                 packet_transmission.k_b_2 = k_b_2
-                
-                ### reset accumulate variables 
-                self.accumulate_current_1 = 0
-                self.accumulate_current_2 = 0
-                self.accumulate_hall_1 = 0
-                self.accumulate_hall_2 = 0
+            
                 
                 print(k_b_1)
                 print(k_b_2)
