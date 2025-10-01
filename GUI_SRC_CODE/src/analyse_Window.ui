@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1453</width>
-    <height>959</height>
+    <width>1434</width>
+    <height>979</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,10 +18,13 @@
     <property name="geometry">
      <rect>
       <x>30</x>
-      <y>10</y>
+      <y>20</y>
       <width>161</width>
       <height>41</height>
      </rect>
+    </property>
+    <property name="cursor">
+     <cursorShape>PointingHandCursor</cursorShape>
     </property>
     <property name="text">
      <string>Open CSV file</string>
@@ -42,8 +45,7 @@
     <widget class="QLabel" name="label">
      <property name="font">
       <font>
-       <family>CMU Serif</family>
-       <pointsize>10</pointsize>
+       <family>Arial</family>
       </font>
      </property>
      <property name="text">
@@ -51,6 +53,9 @@
      </property>
     </widget>
     <widget class="QComboBox" name="data_show_comboBox">
+     <property name="cursor">
+      <cursorShape>WhatsThisCursor</cursorShape>
+     </property>
      <item>
       <property name="text">
        <string>Data table</string>
@@ -101,7 +106,7 @@
    <widget class="QWidget" name="horizontalLayoutWidget">
     <property name="geometry">
      <rect>
-      <x>930</x>
+      <x>1050</x>
       <y>10</y>
       <width>331</width>
       <height>61</height>
@@ -112,11 +117,14 @@
    <widget class="QPushButton" name="save_Button">
     <property name="geometry">
      <rect>
-      <x>540</x>
+      <x>560</x>
       <y>20</y>
-      <width>121</width>
+      <width>151</width>
       <height>41</height>
      </rect>
+    </property>
+    <property name="cursor">
+     <cursorShape>PointingHandCursor</cursorShape>
     </property>
     <property name="text">
      <string>Save CSV file</string>
@@ -206,10 +214,10 @@
    <widget class="QLabel" name="label_file">
     <property name="geometry">
      <rect>
-      <x>30</x>
-      <y>50</y>
-      <width>441</width>
-      <height>16</height>
+      <x>80</x>
+      <y>60</y>
+      <width>411</width>
+      <height>20</height>
      </rect>
     </property>
     <property name="font">
@@ -220,6 +228,12 @@
       <bold>true</bold>
      </font>
     </property>
+    <property name="autoFillBackground">
+     <bool>false</bool>
+    </property>
+    <property name="styleSheet">
+     <string notr="true"/>
+    </property>
     <property name="text">
      <string/>
     </property>
@@ -228,18 +242,10 @@
     <property name="geometry">
      <rect>
       <x>0</x>
-      <y>110</y>
+      <y>100</y>
       <width>51</width>
       <height>21</height>
      </rect>
-    </property>
-    <property name="font">
-     <font>
-      <family>CMU Serif</family>
-      <pointsize>12</pointsize>
-      <weight>75</weight>
-      <bold>true</bold>
-     </font>
     </property>
     <property name="text">
      <string>Average </string>
@@ -248,8 +254,8 @@
    <widget class="QLineEdit" name="textbox_offset1">
     <property name="geometry">
      <rect>
-      <x>690</x>
-      <y>50</y>
+      <x>770</x>
+      <y>40</y>
       <width>51</width>
       <height>21</height>
      </rect>
@@ -261,8 +267,8 @@
    <widget class="QLineEdit" name="textbox_offset2">
     <property name="geometry">
      <rect>
-      <x>810</x>
-      <y>50</y>
+      <x>890</x>
+      <y>40</y>
       <width>51</width>
       <height>21</height>
      </rect>
@@ -274,15 +280,15 @@
    <widget class="QLabel" name="label_3">
     <property name="geometry">
      <rect>
-      <x>660</x>
-      <y>20</y>
+      <x>740</x>
+      <y>10</y>
       <width>111</width>
       <height>22</height>
      </rect>
     </property>
     <property name="font">
      <font>
-      <family>CMU Serif</family>
+      <family>Arial</family>
       <pointsize>13</pointsize>
      </font>
     </property>
@@ -293,20 +299,39 @@
    <widget class="QLabel" name="label_4">
     <property name="geometry">
      <rect>
-      <x>800</x>
-      <y>20</y>
+      <x>880</x>
+      <y>10</y>
       <width>111</width>
       <height>22</height>
      </rect>
     </property>
     <property name="font">
      <font>
-      <family>CMU Serif</family>
+      <family>Arial</family>
       <pointsize>13</pointsize>
      </font>
     </property>
     <property name="text">
      <string>Insert offset 2 (mA)</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_fr">
+    <property name="geometry">
+     <rect>
+      <x>70</x>
+      <y>890</y>
+      <width>421</width>
+      <height>22</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>Arial</family>
+      <pointsize>14</pointsize>
+     </font>
+    </property>
+    <property name="text">
+     <string>fr1 =                                   fr0 = </string>
     </property>
    </widget>
   </widget>
@@ -315,7 +340,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1453</width>
+     <width>1434</width>
      <height>37</height>
     </rect>
    </property>

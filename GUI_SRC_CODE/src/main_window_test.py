@@ -51,9 +51,14 @@ class Ui_MainWindow(object):
         font.setPointSize(12)
         self.label_choose_experiment.setFont(font)
         self.label_choose_experiment.setObjectName("label_choose_experiment")
+        self.photo_label = QtWidgets.QLabel(self.centralwidget)
+        self.photo_label.setGeometry(QtCore.QRect(420, 420, 181, 51))
+        self.photo_label.setText("")
+        self.photo_label.setScaledContents(False)
+        self.photo_label.setObjectName("photo_label")
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 611, 21))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 611, 37))
         self.menubar.setObjectName("menubar")
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QtWidgets.QStatusBar(MainWindow)
@@ -76,13 +81,3 @@ class Ui_MainWindow(object):
         self.choose_electronic_comboBox.setItemText(2, _translate("MainWindow", "Electronic 2"))
         self.label_choose_electronic.setText(_translate("MainWindow", "Types of experiment "))
         self.label_choose_experiment.setText(_translate("MainWindow", "Types of experiment "))
-
-
-if __name__ == "__main__":
-    import sys
-    app = QtWidgets.QApplication(sys.argv)
-    MainWindow = QtWidgets.QMainWindow()
-    ui = Ui_MainWindow()
-    ui.setupUi(MainWindow)
-    MainWindow.show()
-    sys.exit(app.exec_())

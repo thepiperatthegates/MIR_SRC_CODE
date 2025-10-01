@@ -14,12 +14,10 @@ import numpy as np
 from PyQt5 import QtCore, QtGui
 from PyQt5 import *
 from PyQt5.QtCore import QThread, pyqtSignal, QMutex, QRegularExpression, QObject, QTimer
-from PyQt5 import uic
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QIntValidator, QRegularExpressionValidator, QDoubleValidator
 import sys
 import os
-import time
 import multiprocessing
 import sys
 from gui_baru import Ui_Title
@@ -297,10 +295,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
         # construct icon path
-        save_icon_path = os.path.join(project_root, "pics", "save_icon.png")
+        save_icon_path = os.path.join(project_root, "pics", "save_icon.ico")
         calib_icon_path = os.path.join(project_root, "pics", "calibrate.png")
+        fr_icon_path = os.path.join(project_root, "pics", "friction_icon.png")
         
         self.save_button.setIcon(QtGui.QIcon(save_icon_path))
+        self.button_fr_constant.setIcon(QtGui.QIcon(fr_icon_path))
         self.button_cal_constant.setIcon(QtGui.QIcon(calib_icon_path))
 
         self.setWindowTitle("Mini rheometer")
@@ -351,7 +351,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         self.COIL_CONSTANT = 3.097e-3		# in T / A
         self.DIPOLE_MOMENT = 8.594e-3		# in A m^2
-        self.CALIBRATION_FACTOR = 1		# torque calibration no units (K)
+        self.CALIBRATION_FACTOR = packet_transmission.CALIBRATION_FACTOR	# torque calibration no units (K)
         
         
 
@@ -371,6 +371,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         )
         self.label_frequency.setText("Shear rate γ̇ / s<sup>-1</sup>")    
         self.button_fr_constant.setText("Measure f_R")
+        self.textbox_sample_frequency.setText("10000")
         #################################################################################################
 
         #######################################################validator############################################################################
@@ -405,11 +406,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.normalise_button.clicked.connect(self.start_normalise_event)
         
         ### calibration button
-        self.button_cal_constant.clicked.connect(lambda value: self.start_calibration_event(input_current=-400, count_recursion = 0))
+        self.button_cal_constant.clicked.connect(lambda value: self.start_calibration_event(input_current=-400, count_recursion = 1))
         self.button_cal_constant.clicked.connect(lambda  value: self.popout_window(1))
 
         ### friction coefficient rechnung gedrückt
-        self.button_fr_constant.clicked.connect(lambda value: self.start_friction_coeff_event_initiation (1, 1, 0))
+        self.button_fr_constant.clicked.connect(lambda value: self.start_friction_coeff_event_initiation (running_frequency=1, rotation_direction=1, count_recursion=0))
         self.button_fr_constant.clicked.connect(lambda  value: self.popout_window(arg=3))
         
         
@@ -438,6 +439,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.select_mode_comboBox.activated.connect(self.change_graph)
         #same as above but for time interval change
         self.timeInterval_comboBox.activated.connect(self.change_graph)
+        
+    def resizeEvent(self, event):
+        """Scale the image while keeping its aspect ratio"""
+
+        super().resizeEvent(event)
           
         
     def change_graph(self):
@@ -675,10 +681,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         data_2 = packet_transmission.calculate_running_frequency(float(data_2))
         data_3 = self.textbox_amplitude1.text()
         data_4 =  self.textbox_offset1.text()
-        packet_transmission.offset_1 = float(data_4)
         data_5 = self.textbox_amplitude2.text()
         data_6 = self.textbox_offset2.text() 
-        packet_transmission.offset_2 = float(data_6) 
         
         data_10 = 1
         packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
@@ -687,12 +691,17 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         packet_transmission.running_time_event(this_running_time_flag=1)
         
         
-        ### get the desired sampling frequency
+        ######## get the desired sampling frequency from the textbox
         
         
-        sampling_frequency = float(self.textbox_sample_frequency.text())
-        sockets_files.time_increment = 1.0/sampling_frequency
-        sockets_files.tot_average = int(10000.0/ sampling_frequency)
+        sampling_frequency = self.textbox_sample_frequency.text()
+        if sampling_frequency == '' or sampling_frequency == 0:
+            pass
+        else:
+            sockets_files.time_increment = 1.0/float(sampling_frequency)
+            sockets_files.tot_average = int(10000.0/ float(sampling_frequency))
+        
+        #################################################
         print("tot_average", sockets_files.tot_average)
         
         sockets_files.file_name_change_set("dummy")        #set file name from gui
@@ -755,7 +764,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         global data_8
         global data_9
         global data_10
-        
+        print("Recursion in main func:", count_recursion)
         
         packet_transmission.k_b_1 = 0
         packet_transmission.k_b_2 = 0
@@ -795,45 +804,45 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.status_label.setStyleSheet("color: #32a83a;")
         self.status_label.setText("Calibrating!...............")
         
-        QtCore.QTimer.singleShot(1000, lambda: self.after_stabilise_calibration(count_recursion, input_current))
+        QtCore.QTimer.singleShot(2000, lambda: self.after_stabilise_calibration(count_recursion))
         
 
-    def after_stabilise_calibration(self, count_recursion, input_current):
+    def after_stabilise_calibration(self, count_recursion):
         self.worker_sleep = SleepTimer()
-        self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_calibrating(value, count_recursion, input_current))
+        self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_calibrating(value, count_recursion))
         self.worker_sleep.start()
         
 
-    def update_time_counter_calibrating(self, val, count_recursion, input_current):
+    def update_time_counter_calibrating(self, val, count_recursion):
         self.lcdNumber.display(val)
+        print("Recursion in called func:", count_recursion)
 
-        if val != 0.1:
+        if val != 0.0:
             self.button_send.setDisabled(True)
             self.button_start.setDisabled(True)
             self.button_stop.setDisabled(False)
 
-        elif val == 0.1:  #when val is 0 and the thread is stops already
+        elif val == 0.0:  #when val is 0 and the thread is stops already
             
             #reset flags
             self.worker_DataUpdate.flag_special_event(False, False)
 
             if count_recursion == 1:
-                self.mean_hall_1_0_A = np.mean(self.accumulate_hall_1[100:])
-                self.mean_hall_2_0_A = np.mean(self.accumulate_hall_2[100:])
+                self.mean_hall_1_0_A = np.mean(self.accumulate_hall_1[1000:])
+                self.mean_hall_2_0_A = np.mean(self.accumulate_hall_2[1000:])
                 
-                self.mean_current_1_0_A = np.mean(self.accumulate_current_1[100:])
-                self.mean_current_2_0_A = np.mean(self.accumulate_current_2[100:])
-                
-                input_current = 400
+                self.mean_current_1_0_A = np.mean(self.accumulate_current_1[1000:])
+                self.mean_current_2_0_A = np.mean(self.accumulate_current_2[1000:])
+    
                 ### second recursion occurs
                 self.start_calibration_event(400, 2)
             elif count_recursion == 2:
-                self.mean_hall_1_400_A = np.mean(self.accumulate_hall_1[100:])
-                self.mean_hall_2_400_A = np.mean(self.accumulate_hall_2[100:])
+                self.mean_hall_1_400_A = np.mean(self.accumulate_hall_1[1000:])
+                self.mean_hall_2_400_A = np.mean(self.accumulate_hall_2[1000:])
                 
                 
-                self.mean_current_1_400_A = np.mean(self.accumulate_current_1[100:])
-                self.mean_current_2_400_A = np.mean(self.accumulate_current_2[100:])
+                self.mean_current_1_400_A = np.mean(self.accumulate_current_1[1000:])
+                self.mean_current_2_400_A = np.mean(self.accumulate_current_2[1000:])
                 
                 
                 k_b_1 = float ((self.mean_hall_1_400_A - self.mean_hall_1_0_A) / ((self.mean_current_1_400_A - self.mean_current_1_0_A)/1000))
@@ -1033,12 +1042,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         self.lcdNumber.display(val)
 
-        if val != 0.1:   # means val != 0 and val != 0.1
+        if val != 0.0:   # means val != 0 and val != 0.1
             self.button_send.setDisabled(True)
             self.button_start.setDisabled(True)
             self.button_stop.setDisabled(False)
 
-        elif val == 0.1:     # means val == 0 or val == 0.1     
+        elif val == 0.0:     # means val == 0 or val == 0.1     
             #reset flags (so that accumulate does not change here )(data integrity reason here)
             self.worker_DataUpdate.flag_special_event(False, False)
             
@@ -1049,60 +1058,37 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.hall2_fR= self.accumulate_hall_2[2000:]
             
 
-            if 0 <= count_recursion < 20:               
+            if 0 <= count_recursion < 20:
 
-                if  0 <= count_recursion < 9:
-                    ### anticlockwise first 
-                    
-        
-                    self.calculated_angular_velocity[count_recursion] = np.mean(self.calculate_radial_frequency(running_frequency))
-                    before_mean_torque, before_mean_phase = self.calculate_torque_fR(self.current1_fR, self.current2_fR, self.hall1_fR, 
-                                                    self.hall2_fR)
-                    self.calculated_torque[count_recursion] = np.mean(before_mean_torque)
-                    self.mean_phase[count_recursion] = np.mean(before_mean_phase)
-                    self.standard_torque[count_recursion] = np.std(a=before_mean_torque)
-                    self.standard_mean_torque[count_recursion] = np.std(a=before_mean_torque) / np.sqrt(len(before_mean_torque))
-                    self.standard_phase[count_recursion] = np.std(a=before_mean_phase) 
-                    self.standard_mean_phase[count_recursion] = np.std(a=before_mean_phase) / np.sqrt(len(before_mean_phase))
-                        
-                    running_frequency+= 1       #Hz
+                # Determine sign of angular velocity
+                if count_recursion < 10:  # positive / anticlockwise sweep
+                    angular_velocity = np.mean(self.calculate_radial_frequency(running_frequency))
                     rotation_direction = 1
-                    count_recursion = count_recursion + 1 
-                    
-                    
-                elif count_recursion == 9:
-                    #reset to 1Hz (since the negative frequency part, i.e. anti-clockwise part, is done)
-                    
-                    self.calculated_angular_velocity[count_recursion] = np.mean(self.calculate_radial_frequency(running_frequency))
-                    before_mean_torque, before_mean_phase = self.calculate_torque_fR(self.current1_fR, self.current2_fR, self.hall1_fR, 
-                                                    self.hall2_fR)
-                    self.calculated_torque[count_recursion] = np.mean(before_mean_torque)
-                    self.mean_phase[count_recursion] = np.mean(before_mean_phase)
-                    self.standard_torque[count_recursion] = np.std(a=before_mean_torque)
-                    self.standard_mean_torque[count_recursion] = np.std(a=before_mean_torque) / np.sqrt(len(before_mean_torque))
-                    self.standard_phase[count_recursion] = np.std(a=before_mean_phase) 
-                    self.standard_mean_phase[count_recursion] = np.std(a=before_mean_phase) / np.sqrt(len(before_mean_phase))
-                    
+                else:  # negative / clockwise sweep
+                    angular_velocity = -np.mean(self.calculate_radial_frequency(running_frequency))
+                    rotation_direction = 2
+
+                # Calculate torque and phase
+                torque_values, phase_values = self.calculate_torque_fR(
+                    self.current1_fR, self.current2_fR, self.hall1_fR, self.hall2_fR
+                )
+
+                # Store results
+                self.calculated_angular_velocity[count_recursion] = angular_velocity
+                self.calculated_torque[count_recursion] = np.mean(torque_values)
+                self.mean_phase[count_recursion] = np.mean(phase_values)
+                self.standard_torque[count_recursion] = np.std(torque_values)
+                self.standard_mean_torque[count_recursion] = np.std(torque_values) / np.sqrt(len(torque_values))
+                self.standard_phase[count_recursion] = np.std(phase_values)
+                self.standard_mean_phase[count_recursion] = np.std(phase_values) / np.sqrt(len(phase_values))
+
+                # Update running frequency and rotation direction
+                if count_recursion == 9:  # switch from positive to negative sweep
                     running_frequency = 1
-                    count_recursion = count_recursion + 1 
-                    rotation_direction = 2
-                
-                elif 10 <=  count_recursion  < 20 :
-                    #negative frequency
-                    self.calculated_angular_velocity[count_recursion] = -np.mean(self.calculate_radial_frequency(running_frequency))
-                    ### increment by one
-                    before_mean_torque, before_mean_phase= self.calculate_torque_fR(self.current1_fR, self.current2_fR, self.hall1_fR, 
-                                                    self.hall2_fR)
-                    self.calculated_torque[count_recursion] = np.mean(before_mean_torque)
-                    self.mean_phase[count_recursion] = np.mean(before_mean_phase)
-                    self.standard_torque[count_recursion] = np.std(a=before_mean_torque)
-                    self.standard_mean_torque[count_recursion] = np.std(a=before_mean_torque) / np.sqrt(len(before_mean_torque))
-                    self.standard_phase[count_recursion] = np.std(a=before_mean_phase) 
-                    self.standard_mean_phase[count_recursion] = np.std(a=before_mean_phase) / np.sqrt(len(before_mean_phase))
-                
-                    running_frequency+= 1
-                    rotation_direction = 2
-                    count_recursion = count_recursion + 1
+                else:
+                    running_frequency += 1
+
+                count_recursion += 1
                 print("recursion is", count_recursion)
                 
                 #mapping for current {count_recursion:input_current}
@@ -1263,14 +1249,32 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.lcdNumber.display(0)
         self.status_label.setStyleSheet("color: #e30000;")
         self.status_label.setText("STOP!!!") 
+        
+    
     
     def analyse_button_event(self):
+        """
+        Handles the event when the "Analyse" button is clicked.
+
+        - If a previous analysis process is running, it is terminated.
+        - Starts a new separate process to run the `main_3` function using
+        the multiprocessing module.
+        - Stores the new process in `self.p_analyse` for possible future termination.
+
+        Note:
+            - Passes variables such as offsets and fr since different processes do not share same memories. 
+            - Make sure `main_3` is picklable, as required by multiprocessing.
+        """
+        #offset 1 and offset 2
+        global data_4, data_6
+        fr0 = packet_transmission.fr0
+        fr1 = packet_transmission.fr1
 
         #kill the previous process if clicked again
         if self.p_analyse is not None:
             self.p_analyse.terminate()
 
-        self.p_analyse = multiprocessing.Process(target =main_3 , args=())
+        self.p_analyse = multiprocessing.Process(target =main_3 , args=(data_4, data_6, fr0, fr1))
         self.p_analyse.start()
 
     def graph_stop_event(self):
@@ -1375,6 +1379,20 @@ class MainGUI(QMainWindow, Ui_MainWindow):
         """
         super().__init__()
         self.setupUi(self)
+        
+        ################for banner purposes
+        # get absolute path of project root (folder containing 'src' and 'pics')
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
+        banner_path = os.path.join(project_root, "pics", "logo_fzj.png")
+        self.photo_label.setPixmap(QtGui.QPixmap(banner_path))
+        pixmap = QtGui.QPixmap(banner_path)
+        self.photo_label.setPixmap(
+            pixmap.scaled(self.photo_label.size(), 
+                        QtCore.Qt.KeepAspectRatio, 
+                        QtCore.Qt.SmoothTransformation)
+        )
+        ####################################
         # disable experiment combobox initially
         self.choose_experiment_comboBox.setEnabled(False)
 
@@ -1384,7 +1402,7 @@ class MainGUI(QMainWindow, Ui_MainWindow):
         # connect experiment combobox signal at init
         self.choose_experiment_comboBox.activated.connect(self.choose_window)
 
-        
+    
     def enable_choose_experiment(self, index):
         """
         Enable the experiment selection combo box if a valid electronic is selected.
@@ -1448,6 +1466,8 @@ def main():
 
     # construct icon path
     icon_path = os.path.join(project_root, "pics", "fzj.ico")
+    
+
 
     # set window icon
     app_main_window.setWindowIcon(QtGui.QIcon(icon_path))

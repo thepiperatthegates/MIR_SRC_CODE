@@ -36,8 +36,8 @@ p1 = None
 tot_count_accumulate_recv = 250
 
 
-time_increment = None
-tot_average = None
+time_increment = 0.0001
+tot_average = 1
 
 
 ##########################################################################

@@ -62,8 +62,8 @@ k_b_1 = 0.083597946
 k_b_2 = 0.084535931
 
 #default friction coefficient 
-CALIBRATION_FACTOR = 0.773
-fr1 = 0.0 # in Nm / (rad /s)
+CALIBRATION_FACTOR = 0.773              # torque calibration no units (K)
+fr1 = 12e-9 # in Nm / (rad /s)
 fr0 = 0.0 # in Nm / (rad /s)
 
 #offset from main.py
@@ -228,6 +228,12 @@ def get_mir_mode():
     global data_10 
     
     return int(data_10)
+
+def get_offsets():
+    global data_4, data_6 
+    
+    print(data_4)
+    return float(data_4), float(data_6)
 def combine_bytes_for_buffer(send_1, send_2, send_3, send_4, send_5, send_6, send_7, send_8, send_9, send_10):
            
     #ARM Microcontroller is Little Endian, for integer we will be shifting the 
@@ -293,8 +299,8 @@ def calibrated_hall_sensors2(hall_voltage, actual_current):
 def calculate_running_frequency(input):
     
     C_SR = 37.099
-    running_frequency = input/(2*pi*C_SR)
-    return running_frequency
+    running_frequency = float(input)/(2*pi*C_SR)
+    return float(running_frequency)
 
 def calibration_input_coil_1(input):
     

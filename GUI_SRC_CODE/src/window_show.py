@@ -4,12 +4,12 @@ from PyQt5 import *
 from PyQt5.QtCore import QThread, pyqtSignal, QFileInfo
 from PyQt5 import uic
 from PyQt5.QtWidgets import *
-import sys
+
 
 
 from button_tekan_window import Ui_data_capture_Window
 from analyse_Window import Ui_analyse_Window
-import packet_transmission as packet_transmission
+import packet_transmission
 
 from scipy.signal import savgol_filter
 import pandas 
@@ -168,7 +168,7 @@ def main_2(q_filename):
 
 
 class AnalyseWindow(QMainWindow, Ui_analyse_Window):
-    def __init__(self, parent= None) -> None:
+    def __init__(self, offset_1=None, offset_2=None, fr0=None, fr1=None) -> None:
         super().__init__(parent=None)
         
         self.setupUi(self)
@@ -176,7 +176,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
         # construct icon path
-        save_icon_path = os.path.join(project_root, "pics", "save_icon.png")
+        save_icon_path = os.path.join(project_root, "pics", "save_icon.ico")
         self.save_Button.setIcon(QtGui.QIcon(save_icon_path))
             
         
@@ -193,19 +193,26 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
     
    ############calculation constant##############################################################
     
-        self.fr0 = packet_transmission.fr0
-        self.fr1 = packet_transmission.fr1
+        ###############################inherited from another process 
+        
+        self.fr0 = fr0
+        self.fr1 = fr1
+        self.label_fr.setText(f"f<sub>r_0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
+            f"f<sub>r_1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
+        
+        ##########################################################
         self.COIL_CONSTANT = 3.097e-3		# in T / A
         self.DIPOLE_MOMENT = 8.594e-3		# in A m^2
         self.CALIBRATION_FACTOR = packet_transmission.CALIBRATION_FACTOR		# torque calibration no units (K)
     
+        self.offset_1 = offset_1
+        self.offset_2 = offset_2
         
-        self.offset_1 = float(packet_transmission.offset_1)
-        self.offset_2 = float(packet_transmission.offset_2)   
         
         #placeholder for the offsets input
         self.textbox_offset1.setText(str(self.offset_1))  
         self.textbox_offset2.setText(str(self.offset_2)) 
+        
 
     ############geometry constants################################################################
         self.C_SS = 11160103			# conversion factor to stress in Pa / Nm
@@ -221,8 +228,6 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.voltage_1 = None
         self.voltage_2 = None
         
-        self.of1 = None
-        self.of2 = None
         
         #declare bunch of important variable stuffs
         self.angle_magnetic_field = None
@@ -277,6 +282,14 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.data_show_comboBox.setDisabled(True)
         self.save_Button.setDisabled(True)
         
+        self.textbox_offset1.editingFinished.connect(self.save_offset1_event)
+        self.textbox_offset2.editingFinished.connect(self.save_offset2_event)
+        
+    def save_offset1_event(self):
+        self.offset_1 = self.textbox_offset1.text()
+        
+    def save_offset2_event(self):
+        self.offset_2 = self.textbox_offset2.text()
 
     def find_filename_button_pressed(self):
         self.analyse_filename = QFileDialog.getOpenFileName(filter="csv (*.csv)")[0]
@@ -293,6 +306,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         mode = self.data_show_comboBox.currentText()
         self.num_rows, self.num_column = self.data.shape
         
+        self.data_calculation_function()
         
         
         #first mode
@@ -344,7 +358,81 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             self.table_Widget.hide()
             self.canvas.show()
             self.draw_viscosity_diagram()
+            
+            
+    def data_calculation_function(self):
+        if  self.num_column == 5:
+            
+            self.calculate_functions()
+            self.calculate_all_mean()
+
+            # remove last two columns
+            self.final_data_to_show = self.final_data_to_save[:, :-4]
+            
+            self.save_Button.clicked.connect(self.save_button_event)
+            self.save_Button.setDisabled(False)
+            
+        elif self.num_column == 17:
+            
+            #take all the data up to column 13
+            self.final_data_to_show = self.data[:, :-4]
+            #take all the data 2 from the last column
+            self.coefficient_saved = self.data[:, -4:]
+            self.calculate_all_mean_after_save()
+            self.reference_var_for_saved_data()
+            
+            
+            self.save_Button.setDisabled(True)
+            
         
+        
+        
+    def data_mode_function(self):
+
+        # set row and column count
+        self.table_Widget.setRowCount(self.final_data_to_show.shape[0]+1)
+        self.table_Widget.setColumnCount(self.final_data_to_show.shape[1])
+        
+        # insert mean row at the top
+        self.table_Widget.insertRow(0)
+
+        # fill the table starting from row 1
+        for row in range(self.final_data_to_show.shape[0]):
+            for col in range(self.final_data_to_show.shape[1]):
+                item = QTableWidgetItem(str(self.final_data_to_show[row, col]))
+                self.table_Widget.setItem(row + 1, col, item)  # shift by 1
+                
+            
+            
+        #################################SET DATA FOR MEAN VALUE OF THE FIRST ROW#######################
+        
+        # first 7 columns with "-"
+        for col in range(7):
+            item = QTableWidgetItem("-")
+            item.setBackground(QtGui.QColor(255, 0, 0))
+            self.table_Widget.setItem(0, col, item)
+
+        # remaining columns with actual mean values
+        values = [
+            self.phase_difference_mean,
+            self.angular_velocity_mean,
+            self.total_torque_mean,
+            self.shear_rate_mean,
+            self.shear_stress_mean,
+            self.viscosity_mean,
+        ]
+
+        #colour the row with red 
+        for i, val in enumerate(values, start=7):
+            item = QTableWidgetItem(str(val))
+            item.setBackground(QtGui.QColor(255, 0, 0))
+            self.table_Widget.setItem(0, i, item)
+
+
+        
+        ##############################################################################################
+        
+
 
 
 
@@ -396,7 +484,9 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         trq = self.total_torque.reshape(-1, 1)
         sr1 = self.shear_rate.reshape(-1, 1)
         ss2 = self.shear_stress.reshape(-1, 1)
-        vis = self.viscosity.reshape(-1, 1)
+        vis = self.viscosity.reshape(-1, 1) 
+
+ 
         
                 
         N = self.angle_magnetic_field.shape[0]  # number of rows
@@ -410,15 +500,9 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         # put user input only in the first row
         self.off1_to_be_saved[0, 0] = float(self.offset_1)
         self.off2_to_be_saved[0, 0] = float(self.offset_2)
-        self.fr0_to_be_saved[0, 0]  = float(packet_transmission.fr0)
-        self.fr1_to_be_saved[0, 0]  = float(packet_transmission.fr1)
+        self.fr0_to_be_saved[0, 0]  = float(self.fr0)
+        self.fr1_to_be_saved[0, 0]  = float(self.fr1)
         
-        #update fr coefficients IN SYSTEM 
-        self.fr0 = packet_transmission.fr0
-        self.fr1 = packet_transmission.fr1    
-        #update offset coefficients IN SYSTEM 
-        self.offset_1 = float(packet_transmission.offset_1)
-        self.offset_2 = float(packet_transmission.offset_2)    
             
                         
                 
@@ -480,7 +564,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.fr1 = self.coefficient_saved[0, 3]
         
         self.textbox_offset1.setText(str(self.offset_1))
-        self.textbox_offset1.setText(str(object=self.offset_2))
+        self.textbox_offset2.setText(str(object=self.offset_2))
+        
         
         print("Offset 1 from csv:", self.offset_1)
         print("Offset 2 from csv:", self.offset_2)
@@ -488,94 +573,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         print("fr1 from csv:", self.fr1)
     
             
-            
-            
-
-
-    def data_mode_function(self):
-        if  self.num_column == 5:
-            
-            self.calculate_functions()
-            self.calculate_all_mean()
-
-            # remove last two columns
-            self.final_data_to_show = self.final_data_to_save[:, :-4]
-
-            # set row and column count
-            self.table_Widget.setRowCount(self.final_data_to_show.shape[0]+1)
-            self.table_Widget.setColumnCount(self.final_data_to_show.shape[1])
-            
-            # insert mean row at the top
-            self.table_Widget.insertRow(0)
-
-            # fill the table starting from row 1
-            for row in range(self.final_data_to_show.shape[0]):
-                for col in range(self.final_data_to_show.shape[1]):
-                    item = QTableWidgetItem(str(self.final_data_to_show[row, col]))
-                    self.table_Widget.setItem(row + 1, col, item)  # shift by 1
-
-
-                                
-            self.save_Button.setDisabled(False)
-            self.save_Button.clicked.connect(self.save_button_event)
-            
-            
-        elif self.num_column == 17:
-
-            
-            #take all the data up to column 13
-            self.final_data_to_show = self.data[:, :-4]
-            #take all the data 2 from the last column
-            self.coefficient_saved = self.data[:, -4:]
-            self.calculate_all_mean_after_save()
-            self.reference_var_for_saved_data()
-            
-            # set row and column count
-            self.table_Widget.setRowCount(self.final_data_to_show.shape[0]+1)
-            self.table_Widget.setColumnCount(self.final_data_to_show.shape[1])
-            
-            
-            self.table_Widget.insertRow(0)
-
-            for row in range(self.final_data_to_show.shape[0]):
-                for col in range(self.final_data_to_show.shape[1]):
-                    item = QTableWidgetItem(str(self.final_data_to_show[row, col]))
-                    self.table_Widget.setItem(row + 1, col, item)  # shift by 1
-                    
-                    
-            self.save_Button.setDisabled(True)
-            
-            
-        #################################SET DATA FOR MEAN VALUE OF THE FIRST ROW#######################
         
-        
-        # first 7 columns with "-"
-        for col in range(7):
-            item = QTableWidgetItem("-")
-            item.setBackground(QtGui.QColor(255, 0, 0))
-            self.table_Widget.setItem(0, col, item)
-
-        # remaining columns with actual mean values
-        values = [
-            self.phase_difference_mean,
-            self.angular_velocity_mean,
-            self.total_torque_mean,
-            self.shear_rate_mean,
-            self.shear_stress_mean,
-            self.viscosity_mean,
-        ]
-
-        #colour the row with red 
-        for i, val in enumerate(values, start=7):
-            item = QTableWidgetItem(str(val))
-            item.setBackground(QtGui.QColor(255, 0, 0))
-            self.table_Widget.setItem(0, i, item)
-
-
-        
-        ##############################################################################################
-        
-
         
     
     def normalise_voltage_event(self):
@@ -634,8 +632,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             self.angle_magnet[row, 0] = np.arctan2(self.data[row, 2], self.data[row, 1])
             
             # angle from 4th and 5th columns (index 3 and 4)
-            self.angle_magnetic_field[row, 0] = np.arctan2(self.data[row, 4], self.data[row, 3])
-
+            self.angle_magnetic_field[row, 0] = np.arctan2(self.data[row, 4] - float(self.offset_1), self.data[row, 3] - float(self.offset_2))
+        #TODO: OFFSETS
                     
                     
                     
@@ -670,11 +668,9 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         
     def calculate_magnitude_current(self):
-        self.offset_1 =float(self.textbox_offset1.text())
-        self.offset_2 =float(self.textbox_offset2.text())   
         # print(self.offset_1)
         # print(self.offset_2)
-        power_of_2 = np.power((self.current_1 - self.offset_1), 2) + np.power((self.current_2 - self.offset_2), 2)
+        power_of_2 = np.power((self.current_1 - float(self.offset_1)), 2) + np.power((self.current_2 - float(self.offset_2)), 2)
         # power_of_2 = np.power(self.current_1, 2) + np.power(self.current_2, 2)
         self.magnitude_current = np.sqrt(power_of_2)
         
@@ -846,7 +842,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         event.accept()
         
 
-def main_3():
+def main_3(offset_1, offset_2, fr0, fr1):
     app3 = QApplication([])
     
     # get absolute path of project root (folder containing 'src' and 'pics')
@@ -855,9 +851,9 @@ def main_3():
     # construct icon path
     fzj_icon_path = os.path.join(project_root, "pics", "fzj.ico")
     app3.setWindowIcon(QtGui.QIcon(fzj_icon_path))
-    window3 = AnalyseWindow()
+    window3 = AnalyseWindow(offset_1, offset_2, fr0, fr1)
     window3.show()
     app3.exec_()
 
 if __name__ == '__main__':
-    main_3()
+    main_3(offset_1=0, offset_2=0, fr0=0, fr1=0)
