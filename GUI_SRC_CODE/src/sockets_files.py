@@ -59,7 +59,7 @@ def socket_start_connect():
         port_name = '/dev/tty.usbmodem3776345D32331'   #for mac1
         # port_name = '/dev/tty.usbmodem355A357631331'       
     elif sys.platform == 'win32':       #simon's laptop
-        port_name = 'COM5'       #for windows 
+        port_name = 'COM3'       #for windows 
 
     try:
         ser = serial.Serial(port=port_name, baudrate=baud_rate,timeout=None)
