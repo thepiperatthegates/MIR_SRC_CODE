@@ -333,3 +333,7 @@ def calibration_input_coil_2(input):
     
 #     return_calibrated_1 = hall_sensor_voltage1 - get_first_digit * sin(2*pi)
 #     return_calibrated_1 = hall_sensor_voltage2 - get_second_digit * sin(2*pi)
+
+
+if __name__ == "__main___":
+    send_transmission_event(1)

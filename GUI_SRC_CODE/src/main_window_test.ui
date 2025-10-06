@@ -95,18 +95,18 @@
     <widget class="QLabel" name="label_choose_electronic">
      <property name="font">
       <font>
-       <family>CMU Serif</family>
+       <family>Arial</family>
        <pointsize>12</pointsize>
       </font>
      </property>
      <property name="text">
-      <string>Types of experiment </string>
+      <string>Choose Electronics</string>
      </property>
     </widget>
     <widget class="QLabel" name="label_choose_experiment">
      <property name="font">
       <font>
-       <family>CMU Serif</family>
+       <family>Arial</family>
        <pointsize>12</pointsize>
       </font>
      </property>

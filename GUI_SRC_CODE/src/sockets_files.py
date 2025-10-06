@@ -40,6 +40,14 @@ time_increment = 0.0001
 tot_average = 1
 
 
+def init_queues():
+    global q_to_process, q_to_graph, q_to_csv
+    q_to_process = multiprocessing.Queue()
+    q_to_graph = multiprocessing.Queue()
+    q_to_csv = multiprocessing.Queue()
+    print("Multiprocessing queues initialized.")
+
+
 ##########################################################################
 #start socket connection for USB 
 ##########################################################################
@@ -72,10 +80,34 @@ def socket_start_connect():
 #start creating two separate thread
 ##########################################################################
 def thread_start():
-    global flag_for_process
+    """
+    Start the main communication threads for serial data transmission.
+
+    This function establishes a socket/serial connection and manages two
+    separate threads for monitoring and sending data:
+
+    - `recv_thread`: Runs in a background thread to continuously monitor 
+      incoming data from the serial port.
+    - `send_thread`: Spawned whenever the `start_flag_send` is set. It handles
+      sending packets over the established connection.
+
+    Workflow:
+        1. Connect to the serial/socket using `socket_start_connect()`.
+        2. Start a receiving thread (`recv_thread`) to listen for incoming data.
+        3. In a continuous loop:
+            - Check if `start_flag_send` is set.
+            - If set, reset it and start a sending thread (`send_thread`).
+            - Sleep briefly to prevent busy-waiting.
+    
+    Notes:
+        - The receiving thread is persistent and always active.
+        - The sending thread is created on demand when the send flag is raised.
+        - A small delay (`time.sleep(0.001)`) is used to reduce CPU usage.
+        - Threads are daemonized where appropriate to allow clean program exit.
+    """
     ser1 = socket_start_connect()
     #Event for run time receiving data from Serial Porte
-    thread_recv = threading.Thread(target=timer_monitor, args=(ser1,))
+    thread_recv = threading.Thread(target=recv_thread, args=(ser1,))
     thread_recv.start()
 
     while True:
@@ -83,17 +115,59 @@ def thread_start():
         if start_flag_send == 1:
             packet_transmission.start_flag_send_event(0)
             start_flag_send = 0
-            thread_send = threading.Thread(target=send_thread, daemon=True, args=(ser1,))
+            thread_send = threading.Thread(target=send_thread, daemon=False, args=(ser1,))
             thread_send.start()
         time.sleep(0.001)
             
 
     
 
-def timer_monitor(ser1):
-    
-    
-    #get mir_mode
+def recv_thread(ser1):
+    """
+    Continuously read incoming data from a serial connection and 
+    forward it for live plotting and CSV logging.
+
+    This function runs in an infinite loop, reading fixed-size chunks
+    of data from a serial port (`ser1`). The accumulated data is passed
+    to a processing pipeline for live visualization and optional saving
+    to a CSV file. A separate process is spawned to handle plotting 
+    when the first batch of data arrives.
+
+    Args:
+        ser1 (serial.Serial):
+            An open serial connection object used for reading data.
+
+    Globals:
+        flag_for_process (bool):
+            Indicates whether the plotting process has been started.
+        p1 (multiprocessing.Process):
+            Process object for the live plotting subprocess.
+        tot_count_accumulate_recv (int):
+            Number of read iterations to accumulate into one buffer.
+
+    Workflow:
+        1. Initialize an empty buffer (`received_data`).
+        2. Accumulate data from the serial port in fixed-size chunks (48 bytes)
+           until the count reaches `tot_count_accumulate_recv`.
+        3. Once a batch is ready:
+            - If the plotting process has not been started yet, spawn it.
+            - Forward the raw data to `q_to_process` for unpacking.
+        4. Retrieve processed data from `q_to_csv`.
+        5. If the runtime flag (`packet_transmission.running_time_getter()`) 
+           is set, save the processed data to CSV.
+
+    Error Handling:
+        - Any exceptions during serial read or processing are caught and printed.
+        - On error, the loop sleeps briefly (0.1s) before retrying.
+
+    Notes:
+        - The function is designed to run indefinitely as a background thread.
+        - Data is handled in two layers:
+            - Raw byte accumulation (`q_to_process` for unpacking).
+            - Post-processed integers (`q_to_csv` for logging).
+        - The plotting process (`plot_live`) is started only once.
+
+    """
     
     
     global flag_for_process, p1, tot_count_accumulate_recv
@@ -111,8 +185,10 @@ def timer_monitor(ser1):
                 
                 
                 if not flag_for_process and received_data:
+                    multiprocessing.freeze_support()
                     p1 = multiprocessing.Process(target=plot_live, args=(q_to_process, q_to_graph, q_to_csv ))
                     p1.start()
+
                     flag_for_process = True
                 q_to_process.put(received_data) #send to subprocess to be unpacked
                 data_send = q_to_csv.get()
@@ -122,7 +198,7 @@ def timer_monitor(ser1):
                     if data_send:
                         save_to_csv(data_send)
                         data_send = None
-                    print("Done writing once!")
+                    print("Data written!")
 
                     
             except Exception as e:
@@ -179,9 +255,44 @@ def plot_live(queue1, q_to_graph, q_to_csv): #q_to_graph to graph (main file)
     
 
 def start_process_live_graph(queue1, q_to_graph, q_to_csv):
+    """
+    Continuously process incoming data for live graphing and CSV logging.
+
+    This function runs in an infinite loop, consuming raw byte streams 
+    from `queue1`. It parses the stream by looking for specific identifier 
+    bytes and extracting the following two bytes as a 16-bit unsigned integer. 
+    The decoded integer values are then forwarded to two queues:
+    - `q_to_graph` for live visualization
+    - `q_to_csv` for data logging
+
+    Args:
+        queue1 (multiprocessing.Queue):
+            Input queue containing raw byte streams to process.
+        q_to_graph (multiprocessing.Queue):
+            Output queue for passing decoded integer data to a graphing process.
+        q_to_csv (multiprocessing.Queue):
+            Output queue for passing decoded integer data to a CSV writer.
+
+    Processing logic:
+        - Identifiers are defined as {b'H', b'I', b'J', b'K'}.
+        - When an identifier is found in the stream:
+            - The next two bytes are extracted.
+            - Interpreted as a little-endian unsigned 16-bit integer (`<H`).
+            - Added to the list of decoded values (`tot_chunks`).
+        - After processing the full buffer, the collected integers are sent 
+          to both output queues.
+
+    Notes:
+        - The function never terminates on its own (infinite loop).
+        - Assumes that each identifier is always followed by at least two bytes.
+        - Any bytes not matching the identifier set are ignored.
+        - Intended to run in its own process or thread for real-time streaming.
+
+    """
+    
 
     identifier_bits =  {b'H', b'I', b'J', b'K'}
-     
+
     while True:
         recv_buffer = queue1.get()
         if recv_buffer:
@@ -203,7 +314,7 @@ def start_process_live_graph(queue1, q_to_graph, q_to_csv):
             
             
 ##########################################################################
-#write to csv
+#write to dummy csv 
 ##########################################################################     
         
 def file_name_change_set(prefix, extension=".csv"):
@@ -266,15 +377,20 @@ def save_to_csv(cleaned_buffer, num_columns=4):
 
     final_data = np.hstack((time_column, averaged_data))
     
-
+    #always save the data to file dir
+    project_root =  os.path.dirname(os.path.abspath(__file__))
+    file_name_full = os.path.join(project_root, "files", file_name)
+    
+    
+    
     try:
-        if not os.path.exists(file_name):
-            np.savetxt(file_name, final_data, header="",  delimiter=";",  comments="", fmt='%.18e')
+        if not os.path.exists(file_name_full):
+            np.savetxt(file_name_full, final_data, header="",  delimiter=";",  comments="", fmt='%.18e')
         else:
-            with open(file_name, "a") as f:
+            with open(file_name_full, "a") as f:
                 np.savetxt(f, final_data, delimiter=";",fmt='%.18e')
     except Exception as e:
-        print("The fuck?: {e}")
+        print(f"The fuck?: {e}")
 
         
 #for decreasing data size for csv purposes 
@@ -284,7 +400,8 @@ def average_values (col, N):
     return average_val
 
     
-    
+if __name__ == "__main__":
+    socket_start_connect()
     
     
         

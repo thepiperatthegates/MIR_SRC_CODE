@@ -6,24 +6,24 @@ Responsibilities:
 #. Handle live data plotting.
 #. Provide USB transmission functionality.
 
-
-Change to executables:
-#. Auto-Py-To-Exe apps
 """
 import numpy as np
 from PyQt5 import QtCore, QtGui
 from PyQt5 import *
 from PyQt5.QtCore import QThread, pyqtSignal, QMutex, QRegularExpression, QObject, QTimer
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QIntValidator, QRegularExpressionValidator, QDoubleValidator
+from PyQt5.QtGui import QRegularExpressionValidator, QDoubleValidator
 import sys
 import os
+from pathlib import Path
+import threading
+
+# #fix cache problem with MATHPLOTLIB
+os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
 import multiprocessing
 import sys
 from gui_baru import Ui_Title
 from main_window_test import Ui_MainWindow
-
-
 
 import sockets_files as sockets_files
 from sockets_files import q_to_graph
@@ -161,7 +161,7 @@ class DataUpdate(QThread):
                 store_array2 = packet_transmission.calibrated_hall_sensors2(store_array2, store_array4/1000)
                 
                 
-                 #this is normalising step (still do not know whether i want to do it immidiately or not)
+                #this is normalising step (still do not know whether i want to do it immidiately or not)
                 if self.flag_normalise == True:
                     amplitude_voltage_1 = (np.max(a=store_array1) - np.min(store_array1)) / 2
                     zero_offset_voltage_1 = (np.max(store_array1) + np.min(store_array1)) / 2
@@ -278,6 +278,7 @@ class SocketThread(QThread):
         if self.running:
             sockets_files.thread_start()
 
+
     def stop(self):
         self.running = False
     
@@ -292,12 +293,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.setupUi(self)
 
         # get absolute path of project root (folder containing 'src' and 'pics')
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.project_root = os.path.dirname(os.path.abspath(__file__))
 
         # construct icon path
-        save_icon_path = os.path.join(project_root, "pics", "save_icon.ico")
-        calib_icon_path = os.path.join(project_root, "pics", "calibrate.png")
-        fr_icon_path = os.path.join(project_root, "pics", "friction_icon.png")
+        save_icon_path = os.path.join(self.project_root, "pics", "save_icon.ico")
+        calib_icon_path = os.path.join(self.project_root, "pics", "calibrate.png")
+        fr_icon_path = os.path.join(self.project_root, "pics", "friction_icon.png")
         
         self.save_button.setIcon(QtGui.QIcon(save_icon_path))
         self.button_fr_constant.setIcon(QtGui.QIcon(fr_icon_path))
@@ -364,10 +365,10 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.textbox_amplitude2.setPlaceholderText("Enter amplitude from 0 to 480mA")
         self.textbox_offset2.setPlaceholderText("Enter offset +-480mA")
         self.k_b_label.setText(
-            f"k<sub>b_1</sub> = {packet_transmission.k_b_1}&nbsp;&nbsp;&nbsp;"
-            f"k<sub>b_2</sub> = {packet_transmission.k_b_2}&nbsp;&nbsp;&nbsp;"
+            f"k<sub>b1</sub> = {packet_transmission.k_b_1}&nbsp;&nbsp;&nbsp;"
+            f"k<sub>b2</sub> = {packet_transmission.k_b_2}&nbsp;&nbsp;&nbsp;"
             f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
-            f"f<sub>R</sub> Gleichung = {np.poly1d(self.calculate_final_fR)}"
+            f"f<sub>R</sub> equation = {np.poly1d(self.calculate_final_fR)}"
         )
         self.label_frequency.setText("Shear rate γ̇ / s<sup>-1</sup>")    
         self.button_fr_constant.setText("Measure f_R")
@@ -430,6 +431,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.save_button.clicked.connect(self.save_button_event)
 
         #Start backend serial lines
+        
         self.worker_socket = SocketThread()
         self.worker_DataUpdate = DataUpdate(self)
         
@@ -653,11 +655,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.status_label.setText("Data sent!")
     
     def start_data_event(self):
-        
+        path_join =  os.path.join(self.project_root, "files", "dummy.csv")
         #remove the dummy if it exists
-        if os.path.exists("dummy.csv"):
+        if os.path.exists(path_join):
             try:
-                os.remove("dummy.csv")
+                os.remove(path_join)
                 print("dummy.csv deleted")
             except OSError as e:
                 print(f"Error deleting file csv: {e}")
@@ -856,10 +858,10 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 print(k_b_2)
                 
                 self.k_b_label.setText(
-                    f"k<sub>b_1</sub> = {packet_transmission.k_b_1}&nbsp;&nbsp;&nbsp;"
-                    f"k<sub>b_2</sub> = {packet_transmission.k_b_2}&nbsp;&nbsp;&nbsp;"
+                    f"k<sub>b1</sub> = {packet_transmission.k_b_1}&nbsp;&nbsp;&nbsp;"
+                    f"k<sub>b2</sub> = {packet_transmission.k_b_2}&nbsp;&nbsp;&nbsp;"
                     f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
-                    f"f<sub>R</sub> Gleichung = {np.poly1d(self.calculate_final_fR)}"
+                    f"f<sub>R</sub> equation = {np.poly1d(self.calculate_final_fR)}"
                 )
                 
                 self.popout_window(2)
@@ -1052,13 +1054,15 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.worker_DataUpdate.flag_special_event(False, False)
             
             
-            self.current1_fR = self.accumulate_current_1[2000:]
-            self.current2_fR= self.accumulate_current_2[2000:]
-            self.hall1_fR = self.accumulate_hall_1[2000:]
-            self.hall2_fR= self.accumulate_hall_2[2000:]
+            self.current1_fR = self.accumulate_current_1[1000:]
+            self.current2_fR= self.accumulate_current_2[1000:]
+            self.hall1_fR = self.accumulate_hall_1[1000:]
+            self.hall2_fR= self.accumulate_hall_2[1000:]
             
 
             if 0 <= count_recursion < 20:
+                
+                print("recursion is", count_recursion)
 
                 # Determine sign of angular velocity
                 if count_recursion < 10:  # positive / anticlockwise sweep
@@ -1089,7 +1093,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                     running_frequency += 1
 
                 count_recursion += 1
-                print("recursion is", count_recursion)
+                
                 
                 #mapping for current {count_recursion:input_current}
                 if count_recursion == 1:  #Hz
@@ -1141,14 +1145,16 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 # Combine the two arrays column-wise
                 data_to_save = np.column_stack(( self.calculated_angular_velocity, self.calculated_torque, self.standard_mean_torque,
                                                 self.standard_torque, self.mean_phase, self.standard_mean_phase, self.standard_phase))
+                
+                
                 header_text = "angular_velocity  [rad/s];mean_torque [Nm];std_mean_torque [Nm];std_torque [Nm];mean_phase [rad];std_mean_phase [rad];std_phase [rad]"
                 
-                
-                if os.path.exists("results_fr.csv"):
-                    os.remove("results_fr.csv")
-                    print("results_fr.csv deleted")
-                # Save to CSV
-                np.savetxt("results_fr.csv", data_to_save, delimiter=";", comments="", fmt="%.12f", header=header_text)
+                dir_fr_results = os.path.join(self.project_root, "files", "results_fr.csv")
+                if os.path.exists(dir_fr_results):
+                    os.remove(dir_fr_results)
+                    print(dir_fr_results)
+                # Save to CSV      
+                np.savetxt(dir_fr_results, data_to_save, delimiter=";", comments="", fmt="%.12f", header=header_text)
                 #calculate final fR
                 self.calculate_final_fR =  np.polyfit(self.calculated_angular_velocity, self.calculated_torque, 1)
                 self.popout_window(4)
@@ -1157,10 +1163,10 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 
                 #change textbox in the bottom of the GUI 
                 self.k_b_label.setText(
-                    f"k<sub>b_1</sub> = {packet_transmission.k_b_1}&nbsp;&nbsp;&nbsp;"
-                    f"k<sub>b_2</sub> = {packet_transmission.k_b_2}&nbsp;&nbsp;&nbsp;"
+                    f"k<sub>b1</sub> = {packet_transmission.k_b_1}&nbsp;&nbsp;&nbsp;"
+                    f"k<sub>b2</sub> = {packet_transmission.k_b_2}&nbsp;&nbsp;&nbsp;"
                     f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
-                    f"f<sub>R</sub> Gleichung = {np.poly1d(self.calculate_final_fR)}"
+                    f"f<sub>R</sub> equation = {np.poly1d(self.calculate_final_fR)}"
                 )
                 
                 #enable the button again
@@ -1271,9 +1277,9 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         fr1 = packet_transmission.fr1
 
         #kill the previous process if clicked again
-        if self.p_analyse is not None:
-            self.p_analyse.terminate()
-
+        # if self.p_analyse is not None:
+        #     self.p_analyse.terminate()
+        multiprocessing.freeze_support()
         self.p_analyse = multiprocessing.Process(target =main_3 , args=(data_4, data_6, fr0, fr1))
         self.p_analyse.start()
 
@@ -1322,19 +1328,27 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
     def save_button_event(self):
         filename_saving, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv)")
+    
+        dir_dummy_csv = os.path.join(self.project_root, "files", "dummy.csv")
+        
         if filename_saving:
             if not filename_saving.lower().endswith('.csv'):
                 filename_saving += '.csv'
-            data_read = np.loadtxt(f"dummy.csv", delimiter=';')
+            data_read = np.loadtxt(dir_dummy_csv, delimiter=';')
             np.savetxt(filename_saving, data_read, delimiter=';')
 
     #close event to close all the threads
     def closeEvent(self, event):
 
-        # #stop all the background processes
-        # if self.p_window_data is not None:
-        #     self.p_window_data.terminate()
-        #     self.p_window_data.join()
+        #stop all the background processes
+        if self.p_window_data is not None:
+            self.p_window_data.terminate()
+            self.p_window_data.join()
+            
+        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, sockets_files.q_to_csv):
+            q.close()
+            q.join_thread()
+
 
         #terminate the other subprocess
         sockets_files.p1.terminate()
@@ -1375,16 +1389,16 @@ class MainGUI(QMainWindow, Ui_MainWindow):
         - Sets up the UI.
         - Disables the experiment selection combo box initially.
         - Declares experiment windows without showing them.
-        - Connects signals for electronic and experiment selection combo boxes.
+        - Connects signals for electronic and experiment selection combo boxes.`
         """
         super().__init__()
         self.setupUi(self)
         
         ################for banner purposes
         # get absolute path of project root (folder containing 'src' and 'pics')
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.project_root = os.path.dirname(os.path.abspath(__file__))
         
-        banner_path = os.path.join(project_root, "pics", "logo_fzj.png")
+        banner_path = os.path.join(self.project_root, "pics", "logo_fzj.png")
         self.photo_label.setPixmap(QtGui.QPixmap(banner_path))
         pixmap = QtGui.QPixmap(banner_path)
         self.photo_label.setPixmap(
@@ -1458,11 +1472,12 @@ def main():
 
     :return: None
     """
-    multiprocessing.freeze_support()
     app_main_window = QApplication(sys.argv)
     
     # get absolute path of project root (folder containing 'src' and 'pics')
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    
+    
 
     # construct icon path
     icon_path = os.path.join(project_root, "pics", "fzj.ico")
@@ -1478,6 +1493,6 @@ def main():
 
 
 if __name__ == '__main__':
+    multiprocessing.freeze_support()
     main()
-    
     

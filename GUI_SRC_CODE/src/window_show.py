@@ -1,3 +1,4 @@
+import multiprocessing
 import numpy as np
 from PyQt5 import QtCore, QtGui
 from PyQt5 import *
@@ -7,7 +8,7 @@ from PyQt5.QtWidgets import *
 
 
 
-from button_tekan_window import Ui_data_capture_Window
+
 from analyse_Window import Ui_analyse_Window
 import packet_transmission
 
@@ -19,9 +20,9 @@ import pandas
 # import ctypes
 # myappid = 'mycompany.myproduct.subproduct.version' # arbitrary string
 # ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-
+from pathlib import Path
 import os
-
+os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
 
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 14})
@@ -50,122 +51,6 @@ class MatplotlibCanvas(FigureCanvasQTAgg):
 
 
 
-class DataHandler(QThread):
-    data_loaded_signal = QtCore.pyqtSignal(list)
-    def __init__(self, filename,  interval=5000, parent = None):
-        super(DataHandler, self).__init__(parent)
-        self.filename = filename
-        self.interval = interval
-        self.running = True
-
-    def run(self):
-        while self.running:
-            #TODO: try buat guna numpy array instead of list
-            # data = np.loadtxt(self.analyse_filename, delimiter=';')
-
-            with open(f"{str(self.filename)}.csv", "r") as file:
-                data = []
-                for row in file:
-                    row_values = list(map(float, row.strip().split(';')))
-                    data.append(row_values)
-            self.data_loaded_signal.emit(data)
-            self.msleep(self.interval)
-
-    def stop(self):
-        self.running = False
-        
-        
-class SaveFile(QThread):
-    
-    def __init__(self, filename, parent=None):
-        super().__init__(parent)
-        self.filename = filename
-        
-    def run(self):
-        filename_saving, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv)")
-        if filename_saving:
-            if not filename_saving.lower().endswith('.csv'):
-                filename_saving += '.csv'
-            data_read = np.loadtxt(f"{self.filename}.csv", delimiter=';')
-            np.savetxt(filename_saving, data_read, delimiter=';')
-
-class AcquisitionWindow(QMainWindow, Ui_data_capture_Window):
-    def __init__(self, filename):
-        super(AcquisitionWindow, self).__init__()
-        self.filename = filename
-        self.setupUi(self)
-
-        self.setWindowTitle("Data acquisition")
-        
-        self.save_button.setIcon(QtGui.QIcon("../pics/fzj.png"))
-
-        self.tableWidget.setColumnWidth(0, 250)
-        self.tableWidget.setColumnWidth(1, 250)
-        self.tableWidget.setColumnWidth(2, 250)
-        self.tableWidget.setColumnWidth(3, 250)
-        self.tableWidget. setColumnWidth(4, 250)
-        self.stop_button.clicked.connect(self.stop_button_event)
-        self.save_button.clicked.connect(self.save_button_event)
-
-
-        self.tableWidget.setColumnCount(5)
-
-
-        self.data_handling = DataHandler(self.filename, interval=5000) #100ms
-        self.data_handling.start()
-        self.data_handling.data_loaded_signal.connect(self.update_table)
-        self.show()
-    
-    def save_button_event(self):
-        
-        self.save_File = SaveFile(self.filename)
-        self.save_File.start()
-        # filename_saving, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv)")
-        # if filename_saving:
-        #     if not filename_saving.lower().endswith('.csv'):
-        #         filename_saving += '.csv'
-        #     data_read = np.loadtxt(f"{self.filename}.csv", delimiter=';')
-        #     np.savetxt(filename_saving, data_read, delimiter=';')
-            
-            
-            
-        
-    def stop_button_event(self):
-        self.data_handling.stop()
-
-    def update_table(self, data):
-        self.tableWidget.setRowCount(len(data))
-
-        for row_number, row_data in enumerate(data):
-            for col_number, cell in enumerate(row_data):
-                # Create a QTableWidgetItem with the string representation of the float
-                item = QTableWidgetItem(str(cell))
-                self.tableWidget.setItem(row_number, col_number, item)
-                
-    def closeEvent(self, event):
-        #stop threads
-        self.data_handling.data_loaded_signal.disconnect(self.update_table)
-        self.data_handling.stop()
-        
-        packet_transmission.running_time_event(5)
-        print("tutup")
-
-        #delete the dummy csv file once the window is closed
-        try:
-            os.remove("dummy.csv")
-        except OSError as e:
-            print(f"Error deleting file: {e}")
-        event.accept()
-
-
-
-def main_2(q_filename):
-    filename = q_filename.get()
-    app2 = QApplication([])
-    app2.setWindowIcon(QtGui.QIcon('../pics/fzj.png'))
-    window2 = AcquisitionWindow(filename)
-    app2.exec_()
-
 
 class AnalyseWindow(QMainWindow, Ui_analyse_Window):
     def __init__(self, offset_1=None, offset_2=None, fr0=None, fr1=None) -> None:
@@ -173,7 +58,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         self.setupUi(self)
         
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        project_root = os.path.dirname(os.path.abspath(__file__))
 
         # construct icon path
         save_icon_path = os.path.join(project_root, "pics", "save_icon.ico")
@@ -197,8 +82,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         self.fr0 = fr0
         self.fr1 = fr1
-        self.label_fr.setText(f"f<sub>r_0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
-            f"f<sub>r_1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
+        self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
+            f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
         
         ##########################################################
         self.COIL_CONSTANT = 3.097e-3		# in T / A
@@ -647,7 +532,29 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
     
     
     def calculate_shear_rate(self):
+        """
+        Calculate the shear rate from the magnet angle signal.
 
+        This method uses a Savitzky-Golay filter to smooth and differentiate
+        the noisy angular position data (`self.angle_magnet`) with respect
+        to time (`self.time`). The first derivative of the angle signal gives
+        the angular velocity in [rad/s]. The shear rate is then obtained by
+        scaling the angular velocity with the shear rate constant `C_SR`.
+
+        Steps:
+            1. Apply Savitzky-Golay filter to estimate angular velocity.
+            2. Compute shear rate as angular_velocity * shear rate coefficient [C_SR].
+
+        Updates Attributes:
+            self.angular_velocity : np.ndarray
+                Estimated angular velocity of the magnet [rad/s].
+            self.shear_rate : np.ndarray
+                Calculated shear rate [1/s].
+
+        Notes:
+            - The smoothness depends on the chosen `window_length` and `polyorder`.
+            - `delta` is set as the mean time step from `self.time`.
+        """
         self.angular_velocity = savgol_filter(
             self.angle_magnet[:, 0],      # your noisy angle signal
             window_length=400,            # try 51, 101, etc. depending on how smooth you want
@@ -655,9 +562,6 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             deriv=1,                      # first derivative
             delta=np.mean(np.diff(self.time))  # time step
             )  # [rad /s] 
-        
-        
-  
         
         self.shear_rate =  self.angular_velocity * self.C_SR # [1 / s]
         
@@ -668,10 +572,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         
     def calculate_magnitude_current(self):
-        # print(self.offset_1)
-        # print(self.offset_2)
         power_of_2 = np.power((self.current_1 - float(self.offset_1)), 2) + np.power((self.current_2 - float(self.offset_2)), 2)
-        # power_of_2 = np.power(self.current_1, 2) + np.power(self.current_2, 2)
         self.magnitude_current = np.sqrt(power_of_2)
         
         
@@ -846,7 +747,7 @@ def main_3(offset_1, offset_2, fr0, fr1):
     app3 = QApplication([])
     
     # get absolute path of project root (folder containing 'src' and 'pics')
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    project_root = os.path.dirname(os.path.abspath(__file__))
 
     # construct icon path
     fzj_icon_path = os.path.join(project_root, "pics", "fzj.ico")
