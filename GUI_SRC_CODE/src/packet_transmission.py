@@ -63,12 +63,19 @@ k_b_2 = 0.084535931
 
 #default friction coefficient 
 CALIBRATION_FACTOR = 0.773              # torque calibration no units (K)
-fr1 = 12e-9 # in Nm / (rad /s)
+fr1 = 0.0 # in Nm / (rad /s)
 fr0 = 0.0 # in Nm / (rad /s)
+
+#default coefficients
+
+COIL_CONSTANT = 3.097e-3		# in T / A
+DIPOLE_MOMENT = 8.594e-3		# in A m^2
 
 #offset from main.py
 offset_1 = 0.0
 offset_2 = 0.0
+
+
 
 
 #flag for electronics type
@@ -333,6 +340,64 @@ def calibration_input_coil_2(input):
     
 #     return_calibrated_1 = hall_sensor_voltage1 - get_first_digit * sin(2*pi)
 #     return_calibrated_1 = hall_sensor_voltage2 - get_second_digit * sin(2*pi)
+
+
+                
+def calculate_torque_fR( current_1, current_2, hall_1, hall_2, data_4, data_6):
+        """
+        Calculate the torque based on Hall sensor and current measurements.
+
+        This method computes the applied torque using the phase difference between
+        the magnetic field (from the current coils) and the magnet (from
+        the Hall sensors). It applies calibration factors, coil constants,
+        and the dipole moment to convert the measured currents to torque.
+
+        :param current_1: First component of the current measurement.
+        :type current_1: float or np.ndarray
+        :param current_2:ray(hall_2, dtype=float)
+        
+        print("current_2:", current_2)
+        global data_4,  Second component of the current measurement.
+        :type current_2: float or np.ndarray
+        :param hall_1: First Hall sensor reading.
+        :type hall_1: float or np.ndarray
+        :param hall_2: Second Hall sensor reading.
+        :type hall_2: float or np.ndarray
+
+        :return: Calculated torque.
+        :rtype: float or np.ndarray
+        """
+        
+        global CALIBRATION_FACTOR, DIPOLE_MOMENT, COIL_CONSTANT
+        
+        current_1 = numpy.array(current_1, dtype=float)
+        current_2 = numpy.array(current_2, dtype=float)
+        hall_1    = numpy.array(hall_1, dtype=float)
+        hall_2    = numpy.array(hall_2, dtype=float)
+        
+        offset_1 =float(data_4)
+        offset_2 =float(data_6)
+        
+        #magnetic field angle - magnet angle
+        phase_difference = numpy.arctan2(current_2, current_1) - numpy.arctan2(hall_2, hall_1)
+        
+        power_of_2 = numpy.power((current_1 - offset_1), 2) + numpy.power((current_2 - offset_2), 2)
+        
+        magnitude_current = numpy.sqrt(power_of_2)
+        
+        total_torque = CALIBRATION_FACTOR * ( DIPOLE_MOMENT
+        * COIL_CONSTANT                    # [T/A]
+        * magnitude_current / 1000         # mA; -> A, [A]
+        * numpy.sin(phase_difference)   # dimensionless
+        )
+        
+        return total_torque, phase_difference
+    
+def calculate_radial_frequency(running_frequency):
+
+    return float(2 * numpy.pi * running_frequency)
+
+
 
 
 if __name__ == "__main___":

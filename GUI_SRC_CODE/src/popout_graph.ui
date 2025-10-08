@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>939</width>
-    <height>811</height>
+    <width>1407</width>
+    <height>962</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -18,9 +18,9 @@
     <property name="geometry">
      <rect>
       <x>40</x>
-      <y>100</y>
-      <width>851</width>
-      <height>611</height>
+      <y>80</y>
+      <width>1341</width>
+      <height>821</height>
      </rect>
     </property>
     <layout class="QVBoxLayout" name="mlp_layout"/>
@@ -28,9 +28,9 @@
    <widget class="QWidget" name="horizontalLayoutWidget">
     <property name="geometry">
      <rect>
-      <x>570</x>
-      <y>20</y>
-      <width>331</width>
+      <x>790</x>
+      <y>10</y>
+      <width>581</width>
       <height>61</height>
      </rect>
     </property>
@@ -42,8 +42,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>939</width>
-     <height>37</height>
+     <width>1407</width>
+     <height>26</height>
     </rect>
    </property>
   </widget>

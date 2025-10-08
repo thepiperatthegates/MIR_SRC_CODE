@@ -53,8 +53,8 @@ class MatplotlibCanvas(FigureCanvasQTAgg):
 
 
 class AnalyseWindow(QMainWindow, Ui_analyse_Window):
-    def __init__(self, offset_1=None, offset_2=None, fr0=None, fr1=None) -> None:
-        super().__init__(parent=None)
+    def __init__(self) -> None:
+        super().__init__()
         
         self.setupUi(self)
         
@@ -80,18 +80,18 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
     
         ###############################inherited from another process 
         
-        self.fr0 = fr0
-        self.fr1 = fr1
+        self.fr0 = packet_transmission.fr0
+        self.fr1 = packet_transmission.fr1
         self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
             f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
         
         ##########################################################
-        self.COIL_CONSTANT = 3.097e-3		# in T / A
-        self.DIPOLE_MOMENT = 8.594e-3		# in A m^2
+        self.COIL_CONSTANT = packet_transmission.COIL_CONSTANT		# in T / A
+        self.DIPOLE_MOMENT = packet_transmission.DIPOLE_MOMENT		# in A m^2
         self.CALIBRATION_FACTOR = packet_transmission.CALIBRATION_FACTOR		# torque calibration no units (K)
     
-        self.offset_1 = offset_1
-        self.offset_2 = offset_2
+        self.offset_1 = 0.0
+        self.offset_2 = 0.0
         
         
         #placeholder for the offsets input
@@ -348,6 +348,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.voltage_2 = self.data[:, 2]
         self.current_1 = self.data[:, 3]
         self.current_2 = self.data[:, 4]
+        
+        self.offset_1, self.offset_2 = packet_transmission.get_offsets()
         #call normalise function 
         self.normalise_voltage_event()
         self.calculate_angle()
@@ -371,8 +373,9 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         ss2 = self.shear_stress.reshape(-1, 1)
         vis = self.viscosity.reshape(-1, 1) 
 
- 
-        
+        #change text box for visibility
+        self.textbox_offset1.setText(str(self.offset_1))
+        self.textbox_offset2.setText(str(object=self.offset_2))
                 
         N = self.angle_magnetic_field.shape[0]  # number of rows
 
@@ -406,6 +409,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             self.fr0_to_be_saved, 
             self.fr1_to_be_saved
         ))
+            
+            
             
     def reference_var_for_saved_data(self):
         #############################################################################
@@ -743,7 +748,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         event.accept()
         
 
-def main_3(offset_1, offset_2, fr0, fr1):
+def main_3():
     app3 = QApplication([])
     
     # get absolute path of project root (folder containing 'src' and 'pics')
@@ -752,9 +757,9 @@ def main_3(offset_1, offset_2, fr0, fr1):
     # construct icon path
     fzj_icon_path = os.path.join(project_root, "pics", "fzj.ico")
     app3.setWindowIcon(QtGui.QIcon(fzj_icon_path))
-    window3 = AnalyseWindow(offset_1, offset_2, fr0, fr1)
+    window3 = AnalyseWindow()
     window3.show()
     app3.exec_()
 
 if __name__ == '__main__':
-    main_3(offset_1=0, offset_2=0, fr0=0, fr1=0)
+    main_3()

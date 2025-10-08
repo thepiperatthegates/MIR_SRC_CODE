@@ -37,7 +37,7 @@ class PlotWindow(QMainWindow, Ui_MainWindow):
     def __init__(self, parent=None):
         super().__init__()
         self.setupUi(self)
-        
+        self.setWindowTitle("f_R plot")
         #init mlp canvas 
         self.canvas = MatplotlibCanvas(self)
         self.mlp_layout.addWidget(self.canvas)
@@ -45,19 +45,28 @@ class PlotWindow(QMainWindow, Ui_MainWindow):
         self.horizontalLayout.addWidget(self.mlp_toolbar)
         
         #project root dir
-        self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.project_root = os.path.dirname(os.path.abspath(__file__))
         self.dir_name = os.path.join(self.project_root, "files", "results_fr.csv")
         #open results_fr.csv files
         
         self.header_text = "angular_velocity  [rad/s];mean_torque [Nm];std_mean_torque [Nm];std_torque [Nm];mean_phase [rad];std_mean_phase [rad];std_phase [rad]"
         
         self.data = pandas.read_csv(self.dir_name , sep=";", header=0).to_numpy()
+        
+        
+        self.angular_velocity = self.data[:, 0]   # rad/s
+        self.mean_torque = self.data[:, 1]          #Nm
 
         
         self.canvas.axes.cla()  # clear canvas
         self.canvas.axes.set_title(r"$f_r$ Plot Diagram")
         self.canvas.axes.set_ylabel(r"Torque $M$")
-        self.canvas.axes.set_xlabel(r"Time / $s$")
+        self.canvas.axes.set_xlabel(r"Rotational velocity / $\omega$")
+        self.canvas.axes.plot(self.angular_velocity, self.mean_torque, color='r', marker="o")
+        self.canvas.axes.minorticks_on()
+        self.canvas.axes.grid(True)
+        self.canvas.draw()
+        
         
         
         
@@ -66,7 +75,7 @@ class PlotWindow(QMainWindow, Ui_MainWindow):
 def main_graph_popout():
     app_graph_popout = QApplication(sys.argv)
     
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    project_root = os.path.dirname(os.path.abspath(__file__))
     # construct icon path
     icon_path = os.path.join(project_root, "pics", "fzj.ico")
     

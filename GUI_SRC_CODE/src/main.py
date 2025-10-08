@@ -8,7 +8,7 @@ Responsibilities:
 
 """
 import numpy as np
-from PyQt5 import QtCore, QtGui
+from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5 import *
 from PyQt5.QtCore import QThread, pyqtSignal, QMutex, QRegularExpression, QObject, QTimer
 from PyQt5.QtWidgets import *
@@ -16,7 +16,7 @@ from PyQt5.QtGui import QRegularExpressionValidator, QDoubleValidator
 import sys
 import os
 from pathlib import Path
-import threading
+
 
 # #fix cache problem with MATHPLOTLIB
 os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
@@ -29,7 +29,8 @@ import sockets_files as sockets_files
 from sockets_files import q_to_graph
 
 import packet_transmission as packet_transmission
-from window_show import main_3
+from window_show import AnalyseWindow
+from graph_popout import PlotWindow
 
 
 
@@ -263,7 +264,7 @@ class SleepTimer(QObject):
 
     def _tick(self):
         self.remaining -= 0.1
-        if self.remaining >= 0:
+        if self.remaining >= 0.0:
             self.update_time_signal.emit(round(self.remaining, 1))
         else:
             self.timer.stop()
@@ -291,6 +292,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
+        
+        if hasattr(QtCore.Qt, 'AA_EnableHighDpiScaling'):
+            QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
+        if hasattr(QtCore.Qt, 'AA_UseHighDpiPixmaps'):
+            QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)
 
         # get absolute path of project root (folder containing 'src' and 'pics')
         self.project_root = os.path.dirname(os.path.abspath(__file__))
@@ -304,7 +310,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.button_fr_constant.setIcon(QtGui.QIcon(fr_icon_path))
         self.button_cal_constant.setIcon(QtGui.QIcon(calib_icon_path))
 
-        self.setWindowTitle("Mini rheometer")
+        self.setWindowTitle("Const Shear Rate Window")
         
         self.button_stop.setDisabled(True)
 
@@ -350,8 +356,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.calculate_final_fR = 0
         
         
-        self.COIL_CONSTANT = 3.097e-3		# in T / A
-        self.DIPOLE_MOMENT = 8.594e-3		# in A m^2
+        self.COIL_CONSTANT = packet_transmission.COIL_CONSTANT		# in T / A
+        self.DIPOLE_MOMENT = packet_transmission.DIPOLE_MOMENT	# in A m^2
         self.CALIBRATION_FACTOR = packet_transmission.CALIBRATION_FACTOR	# torque calibration no units (K)
         
         
@@ -414,12 +420,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.button_fr_constant.clicked.connect(lambda value: self.start_friction_coeff_event_initiation (running_frequency=1, rotation_direction=1, count_recursion=0))
         self.button_fr_constant.clicked.connect(lambda  value: self.popout_window(arg=3))
         
-        
-        
-        
-        ### clicked to open analyse data window
-        self.analyse_button.clicked.connect(self.analyse_button_event)
-
         self.stop_default_state = 1
         self.graph_stop_button.clicked.connect(self.graph_stop_event)
         
@@ -721,15 +721,16 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_sleep = SleepTimer()
         self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
         self.worker_sleep.start()
+        
+        
+        
     def update_time_counter_acquisition(self, val):
         self.lcdNumber.display(val)
             
         if val in (0, 0.1):
-            self.button_send.setDisabled(False)
             self.button_start.setDisabled(False)
             self.button_stop.setDisabled(True)
         else:
-            self.button_send.setDisabled(True)
             self.button_start.setDisabled(True)
             self.button_stop.setDisabled(False)
 
@@ -979,6 +980,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         # 1 = anti-clockwise
         # 2 = clockwise
         data_7 = rotation_direction
+        
+        self.status_label.setText(
+            f"Recursion {count_recursion} with direction {data_7} and frequency of {data_2}"
+        )
+
             
         if self.filter_checkbox.isChecked():
             data_8 = 0
@@ -1002,17 +1008,17 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         
         time_delay = 10 * 1000
-        QtCore.QTimer.singleShot(time_delay, lambda: self.after_stabilise_fR_measurement(count_recursion, running_frequency, input_current))
+        QtCore.QTimer.singleShot(time_delay, lambda: self.after_stabilise_fR_measurement(count_recursion, running_frequency, input_current, data_4, data_6))
     
 
         
-    def after_stabilise_fR_measurement(self, count_recursion, running_frequency, input_current):
+    def after_stabilise_fR_measurement(self, count_recursion, running_frequency, input_current, data_4, data_6):
         self.worker_sleep = SleepTimer()
-        self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_fR_measurement( value, count_recursion, running_frequency, input_current))
+        self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_fR_measurement( value, count_recursion, running_frequency, input_current, data_4, data_6))
         self.worker_sleep.start()
         
     
-    def update_time_counter_fR_measurement(self, val, count_recursion, running_frequency, input_current):
+    def update_time_counter_fR_measurement(self, val, count_recursion, running_frequency, input_current, data_4, data_6):
         """
         Update the time counter and process data during friction coefficient measurement.
 
@@ -1066,15 +1072,15 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
                 # Determine sign of angular velocity
                 if count_recursion < 10:  # positive / anticlockwise sweep
-                    angular_velocity = np.mean(self.calculate_radial_frequency(running_frequency))
+                    angular_velocity = np.mean(packet_transmission.calculate_radial_frequency(running_frequency))
                     rotation_direction = 1
                 else:  # negative / clockwise sweep
-                    angular_velocity = -np.mean(self.calculate_radial_frequency(running_frequency))
+                    angular_velocity = -np.mean(packet_transmission.calculate_radial_frequency(running_frequency))
                     rotation_direction = 2
 
                 # Calculate torque and phase
-                torque_values, phase_values = self.calculate_torque_fR(
-                    self.current1_fR, self.current2_fR, self.hall1_fR, self.hall2_fR
+                torque_values, phase_values = packet_transmission.calculate_torque_fR(
+                    self.current1_fR, self.current2_fR, self.hall1_fR, self.hall2_fR, data_4, data_6
                 )
 
                 # Store results
@@ -1094,46 +1100,16 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
                 count_recursion += 1
                 
-                
-                #mapping for current {count_recursion:input_current}
-                if count_recursion == 1:  #Hz
-                    input_current = 40 #mA
-                elif count_recursion == 2:
-                    input_current = 45 
-                elif count_recursion == 3:
-                    input_current = 50
-                elif count_recursion == 4:
-                    input_current = 50
-                elif count_recursion == 5:
-                    input_current = 60 
-                elif count_recursion == 6:
-                    input_current = 60
-                elif count_recursion == 7:
-                    input_current = 70
-                elif count_recursion == 8:
-                    input_current = 80
-                elif count_recursion == 9:
-                    input_current = 90
-                if count_recursion == 10:  #Hz
-                    input_current = 30 #mA
-                elif count_recursion == 11:
-                    input_current = 40 
-                elif count_recursion == 12:
-                    input_current = 45
-                elif count_recursion == 13:
-                    input_current = 50
-                elif count_recursion == 14:
-                    input_current = 50 
-                elif count_recursion == 15:
-                    input_current = 60
-                elif count_recursion == 16:
-                    input_current = 60
-                elif count_recursion == 17:
-                    input_current = 70
-                elif count_recursion == 18:
-                    input_current = 80
-                elif count_recursion == 19:
-                    input_current = 90
+                                
+                                #mapping for current {count_recursion:input_current}
+                current_map = {
+                    1: 40,  2: 45,  3: 50,  4: 50,  5: 60,
+                    6: 60,  7: 70,  8: 80,  9: 90,
+                    10: 30, 11: 40, 12: 45, 13: 50, 14: 50,
+                    15: 60, 16: 60, 17: 70, 18: 80, 19: 90
+                }
+
+                input_current = current_map.get(count_recursion, 0)  # default 0 if not found
 
                     
                 ###recursion to the main function occurs
@@ -1154,7 +1130,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                     os.remove(dir_fr_results)
                     print(dir_fr_results)
                 # Save to CSV      
-                np.savetxt(dir_fr_results, data_to_save, delimiter=";", comments="", fmt="%.12f", header=header_text)
+                np.savetxt(dir_fr_results, data_to_save, delimiter=";", comments="", fmt="%.18f", header=header_text)
                 #calculate final fR
                 self.calculate_final_fR =  np.polyfit(self.calculated_angular_velocity, self.calculated_torque, 1)
                 self.popout_window(4)
@@ -1187,61 +1163,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.button_start.setDisabled(False)
             self.button_stop.setDisabled(True)
     
-                
-            
-                
-    def calculate_torque_fR(self, current_1, current_2, hall_1, hall_2):
-        """
-        Calculate the torque based on Hall sensor and current measurements.
-
-        This method computes the applied torque using the phase difference between
-        the magnetic field (from the current coils) and the magnet (from
-        the Hall sensors). It applies calibration factors, coil constants,
-        and the dipole moment to convert the measured currents to torque.
-
-        :param current_1: First component of the current measurement.
-        :type current_1: float or np.ndarray
-        :param current_2:ray(hall_2, dtype=float)
-        
-        print("current_2:", current_2)
-        global data_4,  Second component of the current measurement.
-        :type current_2: float or np.ndarray
-        :param hall_1: First Hall sensor reading.
-        :type hall_1: float or np.ndarray
-        :param hall_2: Second Hall sensor reading.
-        :type hall_2: float or np.ndarray
-
-        :return: Calculated torque.
-        :rtype: float or np.ndarray
-        """
-        
-        current_1 = np.array(current_1, dtype=float)
-        current_2 = np.array(current_2, dtype=float)
-        hall_1    = np.array(hall_1, dtype=float)
-        hall_2    = np.array(hall_2, dtype=float)
-        
-        offset_1 =float(data_4)
-        offset_2 =float(data_6)
-        
-        #magnetic field angle - magnet angle
-        phase_difference = np.arctan2(current_2, current_1) - np.arctan2(hall_2, hall_1)
-        
-        power_of_2 = np.power((current_1 - offset_1), 2) + np.power((current_2 - offset_2), 2)
-        
-        magnitude_current = np.sqrt(power_of_2)
-        
-        total_torque = packet_transmission.CALIBRATION_FACTOR * ( self.DIPOLE_MOMENT
-        *self.COIL_CONSTANT                    # [T/A]
-        * magnitude_current / 1000         # mA; -> A, [A]
-        * np.sin(phase_difference)   # dimensionless
-        )
-        
-        return total_torque, phase_difference
     
-    def calculate_radial_frequency(self, running_frequency):
-        
-        return float(2 * np.pi * running_frequency)
-        
+
 
     def stop_button_push_event(self):
         # packet_transmission.stop_button_event(1)            #goto sockets_files and stop the loop for receiving
@@ -1258,31 +1181,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
     
     
-    def analyse_button_event(self):
-        """
-        Handles the event when the "Analyse" button is clicked.
-
-        - If a previous analysis process is running, it is terminated.
-        - Starts a new separate process to run the `main_3` function using
-        the multiprocessing module.
-        - Stores the new process in `self.p_analyse` for possible future termination.
-
-        Note:
-            - Passes variables such as offsets and fr since different processes do not share same memories. 
-            - Make sure `main_3` is picklable, as required by multiprocessing.
-        """
-        #offset 1 and offset 2
-        global data_4, data_6
-        fr0 = packet_transmission.fr0
-        fr1 = packet_transmission.fr1
-
-        #kill the previous process if clicked again
-        # if self.p_analyse is not None:
-        #     self.p_analyse.terminate()
-        multiprocessing.freeze_support()
-        self.p_analyse = multiprocessing.Process(target =main_3 , args=(data_4, data_6, fr0, fr1))
-        self.p_analyse.start()
-
     def graph_stop_event(self):
         if self.stop_default_state == 1:
             
@@ -1337,13 +1235,31 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             data_read = np.loadtxt(dir_dummy_csv, delimiter=';')
             np.savetxt(filename_saving, data_read, delimiter=';')
 
-    #close event to close all the threads
-    def closeEvent(self, event):
 
+
+
+#different windows with tab 
+class TabWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("MiR | Mini-Rheometer")
+        self.resize(1600, 980)  # width, height
+        
+
+        # Create tab widget
+        tabs = QTabWidget()
+
+        # Add your classes as tabs
+        tabs.addTab(ConstShearGUI(), "Main GUI")
+        tabs.addTab( AnalyseWindow(), "Data analyse")
+        tabs.addTab(PlotWindow(), "f_R Plot")
+
+        # Set central widget
+        self.setCentralWidget(tabs)
+        
+    def closeEvent(self, event):
         #stop all the background processes
-        if self.p_window_data is not None:
-            self.p_window_data.terminate()
-            self.p_window_data.join()
+
             
         for q in (sockets_files.q_to_process, sockets_files.q_to_graph, sockets_files.q_to_csv):
             q.close()
@@ -1355,22 +1271,22 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         sockets_files.p1.join()
 
         #stop all the threads
-        self.worker_socket.stop()
-        self.worker_DataUpdate.stop()
+        
+        self.main_window = ConstShearGUI()
+        self.main_window.worker_socket.stop()
+        self.main_window.worker_DataUpdate.stop()
         
         #DELETE THE GODDAMN FILE 
         try:
             os.remove("dummy.csv")
         except OSError as e:
             print(f"Error deleting file: {e}")
-
-
-        #close main process GUI
+            
         event.accept()
 
 
 
-class MainGUI(QMainWindow, Ui_MainWindow): 
+class FirstGUI(QMainWindow, Ui_MainWindow): 
     """
     Main graphical user interface for the Mini-Rheometer (MIR) application.
 
@@ -1457,11 +1373,13 @@ class MainGUI(QMainWindow, Ui_MainWindow):
         
         if mode == "Control shear rate":
             # declare the window first without showing it 
-            self.shear_constant_mode_window = ConstShearGUI()
-            self.shear_constant_mode_window.show()
-            self.close()      
-        
-
+            # self.shear_constant_mode_window = ConstShearGUI()
+            # self.shear_constant_mode_window.showNormal()
+            # self.close()      
+            
+            self.test = TabWindow()    
+            self.test.showMaximized()
+            self.close()
 
 def main():
     """
@@ -1487,12 +1405,13 @@ def main():
     # set window icon
     app_main_window.setWindowIcon(QtGui.QIcon(icon_path))
     
-    first_window = MainGUI()
+    first_window = FirstGUI()
     first_window.show()
     sys.exit(app_main_window.exec_())
 
 
 if __name__ == '__main__':
     multiprocessing.freeze_support()
+    
     main()
     
