@@ -38,6 +38,12 @@ class PlotWindow(QMainWindow, Ui_MainWindow):
         super().__init__()
         self.setupUi(self)
         self.setWindowTitle("f_R plot")
+        
+        
+        self.refresh_button.clicked.connect(self.refresh_graph)
+        
+        
+        
         #init mlp canvas 
         self.canvas = MatplotlibCanvas(self)
         self.mlp_layout.addWidget(self.canvas)
@@ -67,7 +73,25 @@ class PlotWindow(QMainWindow, Ui_MainWindow):
         self.canvas.axes.grid(True)
         self.canvas.draw()
         
+    def refresh_graph(self):
         
+
+        self.header_text = "angular_velocity  [rad/s];mean_torque [Nm];std_mean_torque [Nm];std_torque [Nm];mean_phase [rad];std_mean_phase [rad];std_phase [rad]"
+        
+        self.data = pandas.read_csv(self.dir_name , sep=";", header=0).to_numpy()
+        
+        
+        self.angular_velocity = self.data[:, 0]   # rad/s
+        self.mean_torque = self.data[:, 1]          #Nm
+        
+        self.canvas.axes.cla()  # clear canvas
+        self.canvas.axes.set_title(r"$f_r$ Plot Diagram")
+        self.canvas.axes.set_ylabel(r"Torque $M$")
+        self.canvas.axes.set_xlabel(r"Rotational velocity / $\omega$")
+        self.canvas.axes.plot(self.angular_velocity, self.mean_torque, color='r', marker="o")
+        self.canvas.axes.minorticks_on()
+        self.canvas.axes.grid(True)
+        self.canvas.draw()
         
         
 

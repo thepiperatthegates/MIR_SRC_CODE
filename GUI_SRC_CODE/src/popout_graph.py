@@ -29,6 +29,9 @@ class Ui_MainWindow(object):
         self.horizontalLayout = QtWidgets.QHBoxLayout(self.horizontalLayoutWidget)
         self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
         self.horizontalLayout.setObjectName("horizontalLayout")
+        self.refresh_button = QtWidgets.QPushButton(self.centralwidget)
+        self.refresh_button.setGeometry(QtCore.QRect(60, 30, 93, 28))
+        self.refresh_button.setObjectName("refresh_button")
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 1407, 26))
@@ -44,3 +47,4 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
+        self.refresh_button.setText(_translate("MainWindow", "Refresh"))

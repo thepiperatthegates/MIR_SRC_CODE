@@ -955,7 +955,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             lambda: self.start_friction_coeff_event(running_frequency, rotation_direction, count_recursion, input_current)
         )
 
-    def start_friction_coeff_event(self, running_frequency = 1,  rotation_direction =  1, count_recursion = 0, input_current = 30):
+    def start_friction_coeff_event(self, running_frequency = 1,  rotation_direction =  1, count_recursion = 0, input_current = 40):
         global data_1
         global data_2
         global data_3
@@ -1103,9 +1103,9 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                                 
                                 #mapping for current {count_recursion:input_current}
                 current_map = {
-                    1: 40,  2: 45,  3: 50,  4: 50,  5: 60,
+                    1: 50,  2: 50,  3: 50,  4: 50,  5: 60,
                     6: 60,  7: 70,  8: 80,  9: 90,
-                    10: 30, 11: 40, 12: 45, 13: 50, 14: 50,
+                    10: 40, 11: 50, 12: 50, 13: 50, 14: 50,
                     15: 60, 16: 60, 17: 70, 18: 80, 19: 90
                 }
 
@@ -1144,6 +1144,10 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                     f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
                     f"f<sub>R</sub> equation = {np.poly1d(self.calculate_final_fR)}"
                 )
+                
+                #refresh the graph
+                self.plot_object = PlotWindow()
+                self.plot_object.refresh_graph()
                 
                 #enable the button again
                 self.button_send.setDisabled(False)

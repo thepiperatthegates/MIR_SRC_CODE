@@ -63,8 +63,8 @@ k_b_2 = 0.084535931
 
 #default friction coefficient 
 CALIBRATION_FACTOR = 0.773              # torque calibration no units (K)
-fr1 = 0.0 # in Nm / (rad /s)
-fr0 = 0.0 # in Nm / (rad /s)
+fr1 = 1.51e-8 # in Nm / (rad /s)
+fr0 = 5.701e-8 # in Nm / (rad /s)
 
 #default coefficients
 
@@ -301,6 +301,11 @@ def calibrated_hall_sensors2(hall_voltage, actual_current):
     calibrated_voltage = hall_voltage - (actual_current*k_b_2)
     return calibrated_voltage
 
+def get_fr_coefficient():
+    
+    global fr0, fr1
+    
+    return fr0, fr1
 
 
 def calculate_running_frequency(input):

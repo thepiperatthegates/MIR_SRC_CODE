@@ -350,6 +350,10 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.current_2 = self.data[:, 4]
         
         self.offset_1, self.offset_2 = packet_transmission.get_offsets()
+        
+        self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
+        f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
+        
         #call normalise function 
         self.normalise_voltage_event()
         self.calculate_angle()
@@ -372,6 +376,10 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         sr1 = self.shear_rate.reshape(-1, 1)
         ss2 = self.shear_stress.reshape(-1, 1)
         vis = self.viscosity.reshape(-1, 1) 
+        
+        #get the fr from packet tranmision
+        self.fr0, self.fr1 = packet_transmission.get_fr_coefficient()
+        
 
         #change text box for visibility
         self.textbox_offset1.setText(str(self.offset_1))
@@ -522,7 +530,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             self.angle_magnet[row, 0] = np.arctan2(self.data[row, 2], self.data[row, 1])
             
             # angle from 4th and 5th columns (index 3 and 4)
-            self.angle_magnetic_field[row, 0] = np.arctan2(self.data[row, 4] - float(self.offset_1), self.data[row, 3] - float(self.offset_2))
+            self.angle_magnetic_field[row, 0] = np.arctan2(self.data[row, 4] - float(self.offset_2), self.data[row, 3] - float(self.offset_1))
         #TODO: OFFSETS
                     
                     
