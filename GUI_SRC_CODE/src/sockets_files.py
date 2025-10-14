@@ -24,6 +24,8 @@ q_to_csv = multiprocessing.Queue()
 offset_1 = 0
 offset_2 = 0
 
+port_name = None 
+
 current_time = None
 status_connection = None
 file_name = ' '
@@ -48,21 +50,27 @@ def init_queues():
     print("Multiprocessing queues initialized.")
 
 
+def port_name_setter(this_port_name):
+    global port_name 
+    
+    port_name = this_port_name
+
 ##########################################################################
 #start socket connection for USB 
 ##########################################################################
 def socket_start_connect():
-    
+    global port_name
 
     
     if sys.platform == 'darwin':        #hijazi's laptop
-        port_name = '/dev/tty.usbmodem3776345D32331'   #for mac1
+        port_num = '/dev/tty.usbmodem3776345D32331'   #for mac1
         # port_name = '/dev/tty.usbmodem355A357631331'       
     elif sys.platform == 'win32':       #simon's laptop
-        port_name = 'COM3'       #for windows 
+        port_num = port_name
+        
 
     try:
-        ser = serial.Serial(port=port_name, baudrate=baud_rate,timeout=None)
+        ser = serial.Serial(port=port_num, baudrate=baud_rate,timeout=None)
         print(ser)
         print("Connecting to the board")
         print("Successful connection")

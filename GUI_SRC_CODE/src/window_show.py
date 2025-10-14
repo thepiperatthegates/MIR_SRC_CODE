@@ -740,7 +740,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.canvas.axes.grid(True, which='both', linestyle='--', linewidth=0.5)
         self.canvas.axes.minorticks_on()
         self.canvas.draw()
-
+                            
     def draw_viscosity_diagram(self):
         self.canvas.axes.cla()  # clear canvas
         self.canvas.axes.set_title("Viscosity diagram")

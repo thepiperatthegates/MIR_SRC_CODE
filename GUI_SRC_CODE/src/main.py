@@ -1335,6 +1335,12 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
 
         # connect experiment combobox signal at init
         self.choose_experiment_comboBox.activated.connect(self.choose_window)
+        
+        self.choose_com_comboBox.activated.connect(self.choose_com_port)
+        
+    def choose_com_port(self):
+        
+        sockets_files.port_name_setter(str(self.choose_com_comboBox.currentText()))
 
     
     def enable_choose_experiment(self, index):

@@ -62,7 +62,11 @@ class PlotWindow(QMainWindow, Ui_MainWindow):
         
         self.angular_velocity = self.data[:, 0]   # rad/s
         self.mean_torque = self.data[:, 1]          #Nm
-
+        
+        
+        index = np.argsort(self.angular_velocity)
+        self.angular_velocity = self.angular_velocity[index]
+        self.mean_torque = self.mean_torque[index]
         
         self.canvas.axes.cla()  # clear canvas
         self.canvas.axes.set_title(r"$f_r$ Plot Diagram")
