@@ -24,6 +24,8 @@ q_to_csv = multiprocessing.Queue()
 offset_1 = 0
 offset_2 = 0
 
+
+#setter for port_name
 port_name = None 
 
 current_time = None
@@ -55,13 +57,13 @@ def port_name_setter(this_port_name):
     
     port_name = this_port_name
 
+
 ##########################################################################
 #start socket connection for USB 
 ##########################################################################
 def socket_start_connect():
     global port_name
 
-    
     if sys.platform == 'darwin':        #hijazi's laptop
         port_num = '/dev/tty.usbmodem3776345D32331'   #for mac1
         # port_name = '/dev/tty.usbmodem355A357631331'       
@@ -78,6 +80,7 @@ def socket_start_connect():
         status_connection = True
     except Exception as e:
         print("Cannot connect with USB serial port!:", e)
+        print(port_name)
         socket_start_connect()  #RECURSIVE TO TRY AGAIN
         
         status_connection = False
