@@ -79,7 +79,7 @@ offset_2 = 0.0
 
 
 #flag for electronics type
-ELECTRONICS_FLAG = None
+ELECTRONICS_FLAG = 0
 
 
 #first sensor coefficient version 1
@@ -314,7 +314,22 @@ def calculate_running_frequency(input):
     running_frequency = float(input)/(2*pi*C_SR)
     return float(running_frequency)
 
+
+def set_electronics_flag(flag):
+    global ELECTRONICS_FLAG
+    
+    ELECTRONICS_FLAG = flag 
+    
+    
+def get_electronics_flag():
+    
+    global ELECTRONICS_FLAG
+    
+    return ELECTRONICS_FLAG
+
 def calibration_input_coil_1(input):
+    
+    global ELECTRONICS_FLAG
     
     if ELECTRONICS_FLAG == 1:
         output = CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 + CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 * input + CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 * pow(input, 2) +  CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 * pow(input, 3)
@@ -324,6 +339,9 @@ def calibration_input_coil_1(input):
 
 
 def calibration_input_coil_2(input):
+    global ELECTRONICS_FLAG
+    
+    
     if ELECTRONICS_FLAG == 1:
         output = CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 + CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 * input + CURRENT_COEFF_SECOND_SENSOR_C_VERSION1 * pow(input, 2) + CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 * pow(input, 3)
     elif ELECTRONICS_FLAG == 2:

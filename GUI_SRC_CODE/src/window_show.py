@@ -503,9 +503,6 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
        
         filename, _ = QFileDialog.getSaveFileName(parent=self, caption="Save File", directory="", filter="CSV Files (*.csv)")
         if filename:
-            if not filename.lower().endswith('.csv'):
-                filename += '.csv'
-            
             # Save with pandas
             df = pandas.DataFrame(self.final_data_to_save)
             df.to_csv(filename, sep=";", index=False, header=None)

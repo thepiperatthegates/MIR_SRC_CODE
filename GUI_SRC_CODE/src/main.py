@@ -226,26 +226,6 @@ class DataUpdate(QThread):
         self.running = False
 
         
-# class SleepThread(QThread):
-
-#     update_time_signal = pyqtSignal(float)            #signal for the time counter
-
-#     def __init__(self, parent=None):
-#         super().__init__(parent)
-#         self.running = True
-
-#     def run(self):
-#         global data_1
-#         local_data = float(data_1)  # allow decimals
-#         while local_data >= 0 and self.running:
-#             time.sleep(0.1)  # check every 100 ms
-#             local_data -= 0.1
-#             self.update_time_signal.emit(round(local_data, 1))  # emit float with 1 decimal
-#         packet_transmission.running_time_event(0)
-
-#     def stop(self):
-#         self.running = False
-            
 class SleepTimer(QObject):
     update_time_signal = pyqtSignal(float)  # emit float countdown values
 
@@ -438,16 +418,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         self.worker_socket.start()
         self.worker_DataUpdate.start()
+        
+        
         #combobox for live graph mode
         self.select_mode_comboBox.activated.connect(self.change_graph)
         #same as above but for time interval change
         self.timeInterval_comboBox.activated.connect(self.change_graph)
-        
-    def resizeEvent(self, event):
-        """Scale the image while keeping its aspect ratio"""
-
-        super().resizeEvent(event)
-          
         
     def change_graph(self):
         global time_axis
@@ -645,6 +621,9 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             
         data_10 = 1
         
+        ##enabled stop rotating button 
+        self.button_stop.setDisabled(False)
+        
         
         packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
         #send all the data to be packed
@@ -656,6 +635,9 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.status_label.setText("Data sent!")
     
     def start_data_event(self):
+        
+        
+        #### delete previous dummy files before acquistion starts. 
         path_join =  os.path.join(self.project_root, "files", "dummy.csv")
         #remove the dummy if it exists
         if os.path.exists(path_join):
@@ -730,10 +712,10 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             
         if val in (0, 0.1):
             self.button_start.setDisabled(False)
-            self.button_stop.setDisabled(True)
+            self.button_stop.setDisabled(False)
         else:
             self.button_start.setDisabled(True)
-            self.button_stop.setDisabled(False)
+            self.button_stop.setDisabled(True)
 
     def start_normalise_event(self):
         if self.worker_DataUpdate.flag_normalise == False:
@@ -870,7 +852,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 #enable the button again
                 self.button_send.setDisabled(False)
                 self.button_start.setDisabled(False)
-                self.button_stop.setDisabled(True)
+                self.button_stop.setDisabled(False)
                     
     def set_constant(self, get_accumulate_hall_1, get_accumulate_hall_2, get_accumulate_current_1, get_accumulate_current2):
         """
@@ -1054,7 +1036,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         if val != 0.0:   # means val != 0 and val != 0.1
             self.button_send.setDisabled(True)
             self.button_start.setDisabled(True)
-            self.button_stop.setDisabled(False)
+            self.button_stop.setDisabled(True)
 
         elif val == 0.0:     # means val == 0 or val == 0.1     
             #reset flags (so that accumulate does not change here )(data integrity reason here)
@@ -1166,23 +1148,55 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             #enable the button again
             self.button_send.setDisabled(False)
             self.button_start.setDisabled(False)
-            self.button_stop.setDisabled(True)
+            self.button_stop.setDisabled(False)
     
     
 
 
     def stop_button_push_event(self):
-        # packet_transmission.stop_button_event(1)            #goto sockets_files and stop the loop for receiving
+        
+        ########################### gives -500mA to the coil 1 and +500mA DC to completely stop the rotation of the magnet 
+        global data_1
+        global data_2
+        global data_3
+        global data_4
+        global data_5
+        global data_6
+        global data_7        #checkbox for direction
+        global data_8
+        global data_9
+        global data_10
+    
+        data_1 = 65534
+        data_2 =self.textbox_frequency.text()
+        data_2 = packet_transmission.calculate_running_frequency(float(data_2))
+        data_3 = 0
+        data_4 =  -500
+        data_5 = 0 
+        data_6 = 500
 
-        # TODO:important, need something to make it a little bit more sophisticated
-        packet_transmission.running_time_event(0)  # STOP RECEIVING DATA FROM BOARD
-
-        self.worker_sleep.update_time_signal.disconnect()
-        self.worker_sleep.stop()
-
-        self.lcdNumber.display(0)
-        self.status_label.setStyleSheet("color: #e30000;")
-        self.status_label.setText("STOP!!!") 
+        
+        #from combobox direction
+        if self.comboBox_direction.currentText() == "Clockwise":
+            data_7 = 2
+        elif self.comboBox_direction.currentText() == "Anti-clockwise":
+            data_7 = 1
+            
+        if self.filter_checkbox.isChecked():
+            data_8 = 0
+        else:
+            data_8 = 2
+            
+        data_10 = 1
+        
+        
+        packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
+        #send all the data to be packed
+        packet_transmission.send_transmission_event(1)            #SET flag for Tx
+        packet_transmission.start_flag_send_event(1)
+        
+        
+        self.status_label.setText("Stop rotation!!....") 
         
     
     
@@ -1235,8 +1249,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         dir_dummy_csv = os.path.join(self.project_root, "files", "dummy.csv")
         
         if filename_saving:
-            if not filename_saving.lower().endswith('.csv'):
-                filename_saving += '.csv'
             data_read = np.loadtxt(dir_dummy_csv, delimiter=';')
             np.savetxt(filename_saving, data_read, delimiter=';')
 
@@ -1370,9 +1382,9 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
             
             ##set the flag for electronics
             if current_text == "Electronic 1":
-                packet_transmission.ELECTRONICS_FLAG = 1
+                packet_transmission.set_electronics_flag(1)
             elif current_text == "Electronic 2":
-                packet_transmission.ELECTRONICS_FLAG = 2
+                packet_transmission.set_electronics_flag(2)
         else:
             self.choose_experiment_comboBox.setEnabled(False)
             self.choose_experiment_comboBox.setCurrentIndex(0)
