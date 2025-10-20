@@ -95,8 +95,8 @@ class PlotWindow(QMainWindow, Ui_MainWindow):
         
         self.canvas.axes.cla()  # clear canvas
         self.canvas.axes.set_title(r"$f_r$ Plot Diagram")
-        self.canvas.axes.set_ylabel(r"Torque $M$")
-        self.canvas.axes.set_xlabel(r"Rotational velocity / $\omega$")
+        self.canvas.axes.set_ylabel(r"Torque $M$ / Nm")
+        self.canvas.axes.set_xlabel(r"Rotational velocity $\omega$ / $s^{-1}$")
         self.canvas.axes.plot(self.angular_velocity, self.mean_torque, color='r', marker="o")
         self.canvas.axes.minorticks_on()
         self.canvas.axes.grid(True)

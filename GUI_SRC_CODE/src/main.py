@@ -25,12 +25,13 @@ import sys
 from gui_baru import Ui_Title
 from main_window_test import Ui_MainWindow
 
-import sockets_files as sockets_files
+import sockets_files 
 from sockets_files import q_to_graph
 
 import packet_transmission as packet_transmission
 from window_show import AnalyseWindow
 from graph_popout import PlotWindow
+from creep_test_window import CreepTestGUI
 
 
 
@@ -1395,9 +1396,15 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
             # self.shear_constant_mode_window.showNormal()
             # self.close()      
             
-            self.test = TabWindow()    
-            self.test.showMaximized()
-            self.close()
+            self.csr_window = TabWindow()    
+            self.csr_window.showMaximized()
+            
+        elif mode == "Creep experiment":
+            self.ct_window = CreepTestGUI()
+            self.ct_window.showMaximized()
+            
+            
+        self.close()
 
 def main():
     """
