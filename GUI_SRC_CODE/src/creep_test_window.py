@@ -288,6 +288,20 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.save_button.setIcon(QtGui.QIcon(save_icon_path))
         ################################################################################################
         
+        
+        
+        
+        
+        ################################### connected signals from widget #############################################
+        
+        
+        
+        
+        self.button_offsets.clicked.connect(self.send_offsets)
+        self.button_button_send_i_1.clicked.connect(self.send_start_vector)
+        
+        ####################################################################################
+        
         ############################Start backend serial lines##################################################
         
         self.worker_socket = SocketThread()
@@ -466,5 +480,123 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.curve_phase_difference.setData(time_axis, phase_difference_val)
         
         
+    def send_offsets(self):
+        """
+        Send offsets for earth field compensation
+        """
+        global data_1
+        global data_2
+        global data_3
+        global data_4
+        global data_5
+        global data_6
+        global data_7        #checkbox for direction
+        global data_8
+        global data_9
+        global data_10
+        
+        
+        data_1 = 65534
+        #make the running frequency 200 Hz, does not matter since we will produce DC current anyway
+        data_2 = 200 #Hz
+        data_3 =0
+        data_4 =  self.textbox_offset_1.text()
+        data_5 = 0
+        data_6 = self.textbox_offset_2.text()  
+
+        
+        ##direction does not matter here 
+        data_7 = 1
+            
+        if self.filter_checkbox.isChecked():
+            data_8 = 0
+        else:
+            data_8 = 2
+            
+        data_10 = 1
+        
+        
+        packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
+        #send all the data to be packed
+        packet_transmission.send_transmission_event(1)            #SET flag for Tx
+        packet_transmission.start_flag_send_event(1)
+        
+
+        self.status_label.setStyleSheet("color: #32a83a;")
+        self.status_label.setText("Offsets sent!")
+
+
+    def send_start_vector(self):
+        """
+        Send start vector for magnet
+        """
+        global data_1
+        global data_2
+        global data_3
+        global data_4
+        global data_5
+        global data_6
+        global data_7        #checkbox for direction
+        global data_8
+        global data_9
+        global data_10
+        
+        
+        data_1 = 65534
+        #make the running frequency 200 Hz, does not matter since we will produce DC current anyway
+        data_2 = 200 #Hz
+        data_3 =0
+        data_4 =  self.textbox_offset_1.text()
+        data_5 = 0
+        data_6 = self.textbox_offset_2.text()  
+
+        
+        ##direction does not matter here 
+        data_7 = 1
+            
+        if self.filter_checkbox.isChecked():
+            data_8 = 0
+        else:
+            data_8 = 2
+            
+        data_10 = 1
+        
+        
+        packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
+        #send all the data to be packed
+        packet_transmission.send_transmission_event(1)            #SET flag for Tx
+        packet_transmission.start_flag_send_event(1)
+        
+
+        self.status_label.setStyleSheet("color: #32a83a;")
+        self.status_label.setText("Offsets sent!")
+
+    def closeEvent(self, event):
+        """
+        Close event for the main window, all the queues, pipes and thread are all first and foremost closed down. 
+        """
+            
+        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, sockets_files.q_to_csv):
+            q.close()
+            q.join_thread()
+
+
+        #terminate the other subprocess
+        sockets_files.p1.terminate()
+        sockets_files.p1.join()
+
+        #stop all the threads
+        self.main_window = CreepTestGUI()
+        self.main_window.worker_socket.stop()
+        self.main_window.worker_DataUpdate.stop()
+        
+        #DELETE THE GODDAMN FILE 
+        try:
+            os.remove("dummy.csv")
+        except OSError as e:
+            print(f"Error deleting file: {e}")
+            
+        event.accept()
+
 
 

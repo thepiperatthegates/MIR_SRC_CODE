@@ -376,6 +376,7 @@ def save_to_csv(cleaned_buffer, num_columns=4):
     col3_after_average = average_values(col3_converted, tot_average).ravel()
     col4_after_average = average_values(col4_converted, tot_average).ravel()
     
+    
     averaged_data = np.zeros((len(col1_after_average), 4))  # shape (100,4)
     averaged_data[:, 0] = col1_after_average
     averaged_data[:, 1] = col2_after_average
