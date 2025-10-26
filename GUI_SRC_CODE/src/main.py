@@ -681,40 +681,71 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         packet_transmission.stop_button_event(0)            #goto sockets_files and stop the loop for receiving
         packet_transmission.running_time_event(this_running_time_flag=1)
         
-        
         ######## get the desired sampling frequency from the textbox
-        
-        
+
+
         sampling_frequency = self.textbox_sample_frequency.text()
         if sampling_frequency == '' or sampling_frequency == 0:
             pass
         else:
             sockets_files.time_increment = 1.0/float(sampling_frequency)
             sockets_files.tot_average = int(10000.0/ float(sampling_frequency))
-            check = 5000/sockets_files.tot_average
+
         #################################################
         print("tot_average", sockets_files.tot_average)
+
+        sockets_files.file_name_change_set("dummy")        #set file name from gui
+        sockets_files.current_time = 0.0
+
+        self.status_label.setStyleSheet("color: #7da832;")
+        self.status_label.setText("Acquisition starts.......")
+
+
+        self.queue_file_name.put("dummy") #Send file name to another process
+
+        #start the process at the initialisation
+        #FOR NOW, LETS NOT DO ACQUISTION WINDOW
+
+        self.worker_sleep = SleepTimer()
+        self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
+        self.worker_sleep.start()
+
+
+        ######## get the desired sampling frequency from the textbox
         
-        if isinstance(check, int):
-            sockets_files.file_name_change_set("dummy")        #set file name from gui
-            sockets_files.current_time = 0.0
 
-            self.status_label.setStyleSheet("color: #7da832;")
-            self.status_label.setText("Acquisition starts.......")
+        
+        
+        # sampling_frequency = self.textbox_sample_frequency.text()
+        # if sampling_frequency == '' or sampling_frequency == 0:
+        #     pass
+        # else:
+        #     sockets_files.time_increment = 1.0/float(sampling_frequency)
+        #     sockets_files.tot_average = int(10000.0/ float(sampling_frequency))
+        #     check = 5000/sockets_files.tot_average
+        # #################################################
+        # print("tot_average", sockets_files.tot_average)
+        
+        # if isinstance(check, int):
+        #     sockets_files.file_name_change_set("dummy")        #set file name from gui
+        #     sockets_files.current_time = 0.0
+
+        #     self.status_label.setStyleSheet("color: #7da832;")
+        #     self.status_label.setText("Acquisition starts.......")
 
 
-            self.queue_file_name.put("dummy") #Send file name to another process
+        #     self.queue_file_name.put("dummy") #Send file name to another process
             
-            #start the process at the initialisation
-            #FOR NOW, LETS NOT DO ACQUISTION WINDOW
-            self.worker_sleep = SleepTimer()
-            self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
-            self.worker_sleep.start()
+        #     #start the process at the initialisation
+        #     #FOR NOW, LETS NOT DO ACQUISTION WINDOW
+        #     self.worker_sleep = SleepTimer()
+        #     self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
+        #     self.worker_sleep.start()
     
         
-        ## Error handling when invalid sampling frequency is being input
-        elif isinstance(check, float):
-            self.popout_window(5)
+        # ## Error handling when invalid sampling frequency is being input
+        # elif isinstance(check, float):
+        #     self.popout_window(5)
         
         
         
