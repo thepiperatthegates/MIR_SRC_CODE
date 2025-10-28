@@ -1,15 +1,16 @@
+import multiprocessing
 import numpy as np
 from PyQt5 import QtCore, QtGui
 from PyQt5 import *
 from PyQt5.QtCore import QThread, pyqtSignal, QFileInfo
 from PyQt5 import uic
 from PyQt5.QtWidgets import *
-import sys
 
 
-from button_tekan_window import Ui_data_capture_Window
+
+
 from analyse_Window import Ui_analyse_Window
-import packet_transmission as packet_transmission
+import packet_transmission
 
 from scipy.signal import savgol_filter
 import pandas 
@@ -19,9 +20,9 @@ import pandas
 # import ctypes
 # myappid = 'mycompany.myproduct.subproduct.version' # arbitrary string
 # ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
-
+from pathlib import Path
 import os
-
+os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
 
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 14})
@@ -50,133 +51,18 @@ class MatplotlibCanvas(FigureCanvasQTAgg):
 
 
 
-class DataHandler(QThread):
-    data_loaded_signal = QtCore.pyqtSignal(list)
-    def __init__(self, filename,  interval=5000, parent = None):
-        super(DataHandler, self).__init__(parent)
-        self.filename = filename
-        self.interval = interval
-        self.running = True
-
-    def run(self):
-        while self.running:
-            #TODO: try buat guna numpy array instead of list
-            # data = np.loadtxt(self.analyse_filename, delimiter=';')
-
-            with open(f"{str(self.filename)}.csv", "r") as file:
-                data = []
-                for row in file:
-                    row_values = list(map(float, row.strip().split(';')))
-                    data.append(row_values)
-            self.data_loaded_signal.emit(data)
-            self.msleep(self.interval)
-
-    def stop(self):
-        self.running = False
-        
-        
-class SaveFile(QThread):
-    
-    def __init__(self, filename, parent=None):
-        super().__init__(parent)
-        self.filename = filename
-        
-    def run(self):
-        filename_saving, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv)")
-        if filename_saving:
-            if not filename_saving.lower().endswith('.csv'):
-                filename_saving += '.csv'
-            data_read = np.loadtxt(f"{self.filename}.csv", delimiter=';')
-            np.savetxt(filename_saving, data_read, delimiter=';')
-
-class AcquisitionWindow(QMainWindow, Ui_data_capture_Window):
-    def __init__(self, filename):
-        super(AcquisitionWindow, self).__init__()
-        self.filename = filename
-        self.setupUi(self)
-
-        self.setWindowTitle("Data acquisition")
-        
-        self.save_button.setIcon(QtGui.QIcon("save_icon.png"))
-
-        self.tableWidget.setColumnWidth(0, 250)
-        self.tableWidget.setColumnWidth(1, 250)
-        self.tableWidget.setColumnWidth(2, 250)
-        self.tableWidget.setColumnWidth(3, 250)
-        self.tableWidget. setColumnWidth(4, 250)
-        self.stop_button.clicked.connect(self.stop_button_event)
-        self.save_button.clicked.connect(self.save_button_event)
-
-
-        self.tableWidget.setColumnCount(5)
-
-
-        self.data_handling = DataHandler(self.filename, interval=5000) #100ms
-        self.data_handling.start()
-        self.data_handling.data_loaded_signal.connect(self.update_table)
-        self.show()
-    
-    def save_button_event(self):
-        
-        self.save_File = SaveFile(self.filename)
-        self.save_File.start()
-        # filename_saving, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv)")
-        # if filename_saving:
-        #     if not filename_saving.lower().endswith('.csv'):
-        #         filename_saving += '.csv'
-        #     data_read = np.loadtxt(f"{self.filename}.csv", delimiter=';')
-        #     np.savetxt(filename_saving, data_read, delimiter=';')
-            
-            
-            
-        
-    def stop_button_event(self):
-        self.data_handling.stop()
-
-    def update_table(self, data):
-        self.tableWidget.setRowCount(len(data))
-
-        for row_number, row_data in enumerate(data):
-            for col_number, cell in enumerate(row_data):
-                # Create a QTableWidgetItem with the string representation of the float
-                item = QTableWidgetItem(str(cell))
-                self.tableWidget.setItem(row_number, col_number, item)
-                
-    def closeEvent(self, event):
-        #stop threads
-        self.data_handling.data_loaded_signal.disconnect(self.update_table)
-        self.data_handling.stop()
-        
-        packet_transmission.running_time_event(5)
-        print("tutup")
-
-        #delete the dummy csv file once the window is closed
-        try:
-            os.remove("dummy.csv")
-        except OSError as e:
-            print(f"Error deleting file: {e}")
-        event.accept()
-
-
-
-def main_2(q_filename):
-    filename = q_filename.get()
-    app2 = QApplication([])
-    app2.setWindowIcon(QtGui.QIcon('fzj.png'))
-    window2 = AcquisitionWindow(filename)
-    app2.exec_()
-
 
 class AnalyseWindow(QMainWindow, Ui_analyse_Window):
-    def __init__(self, parent= None) -> None:
-        super().__init__(parent=None)
+    def __init__(self) -> None:
+        super().__init__()
         
         self.setupUi(self)
         
-        if sys.platform == 'darwin':
-            self.save_Button.setIcon(QtGui.QIcon("GUI_SRC_CODE/src/save_icon.png"))
-        elif sys.platform == 'win32':
-            self.save_Button.setIcon(QtGui.QIcon("GUI_SRC_CODE/src/save_icon.png"))
+        project_root = os.path.dirname(os.path.abspath(__file__))
+
+        # construct icon path
+        save_icon_path = os.path.join(project_root, "pics", "save_icon.ico")
+        self.save_Button.setIcon(QtGui.QIcon(save_icon_path))
             
         
     ############################init variables for this class###############################
@@ -188,25 +74,30 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.num_column = None
         self.total_torque = None     
     #######################################################################################################
-
-        
-        #placeholder for the offsets input
-        self.textbox_offset1.setText("0")  # default value 0
-        self.textbox_offset2.setText("0")  # default value 0
-    
-        
-        self.offset_1 =float(self.textbox_offset1.text())
-        self.offset_2 =float(self.textbox_offset2.text())       
     
     
    ############calculation constant##############################################################
     
-        # self.FRICTION_COEFFICIENT = 14.05e-9  	# in Nm / (rad /s)
-        self.FRICTION_COEFFICIENT = 19.548755e-9  	# in Nm / (rad /s)
-        # self.FRICTION_COEFFICIENT = 0  	# in Nm / (rad /s)
-        self.COIL_CONSTANT = 3.097e-3		# in T / A
-        self.DIPOLE_MOMENT = 8.594e-3		# in A m^2
-        self.CALIBRATION_FACTOR = 1		# torque calibration no units (K)
+        ###############################inherited from another process 
+        
+        self.fr0 = packet_transmission.fr0
+        self.fr1 = packet_transmission.fr1
+        self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
+            f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
+        
+        ##########################################################
+        self.COIL_CONSTANT = packet_transmission.COIL_CONSTANT		# in T / A
+        self.DIPOLE_MOMENT = packet_transmission.DIPOLE_MOMENT		# in A m^2
+        self.CALIBRATION_FACTOR = packet_transmission.CALIBRATION_FACTOR		# torque calibration no units (K)
+    
+        self.offset_1 = 0.0
+        self.offset_2 = 0.0
+        
+        
+        #placeholder for the offsets input
+        self.textbox_offset1.setText(str(self.offset_1))  
+        self.textbox_offset2.setText(str(self.offset_2)) 
+        
 
     ############geometry constants################################################################
         self.C_SS = 11160103			# conversion factor to stress in Pa / Nm
@@ -223,14 +114,12 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.voltage_2 = None
         
         
-        
-        
         #declare bunch of important variable stuffs
         self.angle_magnetic_field = None
         self.angle_magnet = None
         self.phase_difference = None
         self.angular_velocity = None
-        self.friction_moment = None
+        self.fr1on_moment = None
         self.magnitude_current = None
         self.shear_rate = None
         self.total_torque = None
@@ -245,7 +134,6 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.shear_rate_mean = None
         self.shear_stress_mean = None
         self.viscosity_mean = None
-        
      #############################################################################
         
 
@@ -279,6 +167,14 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.data_show_comboBox.setDisabled(True)
         self.save_Button.setDisabled(True)
         
+        self.textbox_offset1.editingFinished.connect(self.save_offset1_event)
+        self.textbox_offset2.editingFinished.connect(self.save_offset2_event)
+        
+    def save_offset1_event(self):
+        self.offset_1 = self.textbox_offset1.text()
+        
+    def save_offset2_event(self):
+        self.offset_2 = self.textbox_offset2.text()
 
     def find_filename_button_pressed(self):
         self.analyse_filename = QFileDialog.getOpenFileName(filter="csv (*.csv)")[0]
@@ -291,100 +187,13 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
     def choose_option(self):
         
-            
-        mode = self.data_show_comboBox.currentText()
-        
-        
         self.data = pandas.read_csv(self.analyse_filename, sep=";", header=None).to_numpy()
-        
-        
+        mode = self.data_show_comboBox.currentText()
         self.num_rows, self.num_column = self.data.shape
-
-
-        #############################################################################
-        self.time = np.zeros(( self.num_rows, 1))
-        self.current_1 = np.zeros(( self.num_rows, 1))
-        self.current_2 = np.zeros(( self.num_rows, 1))
-        self.voltage_1 = np.zeros(( self.num_rows, 1))
-        self.voltage_2 = np.zeros(( self.num_rows, 1))
-        self.angle_magnetic_field = np.zeros(( self.num_rows, 1))
-        self.angle_magnet = np.zeros(( self.num_rows, 1))
-        self.phase_difference = np.zeros((self.num_rows, 1))
-        self.angular_velocity = np.zeros((self.num_rows, 1))
-        self.shear_rate =  np.zeros((self.num_rows, 1))
-        self.friction_moment = np.zeros((self.num_rows, 1))
-        self.total_torque =  np.zeros((self.num_rows, 1))
-        self.magnitude_current = np.zeros((self.num_rows, 1))
-        ###############################################################################
+        
+        self.data_calculation_function()
         
         
-        
-        
-        
-        
-        #declare variables to read from the files (already given)
-        self.time = self.data[:, 0]
-        self.voltage_1 = self.data[:, 1]
-        self.voltage_2 = self.data[:, 2]
-        self.current_1 = self.data[:, 3]
-        self.current_2 = self.data[:, 4]
-        
-        
-        
-        
-         #call normalise function 
-        self.normalise_voltage_event()
-        self.calculate_angle()
-        self.calculate_magnitude_current()
-        # calculate rotation velocity
-        self.calculate_shear_rate()
-        
-        #calculate friction moment from shear rate
-        self.calculate_friction_moment()
-        self.calculate_shear_stress()
-        self.calculate_viscosity()
-
-        
-        
-        amf = self.angle_magnetic_field.reshape(-1, 1)
-        amag = self.angle_magnet.reshape(-1, 1)
-        pd  = self.phase_difference.reshape(-1, 1)
-        angv = self.angular_velocity.reshape(-1,1)
-        trq = self.total_torque.reshape(-1, 1)
-        sr1 = self.shear_rate.reshape(-1, 1)
-        ss2 = self.shear_stress.reshape(-1, 1)
-        vis = self.viscosity.reshape(-1, 1)
-        
-                
-        N = self.angle_magnetic_field.shape[0]  # number of rows
-
-        # make empty string columns
-        off1 = np.full((N, 1), "", dtype=object)
-        off2 = np.full((N, 1), "", dtype=object)
-
-        # put user input only in the first row
-        off1[0, 0] = str(self.offset_1)
-        off2[0, 0] = str(self.offset_2)
-        print(self.offset_1)
-            
-                        
-                
-        self.final_data_to_save = np.hstack((
-            self.data,
-            amf,
-            amag,
-            pd,
-            angv,
-            trq,
-            sr1,
-            ss2,
-            vis,
-            off1, 
-            off2
-        ))
-
-        #find the number of rows and column AGAIN
-
         #first mode
         if mode == "Data table":
             #HIDE THE TABLE WIDGET 
@@ -436,61 +245,51 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             self.draw_viscosity_diagram()
             
             
-            
-
-
-    def data_mode_function(self):
+    def data_calculation_function(self):
         if  self.num_column == 5:
             
+            self.calculate_functions()
             self.calculate_all_mean()
 
             # remove last two columns
-            self.final_data_to_show = self.final_data_to_save[:, :-2]
-
-            # set row and column count
-            self.table_Widget.setRowCount(self.final_data_to_show.shape[0]+1)
-            self.table_Widget.setColumnCount(self.final_data_to_show.shape[1])
+            self.final_data_to_show = self.final_data_to_save[:, :-4]
             
-            # insert mean row at the top
-            self.table_Widget.insertRow(0)
-
-            # fill the table starting from row 1
-            for row in range(self.final_data_to_show.shape[0]):
-                for col in range(self.final_data_to_show.shape[1]):
-                    item = QTableWidgetItem(str(self.final_data_to_show[row, col]))
-                    self.table_Widget.setItem(row + 1, col, item)  # shift by 1
-
-
-                                
-            self.save_Button.setDisabled(False)
             self.save_Button.clicked.connect(self.save_button_event)
+            self.save_Button.setDisabled(False)
             
+        elif self.num_column == 17:
             
-        elif self.num_column == 15:
-
+            #take all the data up to column 13
+            self.final_data_to_show = self.data[:, :-4]
+            #take all the data 2 from the last column
+            self.coefficient_saved = self.data[:, -4:]
             self.calculate_all_mean_after_save()
+            self.reference_var_for_saved_data()
             
             
-            self.final_data_to_show = self.data[:, :-2]
-            
-            
-            # set row and column count
-            self.table_Widget.setRowCount(self.final_data_to_show.shape[0]+1)
-            self.table_Widget.setColumnCount(self.final_data_to_show.shape[1])
-            
-            
-            self.table_Widget.insertRow(0)
-
-            for row in range(self.final_data_to_show.shape[0]):
-                for col in range(self.final_data_to_show.shape[1]):
-                    item = QTableWidgetItem(str(self.final_data_to_show[row, col]))
-                    self.table_Widget.setItem(row + 1, col, item)  # shift by 1
-                    
             self.save_Button.setDisabled(True)
+            
+        
+        
+        
+    def data_mode_function(self):
+
+        # set row and column count
+        self.table_Widget.setRowCount(self.final_data_to_show.shape[0]+1)
+        self.table_Widget.setColumnCount(self.final_data_to_show.shape[1])
+        
+        # insert mean row at the top
+        self.table_Widget.insertRow(0)
+
+        # fill the table starting from row 1
+        for row in range(self.final_data_to_show.shape[0]):
+            for col in range(self.final_data_to_show.shape[1]):
+                item = QTableWidgetItem(str(self.final_data_to_show[row, col]))
+                self.table_Widget.setItem(row + 1, col, item)  # shift by 1
+                
             
             
         #################################SET DATA FOR MEAN VALUE OF THE FIRST ROW#######################
-        
         
         # first 7 columns with "-"
         for col in range(7):
@@ -508,6 +307,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             self.viscosity_mean,
         ]
 
+        #colour the row with red 
         for i, val in enumerate(values, start=7):
             item = QTableWidgetItem(str(val))
             item.setBackground(QtGui.QColor(255, 0, 0))
@@ -518,9 +318,175 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         ##############################################################################################
         
 
+
+
+
+    def calculate_functions(self):
+        #############################################################################
+        self.time = np.zeros(( self.num_rows, 1))
+        self.current_1 = np.zeros(( self.num_rows, 1))
+        self.current_2 = np.zeros(( self.num_rows, 1))
+        self.voltage_1 = np.zeros(( self.num_rows, 1))
+        self.voltage_2 = np.zeros(( self.num_rows, 1))
+        self.angle_magnetic_field = np.zeros(( self.num_rows, 1))
+        self.angle_magnet = np.zeros(( self.num_rows, 1))
+        self.phase_difference = np.zeros((self.num_rows, 1))
+        self.angular_velocity = np.zeros((self.num_rows, 1))
+        self.shear_rate =  np.zeros((self.num_rows, 1))
+        self.fr1on_moment = np.zeros((self.num_rows, 1))
+        self.total_torque =  np.zeros((self.num_rows, 1))
+        self.magnitude_current = np.zeros((self.num_rows, 1))
+        ###############################################################################
+        
+            
+        
+        
+        
+        #declare variables to read from the files (already given)
+        self.time = self.data[:, 0]
+        self.voltage_1 = self.data[:, 1]
+        self.voltage_2 = self.data[:, 2]
+        self.current_1 = self.data[:, 3]
+        self.current_2 = self.data[:, 4]
+        
+        self.offset_1, self.offset_2 = packet_transmission.get_offsets()
+        
+        self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
+        f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
+        
+        #call normalise function 
+        self.normalise_voltage_event()
+        self.calculate_angle()
+        self.calculate_magnitude_current()
+        # calculate rotation velocity
+        self.calculate_shear_rate()
+        
+        #calculate friction moment from shear rate
+        self.calculate_friction_moment()
+        self.calculate_shear_stress()
+        self.calculate_viscosity()
+
+        
+        
+        amf = self.angle_magnetic_field.reshape(-1, 1)
+        amag = self.angle_magnet.reshape(-1, 1)
+        pd  = self.phase_difference.reshape(-1, 1)
+        angv = self.angular_velocity.reshape(-1,1)
+        trq = self.total_torque.reshape(-1, 1)
+        sr1 = self.shear_rate.reshape(-1, 1)
+        ss2 = self.shear_stress.reshape(-1, 1)
+        vis = self.viscosity.reshape(-1, 1) 
+        
+        #get the fr from packet tranmision
+        self.fr0, self.fr1 = packet_transmission.get_fr_coefficient()
+        
+
+        #change text box for visibility
+        self.textbox_offset1.setText(str(self.offset_1))
+        self.textbox_offset2.setText(str(object=self.offset_2))
+                
+        N = self.angle_magnetic_field.shape[0]  # number of rows
+
+        # make empty string columns
+        self.off1_to_be_saved = np.full((N, 1), "", dtype=object)
+        self.off2_to_be_saved = np.full((N, 1), "", dtype=object)
+        self.fr0_to_be_saved = np.full((N, 1), "", dtype=object)
+        self.fr1_to_be_saved = np.full((N, 1), "", dtype=object)
+        
+        # put user input only in the first row
+        self.off1_to_be_saved[0, 0] = float(self.offset_1)
+        self.off2_to_be_saved[0, 0] = float(self.offset_2)
+        self.fr0_to_be_saved[0, 0]  = float(self.fr0)
+        self.fr1_to_be_saved[0, 0]  = float(self.fr1)
+        
+            
+                        
+                
+        self.final_data_to_save = np.hstack((
+            self.data,
+            amf,
+            amag,
+            pd,
+            angv,
+            trq,
+            sr1,
+            ss2,
+            vis,
+            self.off1_to_be_saved, 
+            self.off2_to_be_saved,
+            self.fr0_to_be_saved, 
+            self.fr1_to_be_saved
+        ))
+            
+            
+            
+    def reference_var_for_saved_data(self):
+        #############################################################################
+        self.time = np.zeros(( self.num_rows, 1))
+        self.current_1 = np.zeros(( self.num_rows, 1))
+        self.current_2 = np.zeros(( self.num_rows, 1))
+        self.voltage_1 = np.zeros(( self.num_rows, 1))
+        self.voltage_2 = np.zeros(( self.num_rows, 1))
+        self.angle_magnetic_field = np.zeros(( self.num_rows, 1))
+        self.angle_magnet = np.zeros(( self.num_rows, 1))
+        self.phase_difference = np.zeros((self.num_rows, 1))
+        self.angular_velocity = np.zeros((self.num_rows, 1))
+        self.shear_rate =  np.zeros((self.num_rows, 1))
+        self.fr1on_moment = np.zeros((self.num_rows, 1))
+        self.total_torque =  np.zeros((self.num_rows, 1))
+        self.magnitude_current = np.zeros((self.num_rows, 1))
+        ###############################################################################
+        
+            
+        
+        
+        
+        #declare variables to read from the files (already given)
+        self.time = self.final_data_to_show[:, 0]
+        self.voltage_1 = self.final_data_to_show[:, 1]
+        self.voltage_2 = self.final_data_to_show[:, 2]
+        self.current_1 = self.final_data_to_show[:, 3]
+        self.current_2 = self.final_data_to_show[:, 4]
+        self.angle_magnetic_field = self.final_data_to_show[:, 5]
+        self.angle_magnet = self.final_data_to_show[:, 6]
+        self.phase_difference = self.final_data_to_show[:, 7]
+        self.angular_velocity = self.final_data_to_show[:, 8]
+        self.total_torque = self.final_data_to_show[:, 9]
+        self.shear_rate = self.final_data_to_show[:, 10]
+        self.shear_stress = self.final_data_to_show[:, 11]
+        self.viscosity = self.final_data_to_show[:, 12]
+        
+        self.offset_1 = self.coefficient_saved[0, 0]
+        self.offset_2 = self.coefficient_saved[0, 1]
+        self.fr0 = self.coefficient_saved[0, 2]
+        self.fr1 = self.coefficient_saved[0, 3]
+        
+        self.textbox_offset1.setText(str(self.offset_1))
+        self.textbox_offset2.setText(str(object=self.offset_2))
+        
+        
+        print("Offset 1 from csv:", self.offset_1)
+        print("Offset 2 from csv:", self.offset_2)
+        print("fr0 from csv:", self.fr0)
+        print("fr1 from csv:", self.fr1)
+    
+            
+        
         
     
     def normalise_voltage_event(self):
+        """
+        Normalize Hall sensor voltage data.
+
+        This method reads the Hall voltage data from `self.data` (columns 1 and 2),
+        calculates the amplitude and zero offset, and then normalizes the voltage
+        so that it is centered around 0 and scaled by its amplitude.
+
+        After normalization, the voltage data in `self.data[:, 1]` and
+        `self.data[:, 2]` will be in the range [-1, 1].
+
+        :return: None
+        """
         # #read column 2 and column 3 for the hall voltage
         amplitude_voltage_1 = (np.max(self.data[:, 1]) - np.min(self.data[:, 1]))/2.0
         zero_offset_voltage_1 = (np.max(self.data[:, 1]) + np.min(self.data[:, 1]))/2.0
@@ -533,23 +499,36 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
     
     def save_button_event(self):
-        filename, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv)")
+        
+       
+        filename, _ = QFileDialog.getSaveFileName(parent=self, caption="Save File", directory="", filter="CSV Files (*.csv)")
         if filename:
-            if not filename.lower().endswith('.csv'):
-                filename += '.csv'
-            
             # Save with pandas
             df = pandas.DataFrame(self.final_data_to_save)
-            df.to_csv(filename, sep=";", index=False, header=False)
+            df.to_csv(filename, sep=";", index=False, header=None)
                 
     def calculate_angle(self):
+        """
+        Calculate magnet and magnetic field angles and their phase difference.
+
+        This method computes the angles for the magnet and the magnetic field
+        from the Hall voltage data stored in `self.data`. 
+
+        - The magnet angle is calculated using columns 2 and 3 (`self.data[:, 1]` and `self.data[:, 2]`).
+        - The magnetic field angle is calculated using columns 4 and 5 (`self.data[:, 3]` and `self.data[:, 4]`).
+        - Angles are unwrapped along axis 0 to remove discontinuities.
+        - The phase difference between the magnetic field and the magnet is stored
+        in `self.phase_difference`.
+
+        :return: None
+        """
         for row in range(self.num_rows):
             # angle from 2nd and 3rd columns (index 1 and 2)
             self.angle_magnet[row, 0] = np.arctan2(self.data[row, 2], self.data[row, 1])
             
             # angle from 4th and 5th columns (index 3 and 4)
-            self.angle_magnetic_field[row, 0] = np.arctan2(self.data[row, 4], self.data[row, 3])
-
+            self.angle_magnetic_field[row, 0] = np.arctan2(self.data[row, 4] - float(self.offset_2), self.data[row, 3] - float(self.offset_1))
+        #TODO: OFFSETS
                     
                     
                     
@@ -563,7 +542,29 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
     
     
     def calculate_shear_rate(self):
+        """
+        Calculate the shear rate from the magnet angle signal.
 
+        This method uses a Savitzky-Golay filter to smooth and differentiate
+        the noisy angular position data (`self.angle_magnet`) with respect
+        to time (`self.time`). The first derivative of the angle signal gives
+        the angular velocity in [rad/s]. The shear rate is then obtained by
+        scaling the angular velocity with the shear rate constant `C_SR`.
+
+        Steps:
+            1. Apply Savitzky-Golay filter to estimate angular velocity.
+            2. Compute shear rate as angular_velocity * shear rate coefficient [C_SR].
+
+        Updates Attributes:
+            self.angular_velocity : np.ndarray
+                Estimated angular velocity of the magnet [rad/s].
+            self.shear_rate : np.ndarray
+                Calculated shear rate [1/s].
+
+        Notes:
+            - The smoothness depends on the chosen `window_length` and `polyorder`.
+            - `delta` is set as the mean time step from `self.time`.
+        """
         self.angular_velocity = savgol_filter(
             self.angle_magnet[:, 0],      # your noisy angle signal
             window_length=51,            # try 51, 101, etc. depending on how smooth you want
@@ -572,37 +573,27 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             delta=np.mean(np.diff(self.time))  # time step
             )  # [rad /s] 
         
-        
-  
-        
         self.shear_rate =  self.angular_velocity * self.C_SR # [1 / s]
         
         
         
     def calculate_friction_moment(self):
-        self.friction_moment = self.CALIBRATION_FACTOR * self.angular_velocity * self.FRICTION_COEFFICIENT          # [Nm]
+        self.friction_moment =   self.angular_velocity * self.fr1  - self.fr0 # - y_0        # [Nm]
         
         
     def calculate_magnitude_current(self):
-        self.offset_1 =float(self.textbox_offset1.text())
-        self.offset_2 =float(self.textbox_offset2.text())   
-        # print(self.offset_1)
-        # print(self.offset_2)
-        power_of_2 = np.power((self.current_1 - self.offset_1), 2) + np.power((self.current_2 - self.offset_2), 2)
-        # power_of_2 = np.power(self.current_1, 2) + np.power(self.current_2, 2)
+        power_of_2 = np.power((self.current_1 - float(self.offset_1)), 2) + np.power((self.current_2 - float(self.offset_2)), 2)
         self.magnitude_current = np.sqrt(power_of_2)
         
         
     def calculate_shear_stress(self):
         
-        
-        self.total_torque = (
-        self.CALIBRATION_FACTOR                # dimensionslos
-        * self.DIPOLE_MOMENT                    # [A·m²]
+        self.total_torque = (self.CALIBRATION_FACTOR*            # dimensionslos 
+        self.DIPOLE_MOMENT                    # [A·m²]
         * self.COIL_CONSTANT                    # [T/A]
         * self.magnitude_current / 1000         # mA -> A, [A]
-        * np.sin(self.phase_difference[:, 0])   # dimensionless
-        ) - self.friction_moment                # [Nm]
+        * np.sin(self.phase_difference[:, 0]))   # dimensionless
+        - self.friction_moment              # [Nm]
         
         
         
@@ -746,7 +737,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.canvas.axes.grid(True, which='both', linestyle='--', linewidth=0.5)
         self.canvas.axes.minorticks_on()
         self.canvas.draw()
-
+                            
     def draw_viscosity_diagram(self):
         self.canvas.axes.cla()  # clear canvas
         self.canvas.axes.set_title("Viscosity diagram")
@@ -765,10 +756,12 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 def main_3():
     app3 = QApplication([])
     
-    if sys.platform == 'darwin':
-        app3.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/src/fzj.png"))
-    elif sys.platform == 'win32':
-        app3.setWindowIcon(QtGui.QIcon("GUI_SRC_CODE/src/fzj.png"))
+    # get absolute path of project root (folder containing 'src' and 'pics')
+    project_root = os.path.dirname(os.path.abspath(__file__))
+
+    # construct icon path
+    fzj_icon_path = os.path.join(project_root, "pics", "fzj.ico")
+    app3.setWindowIcon(QtGui.QIcon(fzj_icon_path))
     window3 = AnalyseWindow()
     window3.show()
     app3.exec_()

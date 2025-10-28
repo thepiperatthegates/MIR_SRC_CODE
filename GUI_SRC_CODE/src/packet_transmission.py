@@ -14,6 +14,7 @@ data_6 = 0
 data_7 = 0
 data_8 = 0
 data_9 = 0
+data_10 = 0
 
 
 #for button event flag 
@@ -56,29 +57,57 @@ MIN_V_BEFORE_HALL = 2.5   #or y-intercept
 MAX_V_AFTER_HALL = 3.3
 MIN_V_AFTER_HALL = 0.0
 
-# # default k_b
+#default calibration factor k_b
 k_b_1 = 0.083597946
 k_b_2 = 0.084535931
 
+#default friction coefficient 
+CALIBRATION_FACTOR = 0.773              # torque calibration no units (K)
+fr1 = 1.51e-8 # in Nm / (rad /s)
+fr0 = 5.701e-8 # in Nm / (rad /s)
 
-#first sensor coefficient
-CURRENT_COEFF_FIRST_SENSOR_A = -4.61934
-CURRENT_COEFF_FIRST_SENSOR_B = 0.99182
-CURRENT_COEFF_FIRST_SENSOR_C =  -4.24388e-6
-CURRENT_COEFF_FIRST_SENSOR_D =  -5.40711e-8
+#default coefficients
 
-#second sensor coefficient 
-CURRENT_COEFF_SECOND_SENSOR_A = 3.86547
-CURRENT_COEFF_SECOND_SENSOR_B = 0.98655
-CURRENT_COEFF_SECOND_SENSOR_C = 3.02401e-6
-CURRENT_COEFF_SECOND_SENSOR_D = -3.98871e-8
+COIL_CONSTANT = 3.097e-3		# in T / A
+DIPOLE_MOMENT = 8.594e-3		# in A m^2
 
-
-
+#offset from main.py
+offset_1 = 0.0
+offset_2 = 0.0
 
 
 
-def send_function(this_data_1, this_data_2, this_data_3, this_data_4, this_data_5, this_data_6, this_data_7, this_data_8, this_data_9):
+
+#flag for electronics type
+ELECTRONICS_FLAG = 0
+
+
+#first sensor coefficient version 1
+CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 = -4.61934
+CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 = 0.99182
+CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 =  -4.24388e-6
+CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 =  -5.40711e-8
+
+#second sensor coefficient version 1
+CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 = 3.86547
+CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 = 0.98655
+CURRENT_COEFF_SECOND_SENSOR_C_VERSION1= 3.02401e-6
+CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 = -3.98871e-8
+
+#first sensor coefficient version 2
+CURRENT_COEFF_FIRST_SENSOR_A_VERSION2 = 0
+CURRENT_COEFF_FIRST_SENSOR_B_VERSION2 = 0
+CURRENT_COEFF_FIRST_SENSOR_C_VERSION2 =  0
+CURRENT_COEFF_FIRST_SENSOR_D_VERSION2 =  0
+
+#second sensor coefficient version 2
+CURRENT_COEFF_SECOND_SENSOR_A_VERSION2 = 0
+CURRENT_COEFF_SECOND_SENSOR_B_VERSION2 = 0
+CURRENT_COEFF_SECOND_SENSOR_C_VERSION2= 0
+CURRENT_COEFF_SECOND_SENSOR_D_VERSION2 = 0
+
+
+def send_function(this_data_1, this_data_2, this_data_3, this_data_4, this_data_5, this_data_6, this_data_7, this_data_8, this_data_9, this_data_10):
     global data_1
     global data_2
     global data_3
@@ -88,6 +117,7 @@ def send_function(this_data_1, this_data_2, this_data_3, this_data_4, this_data_
     global data_7
     global data_8
     global data_9
+    global data_10
 
     data_1 = this_data_1                 #set and getter
     data_2 = this_data_2
@@ -98,17 +128,18 @@ def send_function(this_data_1, this_data_2, this_data_3, this_data_4, this_data_
     data_7 = this_data_7
     data_8 = this_data_8
     data_9 = this_data_9
+    data_10 = this_data_10
 
     
     
 def send_function_getter():
-    return data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9
+    return data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10
 
 
 def data_1_getter():
 
 
-    return int(data_1)
+    return float(data_1)
 
 def data_7_getter():
     
@@ -200,6 +231,7 @@ def get_stop_button_data():
     
     return int(data_8)
 
+<<<<<<< HEAD
 def get_electronic_num():
     
     global data_10 
@@ -207,13 +239,27 @@ def get_electronic_num():
     return data_10
 
 
+=======
+def get_mir_mode():
+    global data_10 
+    
+    return int(data_10)
+
+def get_offsets():
+    global data_4, data_6 
+    
+    print(data_4)
+    return float(data_4), float(data_6)
+>>>>>>> dev
 def combine_bytes_for_buffer(send_1, send_2, send_3, send_4, send_5, send_6, send_7, send_8, send_9, send_10):
            
     #ARM Microcontroller is Little Endian, for integer we will be shifting the 
     #bits ourselves but for float, we need to send it little endian preemptively
     
+    
+    ## TODO: CHANGE BYTE_SEND TO FLOAT 
     print("Frequency of DAC", send_2)
-    byte_send1 = struct.pack('>I', int(send_1))       
+    byte_send1 = struct.pack('<f', float(send_1))       
     byte_send2 = struct.pack('<f', float(send_2))             #running frequency of MCU 
     byte_send3 = struct.pack('<f', float(send_3))              #amplitude1
     byte_send4 = struct.pack('<f', float(send_4))              #offset1
@@ -247,6 +293,12 @@ def change_current_adc(digital_current_values):
     analogue_current_after_impedance_matching = 500/5.0 * analogue_voltage_after_impedance_matching
     return analogue_current_after_impedance_matching
 
+
+def gradient_calculate(y_intercept, y_axis, x_axis):
+     
+    gradient =  (y_axis - y_intercept)/x_axis
+    return float(gradient)
+
 def calibrated_hall_sensors1(hall_voltage, actual_current):
     
     global k_b_1
@@ -259,48 +311,74 @@ def calibrated_hall_sensors2(hall_voltage, actual_current):
     calibrated_voltage = hall_voltage - (actual_current*k_b_2)
     return calibrated_voltage
 
-
-def gradient_calculate(y_intercept, y_axis, x_axis):
-     
-    gradient =  (y_axis - y_intercept)/x_axis
+def get_fr_coefficient():
     
-    return float(gradient)
-
-
-
+    global fr0, fr1
+    
+    return fr0, fr1
 
 
 def calculate_running_frequency(input):
     
     C_SR = 37.099
-    running_frequency = input/(2*pi*C_SR)
-    return running_frequency
+    running_frequency = float(input)/(2*pi*C_SR)
+    return float(running_frequency)
+
+
+def set_electronics_flag(flag):
+    global ELECTRONICS_FLAG
+    
+    ELECTRONICS_FLAG = flag 
+    
+    
+def get_electronics_flag():
+    
+    global ELECTRONICS_FLAG
+    
+    return ELECTRONICS_FLAG
 
 def calibration_input_coil_1(input):
     
+<<<<<<< HEAD
 <<<<<<< Updated upstream
     output = CURRENT_COEFF_FIRST_SENSOR_A + CURRENT_COEFF_FIRST_SENSOR_B * input + CURRENT_COEFF_FIRST_SENSOR_C * pow(input, 2) + CURRENT_COEFF_FIRST_SENSOR_D * pow(input, 3)
 =======
+=======
+    global ELECTRONICS_FLAG
+    
+>>>>>>> dev
     if ELECTRONICS_FLAG == 1:
         output = CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 + CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 * input + CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 * pow(input, 2) +  CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 * pow(input, 3)
     elif ELECTRONICS_FLAG == 2:
         output = CURRENT_COEFF_FIRST_SENSOR_A_VERSION2 + CURRENT_COEFF_FIRST_SENSOR_B_VERSION2 * input + CURRENT_COEFF_FIRST_SENSOR_C_VERSION2 * pow(input, 2) +  CURRENT_COEFF_FIRST_SENSOR_D_VERSION2 * pow(input, 3)
+<<<<<<< HEAD
         
 >>>>>>> Stashed changes
+=======
+>>>>>>> dev
     return output   
 
 
 def calibration_input_coil_2(input):
+<<<<<<< HEAD
 <<<<<<< Updated upstream
   
     output = CURRENT_COEFF_SECOND_SENSOR_A + CURRENT_COEFF_SECOND_SENSOR_B * input + CURRENT_COEFF_SECOND_SENSOR_C * pow(input, 2) + CURRENT_COEFF_SECOND_SENSOR_D * pow(input, 3)
 =======
+=======
+    global ELECTRONICS_FLAG
+    
+    
+>>>>>>> dev
     if ELECTRONICS_FLAG == 1:
         output = CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 + CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 * input + CURRENT_COEFF_SECOND_SENSOR_C_VERSION1 * pow(input, 2) + CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 * pow(input, 3)
     elif ELECTRONICS_FLAG == 2:
         output = CURRENT_COEFF_SECOND_SENSOR_A_VERSION2 + CURRENT_COEFF_SECOND_SENSOR_B_VERSION2 * input + CURRENT_COEFF_SECOND_SENSOR_C_VERSION2 * pow(input, 2) +  CURRENT_COEFF_SECOND_SENSOR_D_VERSION2 * pow(input, 3)
+<<<<<<< HEAD
         
 >>>>>>> Stashed changes
+=======
+>>>>>>> dev
     return output   
 
 # def angle_calculate(x1, x2):
@@ -317,3 +395,65 @@ def calibration_input_coil_2(input):
     
 #     return_calibrated_1 = hall_sensor_voltage1 - get_first_digit * sin(2*pi)
 #     return_calibrated_1 = hall_sensor_voltage2 - get_second_digit * sin(2*pi)
+
+
+                
+def calculate_torque_fR( current_1, current_2, hall_1, hall_2, data_4, data_6):
+        """
+        Calculate the torque based on Hall sensor and current measurements.
+
+        This method computes the applied torque using the phase difference between
+        the magnetic field (from the current coils) and the magnet (from
+        the Hall sensors). It applies calibration factors, coil constants,
+        and the dipole moment to convert the measured currents to torque.
+
+        :param current_1: First component of the current measurement.
+        :type current_1: float or np.ndarray
+        :param current_2:ray(hall_2, dtype=float)
+        
+        print("current_2:", current_2)
+        global data_4,  Second component of the current measurement.
+        :type current_2: float or np.ndarray
+        :param hall_1: First Hall sensor reading.
+        :type hall_1: float or np.ndarray
+        :param hall_2: Second Hall sensor reading.
+        :type hall_2: float or np.ndarray
+
+        :return: Calculated torque.
+        :rtype: float or np.ndarray
+        """
+        
+        global CALIBRATION_FACTOR, DIPOLE_MOMENT, COIL_CONSTANT
+        
+        current_1 = numpy.array(current_1, dtype=float)
+        current_2 = numpy.array(current_2, dtype=float)
+        hall_1    = numpy.array(hall_1, dtype=float)
+        hall_2    = numpy.array(hall_2, dtype=float)
+        
+        offset_1 =float(data_4)
+        offset_2 =float(data_6)
+        
+        #magnetic field angle - magnet angle
+        phase_difference = numpy.arctan2(current_2, current_1) - numpy.arctan2(hall_2, hall_1)
+        
+        power_of_2 = numpy.power((current_1 - offset_1), 2) + numpy.power((current_2 - offset_2), 2)
+        
+        magnitude_current = numpy.sqrt(power_of_2)
+        
+        total_torque = CALIBRATION_FACTOR * ( DIPOLE_MOMENT
+        * COIL_CONSTANT                    # [T/A]
+        * magnitude_current / 1000         # mA; -> A, [A]
+        * numpy.sin(phase_difference)   # dimensionless
+        )
+        
+        return total_torque, phase_difference
+    
+def calculate_radial_frequency(running_frequency):
+
+    return float(2 * numpy.pi * running_frequency)
+
+
+
+
+if __name__ == "__main___":
+    send_transmission_event(1)
