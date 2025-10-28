@@ -677,25 +677,24 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         data_10 = 1
         packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
-    
-        packet_transmission.stop_button_event(0)            #goto sockets_files and stop the loop for receiving
-        packet_transmission.running_time_event(this_running_time_flag=1)
-        
-        
+
         ######## get the desired sampling frequency from the textbox
-        
-        
         sampling_frequency = self.textbox_sample_frequency.text()
         if sampling_frequency == '' or sampling_frequency == 0:
             pass
         else:
+                
             sockets_files.time_increment = 1.0/float(sampling_frequency)
-            sockets_files.tot_average = int(10000.0/ float(sampling_frequency))
-            check = 5000/sockets_files.tot_average
-        #################################################
-        print("tot_average", sockets_files.tot_average)
+            sockets_files.tot_average = 10000 // int(sampling_frequency)
+            print("tOT_average", sockets_files.tot_average)
+            
+            check = 5000 / int(sockets_files.tot_average)
+            print("check is", check)
         
-        if isinstance(check, int):
+        if check.is_integer():
+            packet_transmission.stop_button_event(0)            #goto sockets_files and stop the loop for receiving
+            packet_transmission.running_time_event(this_running_time_flag=1)
+            
             sockets_files.file_name_change_set("dummy")        #set file name from gui
             sockets_files.current_time = 0.0
 
@@ -710,13 +709,10 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.worker_sleep = SleepTimer()
             self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
             self.worker_sleep.start()
-    
         
         ## Error handling when invalid sampling frequency is being input
-        elif isinstance(check, float):
+        else:
             self.popout_window(5)
-        
-        
         
     def update_time_counter_acquisition(self, val):
         self.lcdNumber.display(val)
