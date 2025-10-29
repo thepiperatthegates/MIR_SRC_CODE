@@ -358,7 +358,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             f"f<sub>R</sub> equation = {np.poly1d(self.calculate_final_fR)}"
         )
         self.label_frequency.setText("Shear rate γ̇ / s<sup>-1</sup>")    
-        self.button_fr_constant.setText("Measure f_R")
+        self.button_fr_constant.setText("Measure f<sub>R</sub>")
+        ("I⃗R")
         self.textbox_sample_frequency.setText("10000")
         #################################################################################################
 

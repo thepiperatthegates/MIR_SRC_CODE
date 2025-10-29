@@ -169,10 +169,11 @@ class DataUpdate(QThread):
                 angle_magnetic_field_val  = np.unwrap(angle_magnetic_field_val)
                 #######################################################################################################
                 phase_difference_val = angle_magnetic_field_val - angle_permanent_magnet_val
-                data_mutex.unlock()
+                
                 
                 #Clear queue after processing
                 bytes_to_process = np.array([], dtype=np.uint16)
+                data_mutex.unlock()
 
 
     def calculate_calibration(self, store_array1_calibrate, store_array2_calibrate, store_array3_calibrate, store_array4_calibrate):
@@ -269,6 +270,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.textbox_direction1_1.setPlaceholderText("Direction 1")
         self.textbox_direction2_1.setPlaceholderText("Direction 2")
         self.textbox_direction1_2.setPlaceholderText("Direction 1")
+        self.button_send_start_vec.setText("I⃗₁")
         self.textbox_direction2_2.setPlaceholderText("Direction 2")
         
         self.textbox_vector_time_1.setPlaceholderText("for vector 1")
@@ -298,7 +300,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         
         
         self.button_offsets.clicked.connect(self.send_offsets)
-        self.button_button_send_i_1.clicked.connect(self.send_start_vector)
+        self.button_send_start_vec.clicked.connect(self.send_start_vector)
         
         ####################################################################################
         
@@ -546,9 +548,9 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         #make the running frequency 200 Hz, does not matter since we will produce DC current anyway
         data_2 = 200 #Hz
         data_3 =0
-        data_4 =  self.textbox_offset_1.text()
+        data_4 =  self.textbox_direction1_1.text()
         data_5 = 0
-        data_6 = self.textbox_offset_2.text()  
+        data_6 = self.textbox_direction2_1.text()  
 
         
         ##direction does not matter here 
@@ -570,6 +572,8 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
 
         self.status_label.setStyleSheet("color: #32a83a;")
         self.status_label.setText("Offsets sent!")
+        
+        
 
     def closeEvent(self, event):
         """
