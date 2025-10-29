@@ -65,7 +65,7 @@ def socket_start_connect():
     global port_name
 
     if sys.platform == 'darwin':        #hijazi's laptop
-        port_num = '/dev/tty.usbmodem3776345D32331'   #for mac1
+        port_num = '/dev/tty.usbmodem355A357631331'   #for mac1
         # port_name = '/dev/tty.usbmodem355A357631331'       
     elif sys.platform == 'win32':       #simon's laptop
         port_num = port_name

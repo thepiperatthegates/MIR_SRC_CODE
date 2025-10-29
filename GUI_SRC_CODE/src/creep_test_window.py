@@ -66,9 +66,8 @@ data_mutex = QMutex()
 
 #function receiving data through pipe from another thread
 class DataUpdate(QThread):
-    def __init__(self, main_window_ref):
+    def __init__(self):
         super().__init__()
-        self.main_window = main_window_ref
         self.running = True
         self.flag_calibrate = False
 
@@ -218,7 +217,7 @@ class SleepTimer(QObject):
     update_time_signal = pyqtSignal(float)  # emit float countdown values
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        super().__init__()
         global data_1
         self.remaining = float(data_1) # get local_data_1 from global
         self.timer = QTimer(self)
@@ -238,7 +237,32 @@ class SleepTimer(QObject):
         else:
             self.timer.stop()
             packet_transmission.running_time_event(0)
-
+            
+class SleepTimerVector(QObject):
+    
+    update_time_signal_vector = pyqtSignal(float)
+    
+    def __init__(self, start_vector_time, end_vector_time, flag_end_vector = False):
+        super().__init__()
+        self.start_vector_time = start_vector_time 
+        self.end_vector_time = end_vector_time 
+        self.flag_end_vector = flag_end_vector
+        self.timer = QTimer(self)
+        self.timer.setInterval(100)
+        self.timer.timeout.connect(self._tick)
+        
+    def start(self):
+        self.timer.start()
+        
+    def stop(self):
+        self.timer.stop()
+        
+    def _tick(self):
+        self.remaining -= 0.1
+        if self.remaining >= 0.0:
+            self.update_time_signal_vector.emit(round(self.remaining, 1))
+        else:
+            self.timer.stop()
 
 class SocketThread(QThread):
     def __init__(self, parent=None):
@@ -249,16 +273,14 @@ class SocketThread(QThread):
         if self.running:
             sockets_files.thread_start()
 
-
     def stop(self):
         self.running = False
-
-
+        
 
 class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
     def __init__(self):
         super().__init__()
-        self.setupUi(self)\
+        self.setupUi(self)
             
             
         ################################HINT TYPE###################################################
@@ -267,17 +289,15 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.textbox_offset_1.setPlaceholderText("Enter +-480mA")
         self.textbox_offset_2.setPlaceholderText("Enter +-480mA")
         
-        self.textbox_direction1_1.setPlaceholderText("Direction 1")
-        self.textbox_direction2_1.setPlaceholderText("Direction 2")
-        self.textbox_direction1_2.setPlaceholderText("Direction 1")
+        self.textbox_direction_start_x.setPlaceholderText("X-axis")
+        self.textbox_direction_start_y.setPlaceholderText("Y-axis")
         self.button_send_start_vec.setText("I⃗₁")
-        self.textbox_direction2_2.setPlaceholderText("Direction 2")
+        self.textbox_direction_end_x.setPlaceholderText("X-axis")
+        self.textbox_direction_end_y.setPlaceholderText("Y-axis")
         
-        self.textbox_vector_time_1.setPlaceholderText("for vector 1")
-        self.textbox_vector_time_2.setPlaceholderText("for vector 2")
         
-        self.textbox_sampling_rate.setPlaceholderText("specify the fast sampling rate!")
-        self.textbox_sampling_time.setPlaceholderText("counting from 0s")
+        self.textbox_input_sampling_rate.setPlaceholderText("Specify the fast sampling rate!")
+        self.textbox_input_sampling_time.setPlaceholderText("Counting from 0s")
         
         self.textbox_standard_sampling_rate.setText("10000")
         ################################################################################################
@@ -296,18 +316,18 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         
         ################################### connected signals from widget #############################################
         
-        
-        
-        
+        self.button_start_acquistion.clicked.connect(self.start_creep_test)
         self.button_offsets.clicked.connect(self.send_offsets)
         self.button_send_start_vec.clicked.connect(self.send_start_vector)
-        
+        self.save_button.clicked.connect(self.save_button_event)
+        self.graph_stop_button.clicked.connect(self.graph_stop_event)
+        self.button_auto_range.clicked.connect(self.auto_range_event)
         ####################################################################################
         
         ############################Start backend serial lines##################################################
         
         self.worker_socket = SocketThread()
-        self.worker_DataUpdate = DataUpdate(self)
+        self.worker_DataUpdate = DataUpdate()
 
         self.worker_socket.start()
         self.worker_DataUpdate.start()
@@ -471,10 +491,12 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         
 
     def graph_update_angle(self):
+        data_mutex.lock()
         global angle_permanent_magnet_val, angle_magnetic_field_val
         
         self.curve_sigma_m.setData(time_axis, angle_permanent_magnet_val)
         self.curve_sigma_b.setData(time_axis, angle_magnetic_field_val)
+        data_mutex.unlock()
         
     def graph_phase_difference(self):
         global phase_difference_val
@@ -531,6 +553,8 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
     def send_start_vector(self):
         """
         Send start vector for magnet
+        
+        This function just sends a DC voltage to the microcontroller. That's all
         """
         global data_1
         global data_2
@@ -548,9 +572,9 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         #make the running frequency 200 Hz, does not matter since we will produce DC current anyway
         data_2 = 200 #Hz
         data_3 =0
-        data_4 =  self.textbox_direction1_1.text()
+        data_4 =  self.textbox_direction_start_x.text()
         data_5 = 0
-        data_6 = self.textbox_direction2_1.text()  
+        data_6 = self.textbox_direction_start_y.text()  
 
         
         ##direction does not matter here 
@@ -573,6 +597,251 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.status_label.setStyleSheet("color: #32a83a;")
         self.status_label.setText("Offsets sent!")
         
+        
+        
+    def start_creep_test(self):
+        """
+        Send start vector for magnet
+        """
+        #### delete previous dummy files before acquistion starts. 
+        path_join =  os.path.join(self.project_root, "files", "dummy.csv")
+        #remove the dummy if it exists
+        if os.path.exists(path_join):
+            try:
+                os.remove(path_join)
+                print("dummy.csv deleted")
+            except OSError as e:
+                print(f"Error deleting file csv: {e}")
+        else:
+            print("First measurements")
+        
+        """ 
+        Declare all the input textbox variables
+        """
+        start_vector_x = int(self.textbox_direction_start_x.text())
+        start_vector_y = int(self.textbox_direction_start_y.text())
+        end_vector_x = int(self.textbox_direction_end_x.text())
+        end_vector_y = int(self.textbox_direction_end_y.text())
+        
+        start_vector_time = float(self.textbox_vector_start_time.text())
+        end_vector_time = float(self.textbox_vector_end_time.text())
+        
+        input_sampling_rate = int(self.textbox_input_sampling_rate.text())
+        input_sampling_time = float(self.textbox_input_sampling_time.text())
+        
+        standard_sampling_rate = int(self.textbox_standard_sampling_rate.text())
+        
+        #get the total time of the time taken (x-axis on the graph)
+        total_time_for_file_save = start_vector_time + end_vector_time
+        
+        
+        global data_1
+        global data_2
+        global data_3
+        global data_4
+        global data_5
+        global data_6
+        global data_7        #checkbox for direction
+        global data_8
+        global data_9
+        global data_10
+        
+        
+        
+        data_1 = total_time_for_file_save #total time for file saving
+        
+        #make the running frequency 200 Hz, does not matter since we will produce DC current anyway
+        data_2 = 200 #Hz
+        data_3 =0
+        data_4 =  self.textbox_direction1_1.text()
+        data_5 = 0
+        data_6 = self.textbox_direction2_1.text()  
+
+        
+        ##direction does not matter here 
+        data_7 = 1
+            
+        if self.filter_checkbox.isChecked():
+            data_8 = 0
+        else:
+            data_8 = 2
+            
+        data_10 = 1
+        
+        packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
+        
+        self.status_label.setStyleSheet("color: #7da832;")
+        self.status_label.setText("Creep test starts.......")
+        
+        #start processing to write data to csv
+        packet_transmission.stop_button_event(0)            #goto sockets_files and stop the loop for receiving
+        packet_transmission.running_time_event(this_running_time_flag=1)
+        
+
+        self.queue_file_name.put("dummy") #Send file name to another process
+        
+        #start the overall timer (combined timer)
+        self.worker_sleep = SleepTimer()
+        self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
+        self.worker_sleep.start()
+        
+        self.worker_vector_sleep = SleepTimerVector(start_vector_time, end_vector_time, False)
+        self.worker_vector_sleep.update_time_signal_vector(self.update_time_counter_start_vector)
+        self.worker_vector_sleep.start()
+        
+        
+        
+    def update_time_counter_start_vector(self, val):
+        """
+        for vector timer purposes
+        """
+        self.lcdNumber_vector.display(val)
+            
+        if val not in (0, 0.1):
+            self.button_start.setDisabled(True)
+            self.button_stop.setDisabled(True)
+        
+        else:
+            self.button_start.setDisabled(True)
+            self.button_stop.setDisabled(True)
+            
+            
+            """
+            Send the 2nd vector 
+            """
+            global data_1
+            global data_2
+            global data_3
+            global data_4
+            global data_5
+            global data_6
+            global data_7        #checkbox for direction
+            global data_8
+            global data_9
+            global data_10
+            
+        
+            #make the running frequency 200 Hz, does not matter since we will produce DC current anyway
+            data_2 = 200 #Hz
+            data_3 = 0
+            data_4 = self.textbox_direction1_1.text()
+            data_5 = 0
+            data_6 = self.textbox_direction2_1.text()  
+            
+            ##direction does not matter here 
+            data_7 = 1
+                
+            if self.filter_checkbox.isChecked():
+                data_8 = 0
+            else:
+                data_8 = 2
+                
+            data_10 = 1
+            
+            packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
+            
+            packet_transmission.send_transmission_event(1)            #SET flag for Tx
+            packet_transmission.start_flag_send_event(1)
+            
+            self.worker_vector_sleep = SleepTimerVector(0, 1, False)
+            self.worker_vector_sleep.update_time_signal_vector(self.update_time_counter_start_vector)
+            self.worker_vector_sleep.start()
+            
+            self.status_label.setStyleSheet("color: #7da832;")
+            self.status_label.setText("Creep test end vector.......")
+            
+            
+            
+    def update_timer_end_vector(self, val):            
+        """
+        for vector timer purposes
+        """
+        self.lcdNumber_vector.display(val)
+            
+        if val not in (0, 0.1):
+            self.button_start.setDisabled(True)
+            self.button_stop.setDisabled(True)
+        
+        else:
+            self.button_start.setDisabled(True)
+            self.button_stop.setDisabled(True)
+
+            
+            
+    def update_time_counter_acquisition(self, val):
+        """
+        for combined timer purposes
+        """
+        self.lcdNumber.display(val)
+            
+        if val in (0, 0.1):
+            self.button_start.setDisabled(False)
+            self.button_stop.setDisabled(False)
+        else:
+            self.button_start.setDisabled(True)
+            self.button_stop.setDisabled(True)
+            
+    def graph_stop_event(self):
+        if self.stop_default_state == 1:
+            
+            self.graph_stop_button.setText("Resume live-graph")
+            self.stop_default_state = 2
+            self.timer.stop()
+            
+        elif self.stop_default_state == 2:
+            
+            self.graph_stop_button.setText("Pause live-graph")
+            self.stop_default_state = 1
+            self.timer.start()
+            
+    def auto_range_event(self):
+        
+        self.plot1.enableAutoRange(axis='y', enable=True)
+        self.plot2.enableAutoRange(axis='y', enable=True)
+        # self.plot1.enableAutoRange(axis='x', enable=True)
+        # self.plot2.enableAutoRange(axis='x', enable=True)
+        
+
+            
+            
+    def set_hardware_reset_event(self):
+        global data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10
+        
+        data_9 = 1
+        packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
+        packet_transmission.send_transmission_event(1)            #SET flag for Tx
+        packet_transmission.start_flag_send_event(1)
+        data_9 = 0
+        
+        self.set_software_reset_event()
+        
+    
+    def set_software_reset_event(self):
+        # all the background processes
+        if self.p_window_data is not None:
+            self.p_window_data.terminate()
+            self.p_window_data.join()
+
+        #terminate the other subprocess
+        sockets_files.p1.terminate()
+        sockets_files.p1.join()
+
+        #stop all the threads
+        self.worker_socket.stop()
+        self.worker_DataUpdate.stop()
+        
+        #restart the python script
+        os.execv(sys.executable, ['python'] + sys.argv)
+
+    def save_button_event(self):
+        filename_saving, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv)")
+    
+        dir_dummy_csv = os.path.join(self.project_root, "files", "dummy.csv")
+        
+        if filename_saving:
+            data_read = np.loadtxt(dir_dummy_csv, delimiter=';')
+            np.savetxt(filename_saving, data_read, delimiter=';')
+
         
 
     def closeEvent(self, event):
@@ -601,6 +870,8 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             print(f"Error deleting file: {e}")
             
         event.accept()
+        
+        
 
 
 

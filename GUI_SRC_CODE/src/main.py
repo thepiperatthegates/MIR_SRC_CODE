@@ -79,9 +79,8 @@ data_mutex = QMutex()
 
 #function receiving data through pipe from another thread
 class DataUpdate(QThread):
-    def __init__(self, main_window_ref):
+    def __init__(self):
         super().__init__()
-        self.main_window = main_window_ref
         self.running = True
         self.flag_calibrate = False
 
@@ -358,7 +357,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             f"f<sub>R</sub> equation = {np.poly1d(self.calculate_final_fR)}"
         )
         self.label_frequency.setText("Shear rate γ̇ / s<sup>-1</sup>")    
-        self.button_fr_constant.setText("Measure f<sub>R</sub>")
+        self.button_fr_constant.setText("Measure f_R")
         ("I⃗R")
         self.textbox_sample_frequency.setText("10000")
         #################################################################################################
@@ -415,7 +414,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #Start backend serial lines
         
         self.worker_socket = SocketThread()
-        self.worker_DataUpdate = DataUpdate(self)
+        self.worker_DataUpdate = DataUpdate()
         
         self.worker_socket.start()
         self.worker_DataUpdate.start()
@@ -808,7 +807,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_calibrating(value, count_recursion))
         self.worker_sleep.start()
         
-
+        
     def update_time_counter_calibrating(self, val, count_recursion):
         self.lcdNumber.display(val)
         print("Recursion in called func:", count_recursion)
@@ -998,8 +997,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         # send flag for calibration in the thread
         self.worker_DataUpdate.flag_special_event(flag_1=False, flag_2=True)
 
-        
-        
         time_delay = 10 * 1000
         QtCore.QTimer.singleShot(time_delay, lambda: self.after_stabilise_fR_measurement(count_recursion, running_frequency, input_current, data_4, data_6))
     
