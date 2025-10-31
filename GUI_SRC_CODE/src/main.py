@@ -360,6 +360,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.button_fr_constant.setText("Measure f_R")
         ("I⃗R")
         self.textbox_sample_frequency.setText("10000")
+        self.button_stop.setText("Stop rotation!")
         #################################################################################################
 
         #######################################################validator############################################################################
