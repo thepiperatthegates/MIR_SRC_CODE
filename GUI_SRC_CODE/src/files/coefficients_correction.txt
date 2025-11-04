@@ -1,0 +1,69 @@
+####### GUI coefficients #######
+
+
+####### First electronic
+
+CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 = -4.61934
+CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 = 0.99182
+CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 =  -4.24388e-6
+CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 =  -5.40711e-8
+
+#second sensor coefficient version 1
+CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 = 3.86547
+CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 = 0.98655
+CURRENT_COEFF_SECOND_SENSOR_C_VERSION1= 3.02401e-6
+CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 = -3.98871e-8
+
+####### Second electronic 
+
+#first sensor coefficient version 2
+CURRENT_COEFF_FIRST_SENSOR_A_VERSION2 = 3.59556
+CURRENT_COEFF_FIRST_SENSOR_B_VERSION2 = 0.99575
+CURRENT_COEFF_FIRST_SENSOR_C_VERSION2 =  -1.27981e-5
+CURRENT_COEFF_FIRST_SENSOR_D_VERSION2 =  -5.72566e-8
+
+#second sensor coefficient version 2
+CURRENT_COEFF_SECOND_SENSOR_A_VERSION2 = -6.34285
+CURRENT_COEFF_SECOND_SENSOR_B_VERSION2 = 0.99341
+CURRENT_COEFF_SECOND_SENSOR_C_VERSION2= 1.18014e-5
+CURRENT_COEFF_SECOND_SENSOR_D_VERSION2 = -5.62681e-8
+.
+.
+.
+.
+.
+.
+.
+####### Firmware coefficients #######
+
+####### First electronic
+
+//Curve calibration for first coil
+
+//Curve calibration for first coil
+#define A_COEFFICIENT_FIRST_SPULE (double) -1.27499 
+#define B_COEFFICIENT_FIRST_SPULE (double) 1.01651
+#define C_COEFFICIENT_FIRST_SPULE (double) -1.81293e-5
+#define D_COEFFICIENT_FIRST_SPULE (double) -2.40361e-9
+
+//Curve calibration for second coil
+#define A_COEFFICIENT_SECOND_SPULE (double) 0.82962
+#define B_COEFFICIENT_SECOND_SPULE (double) 1.01741
+#define C_COEFFICIENT_SECOND_SPULE (double) 1.62677e-5
+#define D_COEFFICIENT_SECOND_SPULE (double) 1.04469e-8
+
+####### Second electronic 
+
+//Curve calibration for first coil
+#define A_COEFFICIENT_FIRST_SPULE (double) -0.8699
+#define B_COEFFICIENT_FIRST_SPULE (double) 1.00139
+#define C_COEFFICIENT_FIRST_SPULE (double) -1.46945e-5
+#define D_COEFFICIENT_FIRST_SPULE (double) -1.11752e-9
+
+//Curve calibration for second coil
+#define A_COEFFICIENT_SECOND_SPULE (double) 1.29234
+#define B_COEFFICIENT_SECOND_SPULE (double) 1.00034
+#define C_COEFFICIENT_SECOND_SPULE (double) 2.10235e-5
+#define D_COEFFICIENT_SECOND_SPULE (double) -4.39499e-9
+
+

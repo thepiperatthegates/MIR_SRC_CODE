@@ -1389,6 +1389,7 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
                 packet_transmission.set_electronics_flag(1)
             elif current_text == "Electronic 2":
                 packet_transmission.set_electronics_flag(2)
+                print("Elecrtonics flag", packet_transmission.ELECTRONICS_FLAG)
         else:
             self.choose_experiment_comboBox.setEnabled(False)
             self.choose_experiment_comboBox.setCurrentIndex(0)
