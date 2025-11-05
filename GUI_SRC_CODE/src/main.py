@@ -226,6 +226,41 @@ class DataUpdate(QThread):
 
         
 class SleepTimer(QObject):
+    """
+    A countdown timer that emits time updates at fixed intervals using PyQt signals.
+
+    This class implements a simple countdown timer based on `QTimer`. It periodically
+    emits the remaining time (in seconds) until the countdown reaches zero. The timer
+    is intended to be used in GUI applications where a background countdown must update
+    a display or trigger an event when completed.
+
+    Attributes
+    ----------
+    update_time_signal : pyqtSignal(float)
+        Signal emitted with the remaining time in seconds (rounded to one decimal place)
+        after each timer tick.
+    remaining : float
+        The remaining time in seconds. Initialized from the global variable `data_1`.
+    timer : QTimer
+        Internal Qt timer that triggers the `_tick` method every 100 milliseconds.
+
+    Methods
+    -------
+    start()
+        Starts the countdown timer.
+    stop()
+        Stops the countdown timer.
+    _tick()
+        Decrements the remaining time by 0.1 seconds per tick, emits updates via
+        `update_time_signal`, and calls `packet_transmission.running_time_event(0)`
+        when the countdown reaches zero.
+
+    Notes
+    -----
+    - The initial countdown value is taken from the global variable `data_1`.
+    - Each tick occurs every 100 ms (0.1 s).
+    - When the countdown completes, the timer stops automatically.
+    """
     update_time_signal = pyqtSignal(float)  # emit float countdown values
 
     def __init__(self, parent=None):
@@ -681,10 +716,9 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         if sampling_frequency == '' or sampling_frequency == 0:
             pass
         else:
-                
             sockets_files.time_increment = 1.0/float(sampling_frequency)
             sockets_files.tot_average = 10000 // int(sampling_frequency)
-            print("tOT_average", sockets_files.tot_average)
+            print("tot_average", sockets_files.tot_average)
             
             check = 5000 / int(sockets_files.tot_average)
             print("check is", check)

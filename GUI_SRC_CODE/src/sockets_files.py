@@ -33,6 +33,7 @@ status_connection = None
 file_name = ' '
 
 flag_for_process = None
+flag_for_downsampling = None
 
 p1 = None
 
@@ -164,7 +165,7 @@ def recv_thread(ser1):
             - If the plotting process has not been started yet, spawn it.
             - Forward the raw data to `q_to_process` for unpacking.
         4. Retrieve processed data from `q_to_csv`.
-        5. If the runtime flag (`packet_transmission.running_time_getter()`) 
+        5. If the runtime flag (`packet_transmission.running_time_flag_getter()`) 
            is set, save the processed data to CSV.
 
     Error Handling:
@@ -181,7 +182,7 @@ def recv_thread(ser1):
     """
     
     
-    global flag_for_process, p1, tot_count_accumulate_recv
+    global flag_for_process, p1, tot_count_accumulate_recv, flag_for_downsampling
 
     count = 0
     while True:
@@ -194,17 +195,16 @@ def recv_thread(ser1):
                     received_data += chunk
                 count = 0
                 
-                
+                ## run only once
                 if not flag_for_process and received_data:
-                    multiprocessing.freeze_support()
                     p1 = multiprocessing.Process(target=plot_live, args=(q_to_process, q_to_graph, q_to_csv ))
                     p1.start()
-
                     flag_for_process = True
+                
                 q_to_process.put(received_data) #send to subprocess to be unpacked
                 data_send = q_to_csv.get()
                 
-                data_flag = packet_transmission.running_time_getter()
+                data_flag = packet_transmission.running_time_flag_getter()
                 if data_flag == 1:
                     if data_send:
                         save_to_csv(data_send)
@@ -336,9 +336,59 @@ def file_name_change_set(prefix, extension=".csv"):
     file_name = f"{prefix}{extension}"
     
 
-def save_to_csv(cleaned_buffer, num_columns=4):
+def save_to_csv(cleaned_buffer, flag_for_downsampling, num_columns=4):
+    """
+    Process, calibrate, average, and save measurement data to a CSV file.
+
+    This function takes a raw ADC data buffer, reshapes it into the specified number of columns,
+    converts raw ADC values into physical quantities (e.g., magnetic field, current), applies
+    calibration and averaging, appends a time column, and saves the results to a CSV file.
+
+    The function uses several global parameters and functions for calibration, conversion, and 
+    averaging. The CSV file is automatically created in the 'files' directory under the project root.
+    If the file already exists, the new data is appended.
+
+    Parameters
+    ----------
+    cleaned_buffer : array_like
+        The input buffer containing ADC samples in a flat structure (1D list or NumPy array).
+        Must have a total length that is a multiple of `num_columns`.
+    num_columns : int, optional
+        Number of columns per data row in `cleaned_buffer`. Default is 4, corresponding to:
+        - Column 1: U1 (Hall sensor 1)
+        - Column 2: U2 (Hall sensor 2)
+        - Column 3: I1 (Current sensor 1)
+        - Column 4: I2 (Current sensor 2)
+
+    Global Variables
+    ----------------
+    file_name : str
+        Name of the CSV file where processed data is saved.
+    current_time : float
+        The current timestamp (in seconds) used to generate the time column.
+    tot_average : int
+        Averaging factor used to reduce the amount of saved data.
+    time_increment : float
+        Time difference between successive samples in seconds.
+    offset_1, offset_2 : float
+        Calibration offsets used in sensor conversion.
     
-    global file_name, current_time, tot_average, time_increment
+    Notes
+    -----
+    - The resulting CSV file will contain columns in the following order:
+        1. Time (s)
+        2. Calibrated Hall sensor 1 value [U1 / V]
+        3. Calibrated Hall sensor 2 value [U2 / V]
+        4. Calibrated current coil 1 value [I1 / mA]
+        5. Calibrated current coil 2 value  [I2 / mA]
+
+    Raises
+    ------
+    Exception
+        If file writing fails, the error is printed to the console.
+    """
+    
+    global file_name, current_time, time_increment
     global offset_1, offset_2
 
     data = np.array(cleaned_buffer)
@@ -370,18 +420,15 @@ def save_to_csv(cleaned_buffer, num_columns=4):
     
     #Average values to reduce amount of data saved 
     ####FOR CONSTANT SHEAR RATE 
+
+    if flag_for_downsampling:
+        col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted)
     
-    col1_after_average = average_values(col1_converted, tot_average).ravel()
-    col2_after_average = average_values(col2_converted, tot_average).ravel()
-    col3_after_average = average_values(col3_converted, tot_average).ravel()
-    col4_after_average = average_values(col4_converted, tot_average).ravel()
-    
-    
-    averaged_data = np.zeros((len(col1_after_average), 4))  # shape (100,4)
-    averaged_data[:, 0] = col1_after_average
-    averaged_data[:, 1] = col2_after_average
-    averaged_data[:, 2] = col3_after_average
-    averaged_data[:, 3] = col4_after_average
+    averaged_data = np.zeros((len(col1_converted), 4))  # shape (100,4)
+    averaged_data[:, 0] = col1_converted
+    averaged_data[:, 1] = col2_converted
+    averaged_data[:, 2] = col3_converted
+    averaged_data[:, 3] = col4_converted
 
     num_rows = averaged_data.shape[0]
     time_column = np.arange(current_time, current_time + (time_increment * num_rows), time_increment).reshape(-1, 1)
@@ -404,9 +451,49 @@ def save_to_csv(cleaned_buffer, num_columns=4):
     except Exception as e:
         print(f"The fuck?: {e}")
 
+def downsampling_values (col1, col2, col3, col4):
+    
+    global tot_average
         
+    col1_after_average = average_values(col1, tot_average).ravel()
+    col2_after_average = average_values(col2, tot_average).ravel()
+    col3_after_average = average_values(col3, tot_average).ravel()
+    col4_after_average = average_values(col4, tot_average).ravel()
+    
+    return col1_after_average, col2_after_average, col3_after_average, col4_after_average
+    
+    
 #for decreasing data size for csv purposes 
 def average_values (col, N):
+    """
+    Compute the average of every N consecutive elements in a 1D array.
+
+    This function reduces the number of data points by averaging groups of N samples
+    from the input array. It is typically used to downsample high-frequency data while
+    preserving the overall signal trend.
+
+    Parameters
+    ----------
+    col : array_like
+        1D array of numeric values to be averaged.
+        The length of `col` must be a multiple of `N`.
+    N : int
+        Number of consecutive samples to average together.
+
+    Returns
+    -------
+    numpy.ndarray
+        A 2D column vector (shape: `(len(col) // N, 1)`) containing the averaged values.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> col = np.array([1, 2, 3, 4, 5, 6])
+    >>> average_values(col, 2)
+    array([[1.5],
+           [3.5],
+           [5.5]])
+    """
 
     average_val = col.reshape(-1, N).mean(axis=1).reshape(-1, 1)
     return average_val

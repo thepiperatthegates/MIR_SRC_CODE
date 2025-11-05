@@ -165,14 +165,14 @@ def send_transmission_event_getter():
 
 
 #setting the flag for Tx event
-def running_time_event(this_running_time_flag):
+def running_time_flag_setter(this_running_time_flag):
     global running_time_flag
     
     running_time_flag = this_running_time_flag
     
     
 #for for use of reusing Rx event from client to the board
-def running_time_getter():
+def running_time_flag_getter():
     return running_time_flag
 
 #setting the flag for Tx event
@@ -351,22 +351,6 @@ def calibration_input_coil_2(input):
     return output   
 
 
-# def angle_calculate(x1, x2):
-#     return numpy.arctan(x1/x2)
-
-
-# def sin_wave_calibrate(hall_sensor_voltage1, 
-#                        hall_sensor_voltage2, current_sensor1, current_sensor2):
-    
-    
-#     get_first_digit =  int(str(current_sensor1[0]))
-#     get_second_digit =  int(str(current_sensor2[0]))
-    
-    
-#     return_calibrated_1 = hall_sensor_voltage1 - get_first_digit * sin(2*pi)
-#     return_calibrated_1 = hall_sensor_voltage2 - get_second_digit * sin(2*pi)
-
-
                 
 def calculate_torque_fR( current_1, current_2, hall_1, hall_2, data_4, data_6):
         """
@@ -422,7 +406,10 @@ def calculate_radial_frequency(running_frequency):
 
     return float(2 * numpy.pi * running_frequency)
 
-
+class DownsampleEvent():
+    
+    def __init__(self, parent=None):
+        super().__init__()
 
 
 if __name__ == "__main___":

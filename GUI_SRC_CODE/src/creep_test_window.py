@@ -237,15 +237,18 @@ class SleepTimer(QObject):
             self.update_time_signal.emit(round(self.remaining, 1))
         else:
             self.timer.stop()
-            packet_transmission.running_time_event(0)
+            packet_transmission.running_time_flag_setter(0)
             
 class SleepTimerVector(QObject):
     
     update_time_signal_vector = pyqtSignal(float)
     
-    def __init__(self, time_taken):
+    def __init__(self, time_taken, specified_time__sampling, flag_sampling_time):
         super().__init__()
         self.remaining = time_taken
+        self.specified_time__sampling = specified_time__sampling
+        self.flag_sampling_time = flag_sampling_time
+        
         self.timer = QTimer(self)
         self.timer.setInterval(100)
         self.timer.timeout.connect(self._tick)
@@ -260,6 +263,9 @@ class SleepTimerVector(QObject):
         self.remaining -= 0.1
         if self.remaining >= 0.0:
             self.update_time_signal_vector.emit(round(self.remaining, 1))
+        elif self.remaining == self.specified_time__sampling:
+            if self.flag_sampling_time:
+                socket.
         else:
             self.timer.stop()
 
@@ -625,8 +631,6 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         start_vector_time = float(self.textbox_vector_start_time.text())
         end_vector_time = float(self.textbox_vector_end_time.text())
         
-        input_sampling_rate = int(self.textbox_input_sampling_rate.text())
-        input_sampling_time = float(self.textbox_input_sampling_time.text())
         
         standard_sampling_rate = int(self.textbox_standard_sampling_rate.text())
         
@@ -677,14 +681,14 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
                 
             sockets_files.time_increment = 1.0/float(sampling_frequency)
             sockets_files.tot_average = 10000 // int(sampling_frequency)
-            print("tOT_average", sockets_files.tot_average)
+            print("tot_average", sockets_files.tot_average)
             
             check = 5000 / int(sockets_files.tot_average)
             print("check is", check)
         
         if check.is_integer():
             packet_transmission.stop_button_event(0)            #goto sockets_files and stop the loop for receiving
-            packet_transmission.running_time_event(this_running_time_flag=1)
+            packet_transmission.running_time_flag_setter(this_running_time_flag=1)
             
             sockets_files.file_name_change_set("dummy")        #set file name from gui
             sockets_files.current_time = 0.0
@@ -695,14 +699,14 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             
             #start processing to write data to csv
             packet_transmission.stop_button_event(0)            #goto sockets_files and stop the loop for receiving
-            packet_transmission.running_time_event(this_running_time_flag=1)
+            packet_transmission.running_time_flag_setter(this_running_time_flag=1)
             
             #start the overall timer (combined timer)
             self.worker_sleep = SleepTimer()
             self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
             self.worker_sleep.start()
             
-            self.worker_vector_sleep = SleepTimerVector(start_vector_time)
+            self.worker_vector_sleep = SleepTimerVector(start_vector_time, 0, False)
             self.worker_vector_sleep.update_time_signal_vector.connect(self.update_time_counter_start_vector)
             self.worker_vector_sleep.start()
             
@@ -726,7 +730,12 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         else:
             # self.button_start.setDisabled(True)
             # self.button_stop.setDisabled(True)
+            
             end_vector_time = float(self.textbox_vector_end_time.text())
+            input_sampling_rate = int(self.textbox_input_sampling_rate.text())
+            input_sampling_time = float(self.textbox_input_sampling_time.text())
+        
+        
             """
             Send the 2nd vector 
             """
@@ -764,7 +773,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             packet_transmission.send_transmission_event(1)            #SET flag for Tx
             packet_transmission.start_flag_send_event(1)
             
-            self.worker_vector_sleep = SleepTimerVector(end_vector_time)
+            self.worker_vector_sleep = SleepTimerVector(end_vector_time, input_sampling_time, True)
             self.worker_vector_sleep.update_time_signal_vector.connect(self.update_timer_end_vector)
             self.worker_vector_sleep.start()
             
