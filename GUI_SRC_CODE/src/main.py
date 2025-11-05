@@ -29,9 +29,9 @@ import sockets_files
 from sockets_files import q_to_graph
 
 import packet_transmission as packet_transmission
-from window_show import AnalyseWindow
+from analyse_window_const_sr import AnalyseWindow
 from graph_popout import PlotWindow
-from creep_test_window import CreepTestGUI
+from creep_test_window import TabWindowCreepTest
 
 
 
@@ -266,8 +266,6 @@ class SocketThread(QThread):
 
 
 class ConstShearGUI(QMainWindow, Ui_Title):
-
-    queue_file_name = multiprocessing.Queue()
 
     def __init__(self):
         super().__init__()
@@ -703,7 +701,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.status_label.setText("Acquisition starts.......")
 
 
-            self.queue_file_name.put("dummy") #Send file name to another process
             
             #start the process at the initialisation
             #FOR NOW, LETS NOT DO ACQUISTION WINDOW
@@ -1264,7 +1261,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
 
 #different windows with tab 
-class TabWindow(QMainWindow):
+class TabWindowConstSR(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("MiR | Mini-Rheometer")
@@ -1393,6 +1390,7 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
                 packet_transmission.set_electronics_flag(1)
             elif current_text == "Electronic 2":
                 packet_transmission.set_electronics_flag(2)
+                print("Elecrtonics flag", packet_transmission.ELECTRONICS_FLAG)
         else:
             self.choose_experiment_comboBox.setEnabled(False)
             self.choose_experiment_comboBox.setCurrentIndex(0)
@@ -1416,11 +1414,11 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
             # self.shear_constant_mode_window.showNormal()
             # self.close()      
             
-            self.csr_window = TabWindow()    
+            self.csr_window = TabWindowConstSR()    
             self.csr_window.showMaximized()
             
         elif mode == "Creep experiment":
-            self.ct_window = CreepTestGUI()
+            self.ct_window = TabWindowCreepTest()
             self.ct_window.showMaximized()
             
             

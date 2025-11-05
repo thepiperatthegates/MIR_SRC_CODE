@@ -18,6 +18,7 @@ import sockets_files
 from sockets_files import q_to_graph
 
 from creep_test_gui import Ui_CreepTestGUI
+from analyse_window_creep_test import AnalyseWindow
 
 
 
@@ -242,11 +243,9 @@ class SleepTimerVector(QObject):
     
     update_time_signal_vector = pyqtSignal(float)
     
-    def __init__(self, start_vector_time, end_vector_time, flag_end_vector = False):
+    def __init__(self, time_taken):
         super().__init__()
-        self.start_vector_time = start_vector_time 
-        self.end_vector_time = end_vector_time 
-        self.flag_end_vector = flag_end_vector
+        self.remaining = time_taken
         self.timer = QTimer(self)
         self.timer.setInterval(100)
         self.timer.timeout.connect(self._tick)
@@ -653,9 +652,9 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         #make the running frequency 200 Hz, does not matter since we will produce DC current anyway
         data_2 = 200 #Hz
         data_3 =0
-        data_4 =  self.textbox_direction1_1.text()
+        data_4 =  self.textbox_direction_start_x.text()
         data_5 = 0
-        data_6 = self.textbox_direction2_1.text()  
+        data_6 = self.textbox_direction_start_y.text()  
 
         
         ##direction does not matter here 
@@ -670,25 +669,47 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         
         packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
         
-        self.status_label.setStyleSheet("color: #7da832;")
-        self.status_label.setText("Creep test starts.......")
+        ######## get the desired sampling frequency from the textbox
+        sampling_frequency = self.textbox_standard_sampling_rate.text()
+        if sampling_frequency == '' or sampling_frequency == 0:
+            pass
+        else:
+                
+            sockets_files.time_increment = 1.0/float(sampling_frequency)
+            sockets_files.tot_average = 10000 // int(sampling_frequency)
+            print("tOT_average", sockets_files.tot_average)
+            
+            check = 5000 / int(sockets_files.tot_average)
+            print("check is", check)
         
-        #start processing to write data to csv
-        packet_transmission.stop_button_event(0)            #goto sockets_files and stop the loop for receiving
-        packet_transmission.running_time_event(this_running_time_flag=1)
-        
+        if check.is_integer():
+            packet_transmission.stop_button_event(0)            #goto sockets_files and stop the loop for receiving
+            packet_transmission.running_time_event(this_running_time_flag=1)
+            
+            sockets_files.file_name_change_set("dummy")        #set file name from gui
+            sockets_files.current_time = 0.0
 
-        self.queue_file_name.put("dummy") #Send file name to another process
-        
-        #start the overall timer (combined timer)
-        self.worker_sleep = SleepTimer()
-        self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
-        self.worker_sleep.start()
-        
-        self.worker_vector_sleep = SleepTimerVector(start_vector_time, end_vector_time, False)
-        self.worker_vector_sleep.update_time_signal_vector(self.update_time_counter_start_vector)
-        self.worker_vector_sleep.start()
-        
+
+            self.status_label.setStyleSheet("color: #7da832;")
+            self.status_label.setText("Creep test starts.......")
+            
+            #start processing to write data to csv
+            packet_transmission.stop_button_event(0)            #goto sockets_files and stop the loop for receiving
+            packet_transmission.running_time_event(this_running_time_flag=1)
+            
+            #start the overall timer (combined timer)
+            self.worker_sleep = SleepTimer()
+            self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
+            self.worker_sleep.start()
+            
+            self.worker_vector_sleep = SleepTimerVector(start_vector_time)
+            self.worker_vector_sleep.update_time_signal_vector.connect(self.update_time_counter_start_vector)
+            self.worker_vector_sleep.start()
+            
+        ## Error handling when invalid sampling frequency is being input
+        else:
+            self.popout_window(5)
+    
         
         
     def update_time_counter_start_vector(self, val):
@@ -698,14 +719,14 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.lcdNumber_vector.display(val)
             
         if val not in (0, 0.1):
-            self.button_start.setDisabled(True)
-            self.button_stop.setDisabled(True)
+            # self.button_start.setDisabled(True)
+            # self.button_stop.setDisabled(True)
+            print("oi")
         
         else:
-            self.button_start.setDisabled(True)
-            self.button_stop.setDisabled(True)
-            
-            
+            # self.button_start.setDisabled(True)
+            # self.button_stop.setDisabled(True)
+            end_vector_time = float(self.textbox_vector_end_time.text())
             """
             Send the 2nd vector 
             """
@@ -724,9 +745,9 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             #make the running frequency 200 Hz, does not matter since we will produce DC current anyway
             data_2 = 200 #Hz
             data_3 = 0
-            data_4 = self.textbox_direction1_1.text()
+            data_4 = self.textbox_direction_end_x.text()
             data_5 = 0
-            data_6 = self.textbox_direction2_1.text()  
+            data_6 = self.textbox_direction_end_y.text()  
             
             ##direction does not matter here 
             data_7 = 1
@@ -743,8 +764,8 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             packet_transmission.send_transmission_event(1)            #SET flag for Tx
             packet_transmission.start_flag_send_event(1)
             
-            self.worker_vector_sleep = SleepTimerVector(0, 1, False)
-            self.worker_vector_sleep.update_time_signal_vector(self.update_time_counter_start_vector)
+            self.worker_vector_sleep = SleepTimerVector(end_vector_time)
+            self.worker_vector_sleep.update_time_signal_vector.connect(self.update_timer_end_vector)
             self.worker_vector_sleep.start()
             
             self.status_label.setStyleSheet("color: #7da832;")
@@ -759,13 +780,14 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.lcdNumber_vector.display(val)
             
         if val not in (0, 0.1):
-            self.button_start.setDisabled(True)
-            self.button_stop.setDisabled(True)
+            # self.button_start.setDisabled(True)
+            # self.button_stop.setDisabled(True)
+            print("oi")
         
         else:
-            self.button_start.setDisabled(True)
-            self.button_stop.setDisabled(True)
-
+            # self.button_start.setDisabled(True)
+            # self.button_stop.setDisabled(True)
+            print("oi")
             
             
     def update_time_counter_acquisition(self, val):
@@ -775,11 +797,13 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.lcdNumber.display(val)
             
         if val in (0, 0.1):
-            self.button_start.setDisabled(False)
-            self.button_stop.setDisabled(False)
+            # self.button_start.setDisabled(False)
+            # self.button_stop.setDisabled(False)
+            print("oi")
         else:
-            self.button_start.setDisabled(True)
-            self.button_stop.setDisabled(True)
+            # self.button_start.setDisabled(True)
+            # self.button_stop.setDisabled(True)
+            print("oi")
             
     def graph_stop_event(self):
         if self.stop_default_state == 1:
@@ -841,13 +865,28 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         if filename_saving:
             data_read = np.loadtxt(dir_dummy_csv, delimiter=';')
             np.savetxt(filename_saving, data_read, delimiter=';')
-
         
+        
+class TabWindowCreepTest(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("MiR | Mini-Rheometer")
+        
+        
+        # Create tab widget
+        tabs = QTabWidget()
 
+        # Add your classes as tabs
+        tabs.addTab(CreepTestGUI(), "Main GUI")
+        tabs.addTab( AnalyseWindow(), "Data analyse")
+
+        # Set central widget
+        self.setCentralWidget(tabs)
+        
+        
     def closeEvent(self, event):
-        """
-        Close event for the main window, all the queues, pipes and thread are all first and foremost closed down. 
-        """
+        #stop all the background processes
+
             
         for q in (sockets_files.q_to_process, sockets_files.q_to_graph, sockets_files.q_to_csv):
             q.close()
@@ -859,6 +898,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         sockets_files.p1.join()
 
         #stop all the threads
+        
         self.main_window = CreepTestGUI()
         self.main_window.worker_socket.stop()
         self.main_window.worker_DataUpdate.stop()
@@ -870,6 +910,9 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             print(f"Error deleting file: {e}")
             
         event.accept()
+
+        
+        
         
         
 

@@ -1,8 +1,7 @@
-import multiprocessing
 import numpy as np
-from PyQt5 import QtCore, QtGui
+from PyQt5 import QtGui
 from PyQt5 import *
-from PyQt5.QtCore import QThread, pyqtSignal, QFileInfo
+from PyQt5.QtCore import QFileInfo
 from PyQt5 import uic
 from PyQt5.QtWidgets import *
 
@@ -16,10 +15,6 @@ from scipy.signal import savgol_filter
 import pandas 
 
 
-#set the icon???????????
-# import ctypes
-# myappid = 'mycompany.myproduct.subproduct.version' # arbitrary string
-# ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 from pathlib import Path
 import os
 os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
