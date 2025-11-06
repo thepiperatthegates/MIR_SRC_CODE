@@ -252,7 +252,7 @@ class SleepTimer(QObject):
         Stops the countdown timer.
     _tick()
         Decrements the remaining time by 0.1 seconds per tick, emits updates via
-        `update_time_signal`, and calls `packet_transmission.running_time_event(0)`
+        `update_time_signal`, and calls `packet_transmission.running_time_flag_setter(0)`
         when the countdown reaches zero.
 
     Notes
@@ -270,6 +270,8 @@ class SleepTimer(QObject):
         self.timer = QTimer(self)
         self.timer.setInterval(100)  # 100 ms per tick
         self.timer.timeout.connect(self._tick)
+        
+        self.flag_run_time = packet_transmission.RunningTimeFlag()
 
     def start(self):
         self.timer.start()
@@ -283,7 +285,8 @@ class SleepTimer(QObject):
             self.update_time_signal.emit(round(self.remaining, 1))
         else:
             self.timer.stop()
-            packet_transmission.running_time_event(0)
+            self.flag_run_time.flag_running_time = False
+            # packet_transmission.running_time_flag_setter(0)
 
 class SocketThread(QThread):
     def __init__(self, parent=None):
@@ -352,6 +355,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.mean_hall_2_0_A = None         #in V
         self.mean_hall_1_400_A = None       #in mA
         self.mean_hall_2_0_A = None         #in mA
+        
+        ####### flag init ##############################################################################
+        
+        self.flag_run_time = packet_transmission.RunningTimeFlag()
+        
+        
         
         
         ####### variables for fR measurement process ###############################################
@@ -590,7 +599,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             
 
     def graph_update_sensors(self):
-        
+        data_mutex.lock()
         global store_array1, store_array2, store_array3, store_array4, time_axis
 
 
@@ -599,7 +608,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         self.curve_i1.setData(time_axis,store_array3)
         self.curve_i2.setData(time_axis,store_array4)
-        
+        data_mutex.unlock()
     def auto_range_event(self):
         
         self.plot1.enableAutoRange(axis='y', enable=True)
@@ -725,7 +734,10 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         if check.is_integer():
             packet_transmission.stop_button_event(0)            #goto sockets_files and stop the loop for receiving
-            packet_transmission.running_time_event(this_running_time_flag=1)
+            self.flag_run_time.flag_running_time = True
+            
+            print("outside the function:", self.flag_run_time.flag_running_time)
+            # packet_transmission.running_time_flag_setter(1)
             
             sockets_files.file_name_change_set("dummy")        #set file name from gui
             sockets_files.current_time = 0.0

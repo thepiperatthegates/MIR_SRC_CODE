@@ -263,9 +263,9 @@ class SleepTimerVector(QObject):
         self.remaining -= 0.1
         if self.remaining >= 0.0:
             self.update_time_signal_vector.emit(round(self.remaining, 1))
-        elif self.remaining == self.specified_time__sampling:
-            if self.flag_sampling_time:
-                socket.
+        # elif self.remaining == self.specified_time__sampling:
+        #     if self.flag_sampling_time:
+        #         socket.
         else:
             self.timer.stop()
 

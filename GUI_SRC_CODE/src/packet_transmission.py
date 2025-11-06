@@ -175,6 +175,20 @@ def running_time_flag_setter(this_running_time_flag):
 def running_time_flag_getter():
     return running_time_flag
 
+class RunningTimeFlag:
+    def __init__(self, flag_running_time=False):
+        super().__init__()
+        self.flag_running_time = flag_running_time
+        
+    @property
+    def flag_running_time(self):
+        return self._flag_running_time
+    
+    @flag_running_time.setter
+    def flag_running_time(self, value):
+        self._flag_running_time = bool(value)
+        
+        
 #setting the flag for Tx event
 def file_name_event(this_file_name_flag):
     global file_name_flag

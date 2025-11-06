@@ -181,9 +181,11 @@ def recv_thread(ser1):
 
     """
     
-    
     global flag_for_process, p1, tot_count_accumulate_recv, flag_for_downsampling
 
+    data_flag = packet_transmission.RunningTimeFlag()
+    
+    #start count with zero
     count = 0
     while True:
         try:
@@ -204,8 +206,9 @@ def recv_thread(ser1):
                 q_to_process.put(received_data) #send to subprocess to be unpacked
                 data_send = q_to_csv.get()
                 
-                data_flag = packet_transmission.running_time_flag_getter()
-                if data_flag == 1:
+                # data_flag = packet_transmission.running_time_flag_getter()
+                if data_flag.flag_running_time:
+                    print("Inside the function:", data_flag.flag_running_time)
                     if data_send:
                         save_to_csv(data_send)
                         data_send = None
@@ -421,8 +424,8 @@ def save_to_csv(cleaned_buffer, flag_for_downsampling, num_columns=4):
     #Average values to reduce amount of data saved 
     ####FOR CONSTANT SHEAR RATE 
 
-    if flag_for_downsampling:
-        col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted)
+    # if flag_for_downsampling:
+    #     col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted)
     
     averaged_data = np.zeros((len(col1_converted), 4))  # shape (100,4)
     averaged_data[:, 0] = col1_converted
@@ -497,6 +500,9 @@ def average_values (col, N):
 
     average_val = col.reshape(-1, N).mean(axis=1).reshape(-1, 1)
     return average_val
+
+
+
 
     
 if __name__ == "__main__":
