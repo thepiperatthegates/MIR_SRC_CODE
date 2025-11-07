@@ -4,17 +4,6 @@ from math import sin, cos, pi
 import struct
 import numpy
 
-#for data Rx and TX
-data_1 = 0
-data_2 = 0
-data_3 = 0
-data_4 = 0
-data_5 = 0
-data_6 = 0
-data_7 = 0
-data_8 = 0
-data_9 = 0
-data_10 = 0
 
 
 #for button event flag 
@@ -109,6 +98,70 @@ CURRENT_COEFF_SECOND_SENSOR_C_VERSION2= 1.18014e-5
 CURRENT_COEFF_SECOND_SENSOR_D_VERSION2 = -5.62681e-8
 
 
+class TxData():
+
+    _data_1 = _data_2 = _data_3 = _data_4 = _data_5 = _data_6 = _data_7 = _data_8 = _data_9 = _data_10 = 0
+    
+    @property
+    def send_data(self):
+        return ( self.__class__._data_1, self.__class__._data_2, self.__class__._data_3, self.__class__._data_4, self.__class__._data_5, self.__class__._data_6, 
+                self.__class__._data_7, self.__class__._data_8, self.__class__._data_9, self.__class__._data_10)
+    
+    @send_data.setter
+    def send_data(self, values):
+        (self.__class__._data_1, self.__class__._data_2, self.__class__._data_3, self.__class__._data_4, 
+        self.__class__._data_5, self.__class__._data_6, self.__class__._data_7, self.__class__._data_8, self.__class__._data_9, self.__class__._data_10) = values
+        
+    @property 
+    def data_1(self):
+        return self.__class__._data_1 
+    
+    @property
+    def data_2(self):
+        return self.__class_._data_2
+    
+    @data_2.setter
+    def data_2(self, val):
+        C_SR = 37.099
+        running_frequency = float(val)/(2*pi*C_SR)
+        self.__class__._data_2 = running_frequency
+    
+    @property
+    def data_current(self):
+        return  self.__class__._data_3, self.__class__._data_4, self.__class__._data_5,  self.__class__._data_6
+    
+    @property 
+    def data_7(self):
+        return self.__class__._data_7
+    
+    @data_7.setter
+    def data_7(self, val):
+        self.__class__._data_7 = val
+    
+    @property 
+    def data_8(self):
+        return self.__class__._data_8
+    
+    @data_8.setter
+    def data_8(self, val):
+        self.__class__._data_8 = val
+    
+    @property 
+    def data_9(self):
+        return self.__class__._data_9
+    
+   
+    @property 
+    def data_10(self):
+        return self.__class__._data_10
+    
+    @data_10.setter
+    def data_10(self, val):
+        self.__class__._data_10 = val
+
+
+        
+
 def send_function(this_data_1, this_data_2, this_data_3, this_data_4, this_data_5, this_data_6, this_data_7, this_data_8, this_data_9, this_data_10):
     global data_1
     global data_2
@@ -139,6 +192,7 @@ def send_function_getter():
 
 
 def data_1_getter():
+    data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_9, data_10
 
 
     return float(data_1)
@@ -164,29 +218,17 @@ def send_transmission_event_getter():
     return flag_send
 
 
-#setting the flag for Tx event
-def running_time_flag_setter(this_running_time_flag):
-    global running_time_flag
-    
-    running_time_flag = this_running_time_flag
-    
-    
-#for for use of reusing Rx event from client to the board
-def running_time_flag_getter():
-    return running_time_flag
-
 class RunningTimeFlag:
-    def __init__(self, flag_running_time=False):
-        super().__init__()
-        self.flag_running_time = flag_running_time
-        
+    _flag_running_time = False
+    
+    
     @property
     def flag_running_time(self):
-        return self._flag_running_time
+        return self.__class__._flag_running_time 
     
     @flag_running_time.setter
     def flag_running_time(self, value):
-        self._flag_running_time = bool(value)
+        self.__class__._flag_running_time = bool(value)
         
         
 #setting the flag for Tx event
@@ -323,12 +365,6 @@ def get_fr_coefficient():
     
     return fr0, fr1
 
-
-def calculate_running_frequency(input):
-    
-    C_SR = 37.099
-    running_frequency = float(input)/(2*pi*C_SR)
-    return float(running_frequency)
 
 
 def set_electronics_flag(flag):

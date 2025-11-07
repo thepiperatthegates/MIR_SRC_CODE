@@ -106,7 +106,6 @@ class DataUpdate(QThread):
         global bytes_to_process, time_slice, v1_slice, v2_slice, i1_slice, i2_slice
         global store_array1, store_array2, store_array3, store_array4
         global angle_permanent_magnet_val, angle_magnetic_field_val, phase_difference_val
-        global data_3, data_5
         
 
         
@@ -359,6 +358,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         ####### flag init ##############################################################################
         
         self.flag_run_time = packet_transmission.RunningTimeFlag()
+        self.data_block = packet_transmission.TxData()
         
         
         
@@ -382,8 +382,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.DIPOLE_MOMENT = packet_transmission.DIPOLE_MOMENT	# in A m^2
         self.CALIBRATION_FACTOR = packet_transmission.CALIBRATION_FACTOR	# torque calibration no units (K)
         
-        
-
+    
         #########################################################################################
         #placeholder text for textboxes################################################
         self.textbox_time.setPlaceholderText("Enter time in second")
@@ -420,6 +419,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.textbox_amplitude2.setValidator(self.input_validator_unsigned)
         self.textbox_offset2.setValidator(self.input_validator_signed)
         #######################################################validator############################################################################
+        
+    
         
         
         #### connected functions for button
@@ -649,31 +650,34 @@ class ConstShearGUI(QMainWindow, Ui_Title):
     
         data_1 = 65534
         data_2 =self.textbox_frequency.text()
-        data_2 = packet_transmission.calculate_running_frequency(float(data_2))
-        data_3 = self.textbox_amplitude1.text()
-        data_4 =  self.textbox_offset1.text()
-        data_5 = self.textbox_amplitude2.text()
-        data_6 = self.textbox_offset2.text()  
-
         
+        #change to frequency for MCU
+        self.data_block.data_2(data_2)
+        data_2 = self.data_block.data_2
+        
+        data_3, data_4, data_5, data_6 = self.data_block.data_current
+
         #from combobox direction
         if self.comboBox_direction.currentText() == "Clockwise":
-            data_7 = 2
+            data_7 = self.data_block.data_7(2)
         elif self.comboBox_direction.currentText() == "Anti-clockwise":
-            data_7 = 1
+            data_7 = self.data_block.data_7(1)
             
         if self.filter_checkbox.isChecked():
-            data_8 = 0
+            data_8 = self.data_block.data_8(0)
         else:
-            data_8 = 2
+            data_8 = self.data_block.data_8(2)
             
         data_10 = 1
+        data_10 = self.data_block.data_10(1)
         
         ##enabled stop rotating button 
         self.button_stop.setDisabled(False)
         
+        send_datas = packet_transmission.TxData()
+        send_datas.send_data(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
         
-        packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
+        # packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
         #send all the data to be packed
         packet_transmission.send_transmission_event(1)            #SET flag for Tx
         packet_transmission.start_flag_send_event(1)

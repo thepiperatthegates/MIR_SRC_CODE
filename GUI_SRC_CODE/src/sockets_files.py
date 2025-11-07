@@ -203,7 +203,7 @@ def recv_thread(ser1):
                     p1.start()
                     flag_for_process = True
                 
-                q_to_process.put(received_data) #send to subprocess to be unpacked
+                q_to_process.put(obj=received_data) #send to subprocess to be unpacked
                 data_send = q_to_csv.get()
                 
                 # data_flag = packet_transmission.running_time_flag_getter()
@@ -238,11 +238,13 @@ def get_offset(get_offset1, get_offset2):
 def send_thread(ser1):
     
     
+    combined_sends = packet_transmission.TxData()
+    
     flag_send = packet_transmission.send_transmission_event_getter()
     if flag_send == 1:
-        data_send_1 = packet_transmission.data_1_getter()    #for run time
-        data_send_7 = packet_transmission.data_7_getter()       #for direction
-        data_send_3, data_send_4, data_send_5, data_send_6 = packet_transmission.data_current_start()
+        data_send_1 = combined_sends.data_1   #for run time
+        data_send_7 = combined_sends.data_7    #for direction
+        data_send_3, data_send_4, data_send_5, data_send_6 = combined_send.data_current
         
         #find running frequency
         data_send_2 = packet_transmission.get_frequency_dac()
@@ -251,6 +253,7 @@ def send_thread(ser1):
         data_send_8 = packet_transmission.get_stop_button_data()
         data_send_9 = packet_transmission.data_hardware_reset_getter()
         data_send_10 = packet_transmission.get_mir_mode()
+        combined_send
         combined_send = packet_transmission.combine_bytes_for_buffer(data_send_1, data_send_2, data_send_3, data_send_4, 
                                                                     data_send_5, data_send_6, data_send_7, data_send_8, data_send_9, data_send_10)
         packet_transmission.send_transmission_event(0)
@@ -339,7 +342,7 @@ def file_name_change_set(prefix, extension=".csv"):
     file_name = f"{prefix}{extension}"
     
 
-def save_to_csv(cleaned_buffer, flag_for_downsampling, num_columns=4):
+def save_to_csv(cleaned_buffer, num_columns=4):
     """
     Process, calibrate, average, and save measurement data to a CSV file.
 
