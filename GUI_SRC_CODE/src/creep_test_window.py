@@ -22,51 +22,52 @@ from analyse_window_creep_test import AnalyseWindow
 
 
 
-
-# GLOBAL VARIABLES
-checkbox_variable = 0
-time_receive_thread = 0
-
-
-data_1 = 0
-data_2 = 0
-data_3 = 0
-data_4 = 0       #offset 1
-data_5 = 0
-data_6 = 0      #offset 2
-data_7 = 0
-data_8 = 0
-data_9 = 0
-data_10 = 0    #mir mode
-
-time_slice = np.array([], dtype=np.float32)
-v1_slice   = np.array([], dtype=np.uint16)
-v2_slice   = np.array([], dtype=np.uint16)
-i1_slice   = np.array([],  dtype=np.uint16)
-i2_slice   = np.array([], dtype=np.uint16)
-
-store_array1 = np.array([], dtype=np.uint16)
-store_array2 = np.array([], dtype=np.uint16)
-store_array3 = np.array([], dtype=np.uint16)
-store_array4 = np.array([], dtype=np.uint16)
-
-
-
-angle_permanent_magnet_val = np.array([], dtype=np.float32)
-angle_magnetic_field_val = np.array([], dtype=np.float32)
-phase_difference_val = np.array([], dtype=np.float32)
-
-time_axis =  [i * 0.0001 for i in range(1000)]
-
-bytes_to_process = np.array([], dtype=np.uint16)  # Empty NumPy array for incoming data
-
-flag_done = None
-
 data_mutex = QMutex()
 
 
-#function receiving data through pipe from another thread
 class DataUpdate(QThread):
+    """
+    Thread class responsible for receiving, processing, and managing ADC data streams for Hall sensors and current sensors in real-time.
+
+    This class reads incoming data packets from a queue, converts raw ADC values into meaningful voltage and current signals, 
+    applies calibration and normalization, and computes derived quantities such as magnetic field angles and phase differences.
+
+    The processed data is stored in a separate worker class (`StoreArrayGraph`) for visualization or further analysis.
+
+    Attributes
+    ----------
+    running : bool
+        Controls whether the thread continues running.
+    flag_calibrate : bool
+        Enables calibration mode when True.
+    flag_fR_measurement : bool
+        Enables frequency response measurement mode when True.
+    flag_normalise : bool
+        Enables signal normalization when True.
+    accumulate_hall_1, accumulate_hall_2 : np.ndarray or None
+        Accumulated Hall sensor data for calibration.
+    accumulate_current_1, accumulate_current_2 : np.ndarray or None
+        Accumulated current sensor data for calibration.
+    total_hall_1, total_hall_2 : np.ndarray or None
+        Total calibrated Hall sensor values.
+    total_current_1, total_current_2 : np.ndarray or None
+        Total calibrated current sensor values.
+    v1_slice, v2_slice : np.ndarray
+        Processed voltage values from Hall sensors.
+    i1_slice, i2_slice : np.ndarray
+        Processed current values from input coils.
+    bytes_to_process : np.ndarray
+        Buffer for raw incoming ADC data (uint16).
+    angle_permanent_magnet_val : np.ndarray
+        Computed angular position of the permanent magnet based on Hall sensor data.
+    angle_magnetic_field_val : np.ndarray
+        Computed angular position of the magnetic field based on current data.
+    phase_difference_val : np.ndarray
+        Phase difference between magnetic field and permanent magnet angles.
+    worker_array_setter : StoreArrayGraph
+        Object responsible for storing processed arrays for visualization.
+    """
+
     def __init__(self):
         super().__init__()
         self.running = True
@@ -86,17 +87,47 @@ class DataUpdate(QThread):
         self.total_hall_2 = None
         self.total_current_1 = None
         self.total_current_2 = None
+        
+        
+        self.v1_slice   = np.array([], dtype=np.uint16)
+        self.v2_slice   = np.array([], dtype=np.uint16)
+        self.i1_slice   = np.array([],  dtype=np.uint16)
+        self.i2_slice   = np.array([], dtype=np.uint16)
+        
+        self.bytes_to_process = np.array([], dtype=np.uint16)  # Empty NumPy array for incoming data
+        
+        self.angle_permanent_magnet_val = np.array([], dtype=np.float32)
+        self.angle_magnetic_field_val = np.array([], dtype=np.float32)
+        self.phase_difference_val = np.array([], dtype=np.float32)
 
+        self.worker_array_setter = packet_transmission.StoreArrayGraph()
         
 
 
     def run(self):
-        global bytes_to_process, time_slice, v1_slice, v2_slice, i1_slice, i2_slice
-        global store_array1, store_array2, store_array3, store_array4
-        global angle_permanent_magnet_val, angle_magnetic_field_val, phase_difference_val
-        global data_3, data_5
         
+        """
+        Main execution loop for the data update thread.
 
+        This function continuously retrieves data from the `q_to_graph` queue, processes 
+        it, and updates the corresponding arrays. The data processing steps include:
+
+        1. **Reshaping and Conversion**: Raw 16-bit ADC samples are reshaped into  voltage and current columns.
+        2. **Signal Conversion**: ADC counts are converted to voltages (Hall sensors)  and currents (input coils).
+        3. **Calibration**: If enabled, calibration routines adjust sensor outputs.
+        4. **Normalization**: Optionally normalizes signal amplitude and offsets.
+        5. **Angle Computation**: Calculates angular positions using `arctan2` for both magnetic field and permanent magnet signals.
+        6. **Phase Difference Calculation**: Determines the phase difference between the two computed angles.
+        7. **Data Storage**: Updates the `worker_array_setter` with processed arrays.
+
+        The loop continues until the `running` flag is set to False.
+
+        Notes
+        -----
+        - Thread synchronization is managed using `data_mutex` to ensure data integrity.
+        - Data from the queue (`q_to_graph`) must have a multiple of 4 samples, 
+          corresponding to [v1, v2, i1, i2].
+        """
         
         num_columns=4
 
@@ -106,74 +137,86 @@ class DataUpdate(QThread):
             if not self.running:
                 break
             if data_from_pipe:
-                bytes_to_process = data_from_pipe   #now changes to np array so we can work with it better
+                self.bytes_to_process = data_from_pipe   #now changes to np array so we can work with it better
 
-                trimmed_size = len(bytes_to_process) - (len(bytes_to_process) % num_columns)
-                bytes_to_process = bytes_to_process[:trimmed_size]
+                trimmed_size = len(self.bytes_to_process) - (len(self.bytes_to_process) % num_columns)
+                self.bytes_to_process = self.bytes_to_process[:trimmed_size]
 
-                if len(bytes_to_process) == 0:
+                if len(self.bytes_to_process) == 0:
                     return
-                reshaped_data = np.array(bytes_to_process).reshape(-1, num_columns)
+                reshaped_data = np.array(self.bytes_to_process).reshape(-1, num_columns)
                 reshaped_data = reshaped_data.astype(float)
 
-                v1_slice = reshaped_data[:, 0]
-                v2_slice= reshaped_data[:, 1]
-                i1_slice= reshaped_data[:, 2] #STIMMT
-                i2_slice= reshaped_data[:, 3]   #STIMMT
+                self.v1_slice = reshaped_data[:, 0]
+                self.v2_slice= reshaped_data[:, 1]
+                self.i1_slice= reshaped_data[:, 2] #STIMMT
+                self.i2_slice= reshaped_data[:, 3]   #STIMMT
     
                 data_mutex.lock()
 
                 #Hall Sensors
-                store_array1= -packet_transmission.change_adc_hall(v1_slice)               #convert col1 (in V)
-                store_array2 = packet_transmission.change_adc_hall( v2_slice)               #convert col2 (in V)
+                self.v1_slice= -packet_transmission.change_adc_hall(self.v1_slice)               #convert col1 (in V)
+                self.v2_slice = packet_transmission.change_adc_hall( self.v2_slice)               #convert col2 (in V)
                 
                 #Current
-                store_array3 =  -packet_transmission.change_current_adc(i1_slice)               #convert col3 (in mA)
-                store_array4  = packet_transmission.change_current_adc(i2_slice)               #convert col4 (in mA)
+                self.i1_slice =  -packet_transmission.change_current_adc(self.i1_slice)               #convert col3 (in mA)
+                self.i2_slice  = packet_transmission.change_current_adc(self.i2_slice)               #convert col4 (in mA)
                 
                 
                 #calibration for current sensor 
-                store_array3 = packet_transmission.calibration_input_coil_1(store_array3)
-                store_array4 = packet_transmission.calibration_input_coil_2(store_array4)
+                self.i1_slice = packet_transmission.calibration_input_coil_1(self.i1_slice)
+                self.i2_slice = packet_transmission.calibration_input_coil_2( self.i2_slice )
                 
 
                 #Calibrate process starts
                 if self.flag_calibrate:
-                    self.calculate_calibration(store_array1, store_array2, store_array3, store_array4)
+                    self.calculate_calibration(self.v1_slice, self.v2_slice, self.i1_slice, self.i2_slice)
                 
                 #measurement fR process starts
                 if self.flag_fR_measurement:
-                    self.calculate_fR(store_array1, store_array2, store_array3, store_array4)
+                    self.calculate_fR(self.v1_slice, self.v2_slice, self.i1_slice, self.i2_slice)
             
                 #Calibrated hall sensors
-                store_array1 = packet_transmission.calibrated_hall_sensors1(store_array1, store_array3/1000)  
-                store_array2 = packet_transmission.calibrated_hall_sensors2(store_array2, store_array4/1000)
+                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.v1_slice, self.i1_slice/1000)  
+                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.v2_slice, self.i2_slice/1000)
                 
                 
                 #this is normalising step (still do not know whether i want to do it immidiately or not)
                 if self.flag_normalise == True:
-                    amplitude_voltage_1 = (np.max(a=store_array1) - np.min(store_array1)) / 2
-                    zero_offset_voltage_1 = (np.max(store_array1) + np.min(store_array1)) / 2
+                    amplitude_voltage_1 = (np.max(a=self.v1_slice) - np.min(self.v1_slice)) / 2
+                    zero_offset_voltage_1 = (np.max(self.v1_slice) + np.min(self.v1_slice)) / 2
 
-                    amplitude_voltage_2 = (np.max(store_array2) - np.min(store_array2)) / 2
-                    zero_offset_voltage_2 = (np.max(store_array2) + np.min(store_array2)) / 2
+                    amplitude_voltage_2 = (np.max(self.v2_slice) - np.min(self.v2_slice)) / 2
+                    zero_offset_voltage_2 = (np.max(self.v2_slice) + np.min(self.v2_slice)) / 2
 
-                    store_array1 = (store_array1 - zero_offset_voltage_1) / amplitude_voltage_1
-                    store_array2 = (store_array2 - zero_offset_voltage_2) / amplitude_voltage_2
+                    self.v1_slice = (self.v1_slice - zero_offset_voltage_1) / amplitude_voltage_1
+                    self.v2_slice= (self.v2_slice - zero_offset_voltage_2) / amplitude_voltage_2
                     
                 #######################################################################################################
-                angle_permanent_magnet_val = np.arctan2(store_array2, store_array1)
-                angle_magnetic_field_val = np.arctan2(store_array4, store_array3)
+                self.angle_permanent_magnet_val = np.arctan2(self.v2_slice, self.v1_slice)
+                self.angle_magnetic_field_val = np.arctan2(self.i2_slice, self.i1_slice)
                 
-                angle_permanent_magnet_val = np.unwrap(angle_permanent_magnet_val)
-                angle_magnetic_field_val  = np.unwrap(angle_magnetic_field_val)
+                self.angle_permanent_magnet_val = np.unwrap(self.angle_permanent_magnet_val)
+                self.angle_magnetic_field_val  = np.unwrap(self.angle_magnetic_field_val)
                 #######################################################################################################
-                phase_difference_val = angle_magnetic_field_val - angle_permanent_magnet_val
+                self.phase_difference_val = self.angle_magnetic_field_val - self.angle_permanent_magnet_val
                 
+                
+                ##send to setter class
+                self.worker_array_setter.v1_slice = self.v1_slice
+                self.worker_array_setter.v2_slice = self.v2_slice
+                self.worker_array_setter.i1_slice = self.i1_slice
+                self.worker_array_setter.i2_slice = self.i2_slice
+                
+                self.worker_array_setter.angle_permanent_magnet_val = self.angle_permanent_magnet_val
+                self.worker_array_setter.angle_magnetic_field_val = self.angle_magnetic_field_val
+                
+                self.worker_array_setter.phase_difference_val = self.phase_difference_val
+                
+                data_mutex.unlock()
                 
                 #Clear queue after processing
-                bytes_to_process = np.array([], dtype=np.uint16)
-                data_mutex.unlock()
+                self.bytes_to_process = np.array([], dtype=np.uint16)
 
 
     def calculate_calibration(self, store_array1_calibrate, store_array2_calibrate, store_array3_calibrate, store_array4_calibrate):
@@ -217,13 +260,14 @@ class DataUpdate(QThread):
 class SleepTimer(QObject):
     update_time_signal = pyqtSignal(float)  # emit float countdown values
 
-    def __init__(self, parent=None):
+    def __init__(self,  time_tick = 0.0):
         super().__init__()
-        global data_1
-        self.remaining = float(data_1) # get local_data_1 from global
+        self.remaining = time_tick # get local_data_1 from global
         self.timer = QTimer(self)
         self.timer.setInterval(100)  # 100 ms per tick
         self.timer.timeout.connect(self._tick)
+        
+        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
 
     def start(self):
         self.timer.start()
@@ -237,16 +281,16 @@ class SleepTimer(QObject):
             self.update_time_signal.emit(round(self.remaining, 1))
         else:
             self.timer.stop()
-            packet_transmission.running_time_flag_setter(0)
+            self.worker_flag_run_time.flag_running_time = False
             
 class SleepTimerVector(QObject):
     
     update_time_signal_vector = pyqtSignal(float)
     
-    def __init__(self, time_taken, specified_time__sampling, flag_sampling_time):
+    def __init__(self, time_taken, specified_time_sampling, flag_sampling_time):
         super().__init__()
         self.remaining = time_taken
-        self.specified_time__sampling = specified_time__sampling
+        self.specified_time_sampling = specified_time_sampling
         self.flag_sampling_time = flag_sampling_time
         
         self.timer = QTimer(self)
@@ -316,7 +360,8 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         ################################################################################################
         
         
-        
+        self.curve_v1 = self.curve_v2 = self.curve_i1 = self.curve_i2 = self.curve_sigma_b = self.curve_sigma_m = None
+        self.time_axis =  [i * 0.0001 for i in range(1000)]
         
         
         ################################### connected signals from widget #############################################
@@ -338,7 +383,21 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.worker_DataUpdate.start()
         ################################################################################################
         
+        ####### flag init ##############################################################################
         
+        #for receive thread
+        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
+        #for tx data
+        self.worker_data_block = packet_transmission.TxData()
+        #for transmitting thread
+        self.worker_flag_send = packet_transmission.TxFlag()
+        #for data straight from graph
+        self.worker_getter_graph = packet_transmission.StoreArrayGraph()
+        
+        
+        
+        
+        ################################################################################################
         
         ##### combobox for live graph mode
         self.select_mode_comboBox.activated.connect(self.change_graph)
@@ -347,7 +406,6 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
 
 
     def change_graph(self):
-        global time_axis
         
         #get string from combo box
         mode = self.select_mode_comboBox.currentText()
@@ -366,13 +424,13 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             #this is to make sure x-axis is configured properly 
             if time_interval_var_int == 100:
                 sockets_files.tot_count_accumulate_recv = 250
-                time_axis = [i * 0.0001 for i in range(1000)]
+                self.time_axis = [i * 0.0001 for i in range(1000)]
             elif time_interval_var_int == 500:
                 sockets_files.tot_count_accumulate_recv = 5*250
-                time_axis = [i * 0.0001 for i in range(5*1000)]
+                self.time_axis = [i * 0.0001 for i in range(5*1000)]
             elif time_interval_var_int == 1000:
                 sockets_files.tot_count_accumulate_recv = 10*250
-                time_axis = [i * 0.0001 for i in range(10*1000)]
+                self.time_axis = [i * 0.0001 for i in range(10*1000)]
             
             ######################
             self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Hall sensors")
@@ -410,13 +468,13 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             #this is to make sure x-axis is configured properly 
             if time_interval_var_int == 100:
                 sockets_files.tot_count_accumulate_recv = 250
-                time_axis = [i * 0.0001 for i in range(1000)]
+                self.time_axis = [i * 0.0001 for i in range(1000)]
             elif time_interval_var_int == 500:
                 sockets_files.tot_count_accumulate_recv = 5*250
-                time_axis = [i * 0.0001 for i in range(5*1000)]
+                self.time_axis = [i * 0.0001 for i in range(5*1000)]
             elif time_interval_var_int == 1000:
                 sockets_files.tot_count_accumulate_recv = 10*250
-                time_axis = [i * 0.0001 for i in range(10*5000)]
+                self.time_axis = [i * 0.0001 for i in range(10*5000)]
                 
             self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Permanent magnet angle")
             self.plot1.setLabel('left', 'ϕ_m', units='rad')
@@ -446,19 +504,16 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
 
             
         elif mode == "View phase difference":
-            
-            
-            #this is to make sure x-axis is configured properly 
             #this is to make sure x-axis is configured properly 
             if time_interval_var_int == 100:
                 sockets_files.tot_count_accumulate_recv = 250
-                time_axis = [i * 0.0001 for i in range(1000)]
+                self.time_axis = [i * 0.0001 for i in range(1000)]
             elif time_interval_var_int == 500:
                 sockets_files.tot_count_accumulate_recv = 5*250
-                time_axis = [i * 0.0001 for i in range(5*1000)]
+                self.time_axis = [i * 0.0001 for i in range(5*1000)]
             elif time_interval_var_int == 1000:
                 sockets_files.tot_count_accumulate_recv = 10*250
-                time_axis = [i * 0.0001 for i in range(10*1000)]
+                self.time_axis = [i * 0.0001 for i in range(10*1000)]
                 
             self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Permanent magnet angle")
             self.plot1.setLabel('left', 'Δϕ', units='rad')
@@ -477,18 +532,15 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             self.timer.start()
             
     def graph_update_sensors(self):
+        global data_mutex
+        data_mutex.lock()
+        self.curve_v1.setData(self.time_axis,self.worker_getter_graph.v1_slice)
+        self.curve_v2.setData(self.time_axis,self.worker_getter_graph.v2_slice)
         
-        global store_array1, store_array2, store_array3, store_array4, time_axis
-
-
-        self.curve_v1.setData(time_axis,store_array1)
-        self.curve_v2.setData(time_axis,store_array2)
-        
-        self.curve_i1.setData(time_axis,store_array3)
-        self.curve_i2.setData(time_axis,store_array4)
-        
+        self.curve_i1.setData(self.time_axis,self.worker_getter_graph.i1_slice)
+        self.curve_i2.setData(self.time_axis,self.worker_getter_graph.i2_slice)
+        data_mutex.unlock()
     def auto_range_event(self):
-        
         self.plot1.enableAutoRange(axis='y', enable=True)
         self.plot2.enableAutoRange(axis='y', enable=True)
         # self.plot1.enableAutoRange(axis='x', enable=True)
@@ -496,59 +548,48 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         
 
     def graph_update_angle(self):
+        global data_mutex
         data_mutex.lock()
-        global angle_permanent_magnet_val, angle_magnetic_field_val
-        
-        self.curve_sigma_m.setData(time_axis, angle_permanent_magnet_val)
-        self.curve_sigma_b.setData(time_axis, angle_magnetic_field_val)
+        self.curve_sigma_m.setData(self.time_axis, self.worker_getter_graph.angle_permanent_magnet_val)
+        self.curve_sigma_b.setData(self.time_axis, self.worker_getter_graph.angle_magnetic_field_val)
         data_mutex.unlock()
         
     def graph_phase_difference(self):
-        global phase_difference_val
-        
-        self.curve_phase_difference.setData(time_axis, phase_difference_val)
-        
+        global data_mutex
+        data_mutex.lock()
+        self.curve_phase_difference.setData(self.time_axis, self.worker_getter_graph.phase_difference_val)
+        data_mutex.unlock()
         
     def send_offsets(self):
         """
         Send offsets for earth field compensation
         """
-        global data_1
-        global data_2
-        global data_3
-        global data_4
-        global data_5
-        global data_6
-        global data_7        #checkbox for direction
-        global data_8
-        global data_9
-        global data_10
-        
-        
-        data_1 = 65534
+        ############################# send data to setter getter ######################################
+        self.worker_data_block.data_1 = 65534
         #make the running frequency 200 Hz, does not matter since we will produce DC current anyway
-        data_2 = 200 #Hz
-        data_3 =0
-        data_4 =  self.textbox_offset_1.text()
-        data_5 = 0
-        data_6 = self.textbox_offset_2.text()  
-
+        #change to frequency for MCU
+        self.worker_data_block.data_2_for_MCU  = 200 #Hz
         
-        ##direction does not matter here 
-        data_7 = 1
+        self.worker_data_block.data_current = 0, self.textbox_offset1.text(), 0, self.textbox_offset2.text()
+
+        #from combobox direction
+        self.worker_data_block.data_7 = 1
+
+
             
         if self.filter_checkbox.isChecked():
-            data_8 = 0
+            self.worker_data_block.data_8 = 0
         else:
-            data_8 = 2
-            
-        data_10 = 1
+            self.worker_data_block.data_8 =  2
+        
+        #for data 10
+        self.worker_data_block.data_10 = 1 
+        ######################################################################################
         
         
-        packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
-        #send all the data to be packed
-        packet_transmission.send_transmission_event(1)            #SET flag for Tx
-        packet_transmission.start_flag_send_event(1)
+        ##send all data to microcontroller
+        #activate flag
+        self.worker_flag_send.flag_tx = True
         
 
         self.status_label.setStyleSheet("color: #32a83a;")
@@ -561,42 +602,33 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         
         This function just sends a DC voltage to the microcontroller. That's all
         """
-        global data_1
-        global data_2
-        global data_3
-        global data_4
-        global data_5
-        global data_6
-        global data_7        #checkbox for direction
-        global data_8
-        global data_9
-        global data_10
         
-        
-        data_1 = 65534
+        ############################# send data to setter getter ######################################
+        self.worker_data_block.data_1 = 65534
         #make the running frequency 200 Hz, does not matter since we will produce DC current anyway
-        data_2 = 200 #Hz
-        data_3 =0
-        data_4 =  self.textbox_direction_start_x.text()
-        data_5 = 0
-        data_6 = self.textbox_direction_start_y.text()  
-
+        #change to frequency for MCU
+        self.worker_data_block.data_2_for_MCU  = 200 #Hz
         
-        ##direction does not matter here 
-        data_7 = 1
+        self.worker_data_block.data_current = 0, self.textbox_direction_start_x.text(), 0, self.textbox_direction_start_y.text()
+
+        #from combobox direction
+        self.worker_data_block.data_7 = 1
+
+
             
         if self.filter_checkbox.isChecked():
-            data_8 = 0
+            self.worker_data_block.data_8 = 0
         else:
-            data_8 = 2
-            
-        data_10 = 1
+            self.worker_data_block.data_8 =  2
+        
+        #for data 10
+        self.worker_data_block.data_10 = 1 
+        ######################################################################################
         
         
-        packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
-        #send all the data to be packed
-        packet_transmission.send_transmission_event(1)            #SET flag for Tx
-        packet_transmission.start_flag_send_event(1)
+        ##send all data to microcontroller
+        #activate flag
+        self.worker_flag_send.flag_tx = True
         
 
         self.status_label.setStyleSheet("color: #32a83a;")
@@ -637,41 +669,27 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         #get the total time of the time taken (x-axis on the graph)
         total_time_for_file_save = start_vector_time + end_vector_time
         
-        
-        global data_1
-        global data_2
-        global data_3
-        global data_4
-        global data_5
-        global data_6
-        global data_7        #checkbox for direction
-        global data_8
-        global data_9
-        global data_10
-        
-        
-        
-        data_1 = total_time_for_file_save #total time for file saving
-        
+        ############################# send data to setter getter ######################################
+        self.worker_data_block.data_1 = total_time_for_file_save
         #make the running frequency 200 Hz, does not matter since we will produce DC current anyway
-        data_2 = 200 #Hz
-        data_3 =0
-        data_4 =  self.textbox_direction_start_x.text()
-        data_5 = 0
-        data_6 = self.textbox_direction_start_y.text()  
-
+        #change to frequency for MCU
+        self.worker_data_block.data_2_for_MCU  = 200 #Hz
         
-        ##direction does not matter here 
-        data_7 = 1
+        self.worker_data_block.data_current = 0, self.textbox_direction_start_x.text(), 0, self.textbox_direction_start_y.text()
+
+        #from combobox direction
+        self.worker_data_block.data_7 = 1
+
+
             
         if self.filter_checkbox.isChecked():
-            data_8 = 0
+            self.worker_data_block.data_8 = 0
         else:
-            data_8 = 2
-            
-        data_10 = 1
+            self.worker_data_block.data_8 =  2
         
-        packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
+        #for data 10
+        self.worker_data_block.data_10 = 1 
+        ######################################################################################
         
         ######## get the desired sampling frequency from the textbox
         sampling_frequency = self.textbox_standard_sampling_rate.text()
@@ -687,8 +705,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             print("check is", check)
         
         if check.is_integer():
-            packet_transmission.stop_button_event(0)            #goto sockets_files and stop the loop for receiving
-            packet_transmission.running_time_flag_setter(this_running_time_flag=1)
+            self.worker_flag_run_time.flag_running_time = True
             
             sockets_files.file_name_change_set("dummy")        #set file name from gui
             sockets_files.current_time = 0.0
@@ -697,9 +714,6 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             self.status_label.setStyleSheet("color: #7da832;")
             self.status_label.setText("Creep test starts.......")
             
-            #start processing to write data to csv
-            packet_transmission.stop_button_event(0)            #goto sockets_files and stop the loop for receiving
-            packet_transmission.running_time_flag_setter(this_running_time_flag=1)
             
             #start the overall timer (combined timer)
             self.worker_sleep = SleepTimer()
@@ -739,39 +753,36 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             """
             Send the 2nd vector 
             """
-            global data_1
-            global data_2
-            global data_3
-            global data_4
-            global data_5
-            global data_6
-            global data_7        #checkbox for direction
-            global data_8
-            global data_9
-            global data_10
             
-        
+            ############################# send data to setter getter ######################################
+            self.worker_data_block.data_1 = end_vector_time
             #make the running frequency 200 Hz, does not matter since we will produce DC current anyway
-            data_2 = 200 #Hz
-            data_3 = 0
-            data_4 = self.textbox_direction_end_x.text()
-            data_5 = 0
-            data_6 = self.textbox_direction_end_y.text()  
+            #change to frequency for MCU
+            self.worker_data_block.data_2_for_MCU  = 200 #Hz
             
-            ##direction does not matter here 
-            data_7 = 1
+            self.worker_data_block.data_current = 0, self.textbox_direction_end_x.text(), 0, self.textbox_direction_end_y.text()  
+
+            #from combobox direction
+            self.worker_data_block.data_7 = 1
+
+
                 
             if self.filter_checkbox.isChecked():
-                data_8 = 0
+                self.worker_data_block.data_8 = 0
             else:
-                data_8 = 2
-                
-            data_10 = 1
+                self.worker_data_block.data_8 =  2
             
-            packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
+            #for data 10
+            self.worker_data_block.data_10 = 1 
+            ######################################################################################
             
-            packet_transmission.send_transmission_event(1)            #SET flag for Tx
-            packet_transmission.start_flag_send_event(1)
+            ##send all data to microcontroller
+            #activate flag
+            self.worker_flag_send.flag_tx = True
+            
+            #start saving the data
+            self.worker_flag_run_time.flag_running_time = True
+        
             
             self.worker_vector_sleep = SleepTimerVector(end_vector_time, input_sampling_time, True)
             self.worker_vector_sleep.update_time_signal_vector.connect(self.update_timer_end_vector)
@@ -838,17 +849,13 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             
             
     def set_hardware_reset_event(self):
-        global data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10
+            
+            self.worker_data_block.data_9 =  1
+            self.worker_flag_send =  True
+            self.worker_data_block.data_9 =  0 
+            self.set_software_reset_event()
+            
         
-        data_9 = 1
-        packet_transmission.send_function(data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10)
-        packet_transmission.send_transmission_event(1)            #SET flag for Tx
-        packet_transmission.start_flag_send_event(1)
-        data_9 = 0
-        
-        self.set_software_reset_event()
-        
-    
     def set_software_reset_event(self):
         # all the background processes
         if self.p_window_data is not None:

@@ -121,18 +121,19 @@ def thread_start():
     #Event for run time receiving data from Serial Porte
     thread_recv = threading.Thread(target=recv_thread, args=(ser1,))
     thread_recv.start()
+    
+    worker_flag_send = packet_transmission.TxFlag()
 
     while True:
-        start_flag_send = packet_transmission.start_flag_send_getter()
-        if start_flag_send == 1:
-            packet_transmission.start_flag_send_event(0)
-            start_flag_send = 0
+        if worker_flag_send.flag_tx:
+            #reset the flag
+            worker_flag_send.flag_tx = False
             thread_send = threading.Thread(target=send_thread, daemon=False, args=(ser1,))
             thread_send.start()
-        time.sleep(0.001)
-            
+        else:
+            time.sleep(4)
 
-    
+            
 
 def recv_thread(ser1):
     """
@@ -183,7 +184,8 @@ def recv_thread(ser1):
     
     global flag_for_process, p1, tot_count_accumulate_recv, flag_for_downsampling
 
-    data_flag = packet_transmission.RunningTimeFlag()
+    worker_data_flag = packet_transmission.RunningTimeFlag()
+    worker_process_flag = packet_transmission.ProcessUnpackingFlag()
     
     #start count with zero
     count = 0
@@ -197,29 +199,29 @@ def recv_thread(ser1):
                     received_data += chunk
                 count = 0
                 
-                ## run only once
-                if not flag_for_process and received_data:
+                ## run only once when the program starts
+                if not worker_process_flag.flag_process and received_data:
                     p1 = multiprocessing.Process(target=plot_live, args=(q_to_process, q_to_graph, q_to_csv ))
                     p1.start()
-                    flag_for_process = True
+                    worker_process_flag.flag_process = True
                 
                 q_to_process.put(obj=received_data) #send to subprocess to be unpacked
                 data_send = q_to_csv.get()
                 
-                # data_flag = packet_transmission.running_time_flag_getter()
-                if data_flag.flag_running_time:
-                    print("Inside the function:", data_flag.flag_running_time)
+                # worker_data_flag = packet_transmission.running_time_flag_getter()
+                if worker_data_flag.flag_running_time:
+                    
+                    print("Inside the function:", worker_data_flag.flag_running_time)
+                    
                     if data_send:
                         save_to_csv(data_send)
                         data_send = None
                     print("Data written!")
-
-                    
             except Exception as e:
                 print(f"Here 1: {e}")
         except Exception as e:
             print(f"Here 2: {e}")
-            time.sleep(0.1)
+            time.sleep(0.01)
 
 
 
@@ -236,36 +238,15 @@ def get_offset(get_offset1, get_offset2):
 #thread for TCP Tx
 ##########################################################################
 def send_thread(ser1):
-    
-    
-    combined_sends = packet_transmission.TxData()
-    
-    flag_send = packet_transmission.send_transmission_event_getter()
-    if flag_send == 1:
-        data_send_1 = combined_sends.data_1   #for run time
-        data_send_7 = combined_sends.data_7    #for direction
-        data_send_3, data_send_4, data_send_5, data_send_6 = combined_send.data_current
-        
-        #find running frequency
-        data_send_2 = packet_transmission.get_frequency_dac()
-        
-        
-        data_send_8 = packet_transmission.get_stop_button_data()
-        data_send_9 = packet_transmission.data_hardware_reset_getter()
-        data_send_10 = packet_transmission.get_mir_mode()
-        combined_send
-        combined_send = packet_transmission.combine_bytes_for_buffer(data_send_1, data_send_2, data_send_3, data_send_4, 
-                                                                    data_send_5, data_send_6, data_send_7, data_send_8, data_send_9, data_send_10)
-        packet_transmission.send_transmission_event(0)
-        try:
-            ser1.write(combined_send)
-        except Exception as e:
-            print("Error with socket connection!", e)
-    else:
-        time.sleep(1)
-        
-        
-        
+    worker_combined_send = packet_transmission.TxData()
+    #combined everything
+    combined_send = worker_combined_send.combine_data()
+    #reset the flag
+    try:
+        ser1.write(combined_send)
+    except Exception as e:
+        print("Cannot send data!", e)
+
 def plot_live(queue1, q_to_graph, q_to_csv): #q_to_graph to graph (main file)
     start_process_live_graph(queue1, q_to_graph, q_to_csv)
 
@@ -315,7 +296,6 @@ def start_process_live_graph(queue1, q_to_graph, q_to_csv):
         if recv_buffer:
             tot_chunks = []
             i = 0 
-            
             while i < len(recv_buffer):
                 if bytes([recv_buffer[i]]) in identifier_bits:
                     if i + 2 < len(recv_buffer):

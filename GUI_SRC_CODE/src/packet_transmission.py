@@ -2,7 +2,7 @@
 
 from math import sin, cos, pi
 import struct
-import numpy
+import numpy as np
 
 
 
@@ -116,6 +116,10 @@ class TxData():
     def data_1(self):
         return self.__class__._data_1 
     
+    @data_1.setter
+    def data_1(self, val):
+        self.__class__._data_1 = val
+    
     @property
     def data_2(self):
         return self.__class_._data_2
@@ -125,11 +129,39 @@ class TxData():
         C_SR = 37.099
         running_frequency = float(val)/(2*pi*C_SR)
         self.__class__._data_2 = running_frequency
+        
+    @property
+    def data_2_for_MCU(self):
+        return self.__class_._data_2
+    
+    @data_2_for_MCU.setter
+    def data_2_for_MCU(self, val):
+        self.__class__._data_2 = val
     
     @property
     def data_current(self):
         return  self.__class__._data_3, self.__class__._data_4, self.__class__._data_5,  self.__class__._data_6
     
+    @data_current.setter
+    def data_current(self, val):
+        self.__class__._data_3, self.__class__._data_4 , self.__class__._data_5 , self.__class__._data_6 = val 
+        
+    @property 
+    def data_4(self):
+        return self.__class__._data_4
+    
+    @data_4.setter
+    def data_4(self, val):
+        self.__class__._data_4 = val
+        
+    @property 
+    def data_6(self):
+        return self.__class__._data_6
+    
+    @data_6.setter
+    def data_6(self, val):
+        self.__class__._data_6 = val
+        
     @property 
     def data_7(self):
         return self.__class__._data_7
@@ -150,7 +182,10 @@ class TxData():
     def data_9(self):
         return self.__class__._data_9
     
-   
+    @data_9.setter
+    def data_9(self, val):
+        self.__class__._data_9 = val
+    
     @property 
     def data_10(self):
         return self.__class__._data_10
@@ -158,65 +193,52 @@ class TxData():
     @data_10.setter
     def data_10(self, val):
         self.__class__._data_10 = val
-
-
         
+    
+    def combine_data(self):
+        #ARM Microcontroller is Little Endian, for integer we will be shifting the 
+        #bits ourselves but for float, we need to send it little endian preemptively
+        
+        ## TODO: CHANGE BYTE_SEND TO FLOAT 
+        print("Frequency of DAC", self.__class__._data_2)
+        byte_send1 = struct.pack('<f', float(self.__class__._data_1))       
+        byte_send2 = struct.pack('<f', float(self.__class__._data_2))             #running frequency of MCU 
+        byte_send3 = struct.pack('<f', float(self.__class__._data_3))              #amplitude1
+        byte_send4 = struct.pack('<f', float(self.__class__._data_4))              #offset1
+        byte_send5 = struct.pack('<f', float(self.__class__._data_5))              #amplitude2
+        byte_send6 = struct.pack('<f', float(self.__class__._data_6))              #offset2
+        byte_send7 = struct.pack('>I', int(self.__class__._data_7))                 #if FIR filter is used or not
+        byte_send8 = struct.pack('>I', int(self.__class__._data_8))                 #Mode for dc or ac waves (calibration purposes)
+        byte_send9 = struct.pack('>I', int(self.__class__._data_9))                 #hardware reset
+        byte_send10 = struct.pack('>I', int(self.__class__._data_10))                 #mir mode
 
-def send_function(this_data_1, this_data_2, this_data_3, this_data_4, this_data_5, this_data_6, this_data_7, this_data_8, this_data_9, this_data_10):
-    global data_1
-    global data_2
-    global data_3
-    global data_4
-    global data_5
-    global data_6
-    global data_7
-    global data_8
-    global data_9
-    global data_10
-
-    data_1 = this_data_1                 #set and getter
-    data_2 = this_data_2
-    data_3 = this_data_3
-    data_4 = this_data_4
-    data_5 = this_data_5
-    data_6 = this_data_6
-    data_7 = this_data_7
-    data_8 = this_data_8
-    data_9 = this_data_9
-    data_10 = this_data_10
+        combined_send = b''.join([byte_send1, byte_send2, byte_send3, byte_send4, byte_send5, byte_send6, byte_send7, byte_send8, byte_send9, byte_send10])
+        
+        return combined_send
 
     
+
+class TxFlag():
+    _flag_tx = False
     
-def send_function_getter():
-    return data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_8, data_9, data_10
-
-
-def data_1_getter():
-    data_1, data_2, data_3, data_4, data_5, data_6, data_7, data_9, data_10
-
-
-    return float(data_1)
-
-def data_7_getter():
+    @property
+    def flag_tx(self):
+        return self.__class__._flag_tx 
     
-    return int(data_7)
+    @flag_tx.setter
+    def flag_tx(self, val):
+        self.__class__._flag_tx = bool(val)
 
-def data_hardware_reset_getter():
-    global data_9
-    return int(data_9)
-
-
-#setting the flag for Tx event
-def send_transmission_event(this_flag_send):
-    global flag_send 
-    flag_send = this_flag_send
+class ProcessUnpackingFlag():
+    _flag_process = False
     
+    @property
+    def flag_process(self):
+        return self.__class__._flag_process
     
-    
-#for use of reusing Tx event from client to the board
-def send_transmission_event_getter():
-    return flag_send
-
+    @flag_process.setter
+    def flag_process(self, val):
+        self.__class__._flag_process = bool(val)
 
 class RunningTimeFlag:
     _flag_running_time = False
@@ -229,36 +251,80 @@ class RunningTimeFlag:
     @flag_running_time.setter
     def flag_running_time(self, value):
         self.__class__._flag_running_time = bool(value)
+
+class StoreArrayGraph():
+    _v1_slice = _v2_slice = _i1_slice = _i2_slice = np.array([], dtype=np.uint16)
+    
+    _angle_permanent_magnet_val = np.array([], dtype=np.float32)
+    _angle_magnetic_field_val = np.array([], dtype=np.float32)
+    _phase_difference_val = np.array([], dtype=np.float32)
+    
+    @property
+    def v1_slice(self):
+        return self.__class__._v1_slice 
+    
+    @v1_slice .setter
+    def v1_slice(self, val):
+        self.__class__._v1_slice  = val
+    
+    @property
+    def v2_slice(self):
+        return self.__class__._v2_slice
+    
+    @v2_slice.setter
+    def v2_slice(self, val):
+        self.__class__._v2_slice = val
+        
+    @property
+    def i1_slice(self):
+        return self.__class__._i1_slice
+    
+    @i1_slice.setter
+    def i1_slice(self, val):
+        self.__class__._i1_slice = val
+        
+    @property
+    def i2_slice(self):
+        return self.__class__._i2_slice
+    
+    @i2_slice.setter
+    def i2_slice(self, val):
+        self.__class__._i2_slice = val
+        
+    @property
+    def angle_permanent_magnet_val(self):
+        return self.__class__._angle_permanent_magnet_val
+    
+    @angle_permanent_magnet_val.setter
+    def angle_permanent_magnet_val(self, val):
+        self.__class__._angle_permanent_magnet_val = val
+        
+    
+    @property
+    def angle_magnetic_field_val(self):
+        return self.__class__._angle_magnetic_field_val
+    
+    @angle_magnetic_field_val.setter
+    def angle_magnetic_field_val(self, val):
+        self.__class__._angle_magnetic_field_val = val
         
         
-#setting the flag for Tx event
-def file_name_event(this_file_name_flag):
-    global file_name_flag
+    @property
+    def phase_difference_val(self):
+        return self.__class__._phase_difference_val
     
-    file_name_flag = this_file_name_flag
+    @phase_difference_val.setter
+    def phase_difference_val(self, val):
+        self.__class__._phase_difference_val = val
+        
     
-    
-#for use of reusing Rx event from client to the board
-def file_name_getter():
-    return file_name_flag
-
-
+        
 
 def start_flag_rx_event(this_start_flag_rx):
     global start_flag_rx
     
     start_flag_rx = this_start_flag_rx
     
-def start_flag_rx_getter():
-    return start_flag_rx
-
-def start_flag_send_event(this_start_flag_send):
-    global start_flag_send
-    
-    start_flag_send = this_start_flag_send
-    
-def start_flag_send_getter():
-    return start_flag_send
 
 def stop_button_event(this_stop_button_flag):
     global stop_button_flag
@@ -268,60 +334,7 @@ def stop_button_event(this_stop_button_flag):
 def stop_button_getter():
     return stop_button_flag
     
-def data_current_start():
-    amplitude_1 = data_3
-    offset_1 = data_4
-    amplitude_2 = data_5
-    offset_2 = data_6
 
-    return amplitude_1, offset_1, amplitude_2, offset_2
-    
-
-def get_frequency_dac():
-    
-    global data_2
-    
-    return data_2           
-
-def get_stop_button_data():
-    
-    global data_8
-    
-    return int(data_8)
-
-def get_mir_mode():
-    global data_10 
-    
-    return int(data_10)
-
-def get_offsets():
-    global data_4, data_6 
-    
-    print(data_4)
-    return float(data_4), float(data_6)
-def combine_bytes_for_buffer(send_1, send_2, send_3, send_4, send_5, send_6, send_7, send_8, send_9, send_10):
-           
-    #ARM Microcontroller is Little Endian, for integer we will be shifting the 
-    #bits ourselves but for float, we need to send it little endian preemptively
-    
-    
-    ## TODO: CHANGE BYTE_SEND TO FLOAT 
-    print("Frequency of DAC", send_2)
-    byte_send1 = struct.pack('<f', float(send_1))       
-    byte_send2 = struct.pack('<f', float(send_2))             #running frequency of MCU 
-    byte_send3 = struct.pack('<f', float(send_3))              #amplitude1
-    byte_send4 = struct.pack('<f', float(send_4))              #offset1
-    byte_send5 = struct.pack('<f', float(send_5))              #amplitude2
-    byte_send6 = struct.pack('<f', float(send_6))              #offset2
-    byte_send7 = struct.pack('>I', int(send_7))                 
-    byte_send8 = struct.pack('>I', int(send_8))                 #Mode for dc or ac waves (calibration purposes)
-    byte_send9 = struct.pack('>I', int(send_9))                 #hardware reset
-    byte_send10 = struct.pack('>I', int(send_10))                 #mir mode
-
-    combined_send = b''.join([byte_send1, byte_send2, byte_send3, byte_send4, byte_send5, byte_send6, byte_send7, byte_send8, byte_send9, byte_send10])
-    
-    return combined_send
-   
 
 def change_adc_hall(digital_hall_voltage):
 
@@ -429,32 +442,32 @@ def calculate_torque_fR( current_1, current_2, hall_1, hall_2, data_4, data_6):
         
         global CALIBRATION_FACTOR, DIPOLE_MOMENT, COIL_CONSTANT
         
-        current_1 = numpy.array(current_1, dtype=float)
-        current_2 = numpy.array(current_2, dtype=float)
-        hall_1    = numpy.array(hall_1, dtype=float)
-        hall_2    = numpy.array(hall_2, dtype=float)
+        current_1 = np.array(current_1, dtype=float)
+        current_2 = np.array(current_2, dtype=float)
+        hall_1    = np.array(hall_1, dtype=float)
+        hall_2    = np.array(hall_2, dtype=float)
         
         offset_1 =float(data_4)
         offset_2 =float(data_6)
         
         #magnetic field angle - magnet angle
-        phase_difference = numpy.arctan2(current_2, current_1) - numpy.arctan2(hall_2, hall_1)
+        phase_difference = np.arctan2(current_2, current_1) - np.arctan2(hall_2, hall_1)
         
-        power_of_2 = numpy.power((current_1 - offset_1), 2) + numpy.power((current_2 - offset_2), 2)
+        power_of_2 = np.power((current_1 - offset_1), 2) + np.power((current_2 - offset_2), 2)
         
-        magnitude_current = numpy.sqrt(power_of_2)
+        magnitude_current = np.sqrt(power_of_2)
         
         total_torque = CALIBRATION_FACTOR * ( DIPOLE_MOMENT
         * COIL_CONSTANT                    # [T/A]
         * magnitude_current / 1000         # mA; -> A, [A]
-        * numpy.sin(phase_difference)   # dimensionless
+        * np.sin(phase_difference)   # dimensionless
         )
         
         return total_torque, phase_difference
     
 def calculate_radial_frequency(running_frequency):
 
-    return float(2 * numpy.pi * running_frequency)
+    return float(2 * np.pi * running_frequency)
 
 class DownsampleEvent():
     
@@ -463,4 +476,4 @@ class DownsampleEvent():
 
 
 if __name__ == "__main___":
-    send_transmission_event(1)
+    calculate_radial_frequency(4)
