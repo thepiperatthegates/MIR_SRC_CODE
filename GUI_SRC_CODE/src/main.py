@@ -20,10 +20,10 @@ os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
 import multiprocessing
 import sys
 import packet_transmission as packet_transmission
-import sockets_files
-from main_window_test import Ui_MainWindow
-from creep_test_window import TabWindowCreepTest
-from constant_shear_rate import TabWindowConstSR
+import socket_GUI
+from main_window_gui import Ui_MainWindow
+from creep_test.creep_test_window_main import TabWindowCreepTest
+from constant_shear_rate.constant_shear_rate_main import TabWindowConstSR
 
 from PyQt5 import QtCore, QtGui
 
@@ -105,7 +105,7 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
             self.choose_electronic_comboBox.setEnabled(False)
         else:
             self.choose_electronic_comboBox.setEnabled(True)
-            sockets_files.port_name_setter(choose_com_text)
+            socket_GUI.sockets_files.port_name_setter(choose_com_text)
         
 
     
@@ -159,7 +159,6 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
             
             
         self.close()
-
 
 
 def main():

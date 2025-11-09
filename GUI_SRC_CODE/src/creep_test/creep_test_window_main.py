@@ -14,11 +14,11 @@ import packet_transmission
 os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
 import sys
 
-import sockets_files 
-from sockets_files import q_to_graph
+from socket_GUI import sockets_files
+from socket_GUI.sockets_files import q_to_graph
 
-from creep_test_gui import Ui_CreepTestGUI
-from analyse_window_creep_test import AnalyseWindow
+from .creep_test_gui import Ui_CreepTestGUI
+from .analyse_window_creep_test import AnalyseWindow
 
 
 
@@ -353,7 +353,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
 
         ################################ SET ICON ###################################################
         # get absolute path of project root (folder containing 'src' and 'pics')
-        self.project_root = os.path.dirname(os.path.abspath(__file__))
+        self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         save_icon_path = os.path.join(self.project_root, "pics", "save_icon.ico")
         
         self.save_button.setIcon(QtGui.QIcon(save_icon_path))

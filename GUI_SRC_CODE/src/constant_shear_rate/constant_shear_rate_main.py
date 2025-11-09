@@ -14,15 +14,14 @@ from pathlib import Path
 os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
 import multiprocessing
 import sys
-from gui_baru import Ui_Title
+from .gui_baru import Ui_Title
 
-import sockets_files 
-from sockets_files import q_to_graph
+import socket_GUI.sockets_files as sockets_files
+from socket_GUI.sockets_files import q_to_graph
 
 import packet_transmission as packet_transmission
-from analyse_window_const_sr import AnalyseWindow
-from graph_popout import PlotWindow
-from creep_test_window import TabWindowCreepTest
+from .analyse_window_const_sr import AnalyseWindow
+from .graph_fr import PlotWindow
 
 
 
@@ -353,7 +352,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)
 
         # get absolute path of project root (folder containing 'src' and 'pics')
-        self.project_root = os.path.dirname(os.path.abspath(__file__))
+        self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
         # construct icon path
         save_icon_path = os.path.join(self.project_root, "pics", "save_icon.ico")
@@ -1330,7 +1329,7 @@ class TabWindowConstSR(QMainWindow):
             print(f"Error deleting file: {e}")
             
         event.accept()
-        
+    
 
 
 if __name__ == '__main__':
