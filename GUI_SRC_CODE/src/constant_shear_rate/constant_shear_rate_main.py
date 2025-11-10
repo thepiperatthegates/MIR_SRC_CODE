@@ -403,7 +403,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_flag_send = packet_transmission.TxFlag()
         #for data straight from graph
         self.worker_getter_graph = packet_transmission.StoreArrayGraph()
-        
+        #for graph tab window (for fr)
+        self.plot_object = PlotWindow()
         
         ####### variables for fR measurement process ###############################################
         self.mean_current1_fR = None        #in mA
@@ -909,6 +910,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 self.button_send.setDisabled(False)
                 self.button_start.setDisabled(False)
                 self.button_stop.setDisabled(False)
+                
+                
     def set_constant(self, get_accumulate_hall_1, get_accumulate_hall_2, get_accumulate_current_1, get_accumulate_current2):
         """
         Set accumulated measurement values for Hall sensors and current sensors.
@@ -1130,9 +1133,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 header_text = "angular_velocity  [rad/s];mean_torque [Nm];std_mean_torque [Nm];std_torque [Nm];mean_phase [rad];std_mean_phase [rad];std_phase [rad]"
                 
                 dir_fr_results = os.path.join(self.project_root, "files", "results_fr.csv")
+                
                 if os.path.exists(dir_fr_results):
                     os.remove(dir_fr_results)
                     print(dir_fr_results)
+                    
                 # Save to CSV      
                 np.savetxt(dir_fr_results, data_to_save, delimiter=";", comments="", fmt="%.18f", header=header_text)
                 #calculate final fR
@@ -1150,7 +1155,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 )
                 
                 #refresh the graph
-                self.plot_object = PlotWindow()
                 self.plot_object.refresh_graph()
                 
                 
@@ -1286,6 +1290,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
 #different windows with tab 
 class TabWindowConstSR(QMainWindow):
+    
     def __init__(self):
         super().__init__()
         self.setWindowTitle("MiR | Mini-Rheometer")
