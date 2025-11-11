@@ -46,12 +46,11 @@ MIN_V_BEFORE_HALL = 2.5   #or y-intercept
 MAX_V_AFTER_HALL = 3.3
 MIN_V_AFTER_HALL = 0.0
 
-#default calibration factor k_b
-k_b_1 = 0.083597946
-k_b_2 = 0.084535931
 
 #default friction coefficient 
 CALIBRATION_FACTOR = 0.773              # torque calibration no units (K)
+
+
 fr1 = 1.51e-8 # in Nm / (rad /s)
 fr0 = 5.701e-8 # in Nm / (rad /s)
 
@@ -59,11 +58,6 @@ fr0 = 5.701e-8 # in Nm / (rad /s)
 
 COIL_CONSTANT = 3.097e-3		# in T / A
 DIPOLE_MOMENT = 8.594e-3		# in A m^2
-
-#offset from main.py
-offset_1 = 0.0
-offset_2 = 0.0
-
 
 
 
@@ -201,6 +195,7 @@ class TxData():
         
         ## TODO: CHANGE BYTE_SEND TO FLOAT 
         print("Frequency of DAC", self.__class__._data_2)
+        
         byte_send1 = struct.pack('<f', float(self.__class__._data_1))       
         byte_send2 = struct.pack('<f', float(self.__class__._data_2))             #running frequency of MCU 
         byte_send3 = struct.pack('<f', float(self.__class__._data_3))              #amplitude1
@@ -251,6 +246,72 @@ class RunningTimeFlag:
     @flag_running_time.setter
     def flag_running_time(self, value):
         self.__class__._flag_running_time = bool(value)
+        
+        
+class DownSampleSpecificFlag():
+    
+    _flag_specific_downsample = False
+    
+    _tot_average = 1
+    
+    _tot_average_specified = 1
+    
+    _time_increment = 0.0001
+    
+    _time_increment_specified = 0.0001
+    
+    _current_time = None
+    
+    @property
+    def flag_specific_downsample(self):
+        return self.__class__._flag_specific_downsample 
+
+    @flag_specific_downsample.setter
+    def flag_specific_downsample(self, val):
+        self.__class__._flag_specific_downsample = bool(val)
+        
+        
+    @property
+    def tot_average(self):
+        return self.__class__._tot_average
+    
+    @tot_average.setter
+    def tot_average(self, val):
+        self.__class__._tot_average = val 
+        
+    @property
+    def tot_average_specified(self):
+        return self.__class__._tot_average_specified
+    
+    @tot_average_specified.setter
+    def tot_average_specified(self, val):
+        self.__class__._tot_average_specified = val 
+        
+    @property
+    def time_increment_specified(self):
+        return self.__class__._time_increment_specified
+    
+    @time_increment_specified.setter
+    def time_increment_specified(self, val):
+        self.__class__._time_increment_specified = val  
+        
+    @property
+    def time_increment(self):
+        return self.__class__._time_increment
+    
+    @time_increment.setter
+    def time_increment(self, val):
+        self.__class__._time_increment = val
+        
+    @property
+    def current_time(self):
+        return self.__class__._current_time
+    
+    @current_time.setter
+    def current_time(self, val):
+        self.__class__._current_time = val
+        
+        
 
 class StoreArrayGraph():
     _v1_slice = _v2_slice = _i1_slice = _i2_slice = np.array([], dtype=np.uint16)
@@ -317,14 +378,57 @@ class StoreArrayGraph():
     def phase_difference_val(self, val):
         self.__class__._phase_difference_val = val
         
+        
+class fRCoefficients():
+    
+    #default fr coefficient
+    _fr1 = 1.51e-8 # in Nm / (rad /s)
+    _fr0 = 5.701e-8 # in Nm / (rad /s)
+    
+    @property 
+    def fr1(self):
+        return self.__class__._fr1
+    
+    @fr1.setter
+    def fr1(self, val):
+        self.__class__._fr1 = val
+    
+    @property 
+    def fr0(self):
+        return self.__class__._fr0
+    
+    @fr1.setter
+    def fr0(self, val):
+        self.__class__._fr0 = val
+        
+    
     
         
+        
+class kbCoefficient():
 
-def start_flag_rx_event(this_start_flag_rx):
-    global start_flag_rx
+    #default calibration factor k_b
+    _k_b_1 = 0.083597946
+    _k_b_2 = 0.084535931
     
-    start_flag_rx = this_start_flag_rx
+    @property
+    def k_b_1(self):
+        return self.__class__._k_b_1
     
+    @k_b_1.setter
+    def k_b_1(self, val):
+        self.__class__._k_b_1 = val 
+        
+        
+    @property
+    def k_b_2(self):
+        return self.__class__._k_b_2
+    
+    @k_b_2.setter
+    def k_b_2(self, val):
+        self.__class__._k_b_2 = val 
+    
+
 
 def stop_button_event(this_stop_button_flag):
     global stop_button_flag
@@ -360,23 +464,16 @@ def gradient_calculate(y_intercept, y_axis, x_axis):
     gradient =  (y_axis - y_intercept)/x_axis
     return float(gradient)
 
-def calibrated_hall_sensors1(hall_voltage, actual_current):
+def calibrated_hall_sensors1(k_b_1, hall_voltage, actual_current):
     
-    global k_b_1
     calibrated_voltage = hall_voltage - (actual_current*k_b_1)
     return calibrated_voltage
 
-def calibrated_hall_sensors2(hall_voltage, actual_current):
+def calibrated_hall_sensors2(k_b_2, hall_voltage, actual_current):
     
-    global k_b_2
+    
     calibrated_voltage = hall_voltage - (actual_current*k_b_2)
     return calibrated_voltage
-
-def get_fr_coefficient():
-    
-    global fr0, fr1
-    
-    return fr0, fr1
 
 
 

@@ -94,6 +94,9 @@ class DataUpdate(QThread):
         self.total_current_1 = None
         self.total_current_2 = None
         
+        self.k_b_1 = 0.0
+        self.k_b_2 = 0.0
+        
         
         self.v1_slice   = np.array([], dtype=np.uint16)
         self.v2_slice   = np.array([], dtype=np.uint16)
@@ -107,7 +110,9 @@ class DataUpdate(QThread):
         self.phase_difference_val = np.array([], dtype=np.float32)
 
         self.worker_array_setter = packet_transmission.StoreArrayGraph()
-        
+        self.worker_kb_property = packet_transmission.kbCoefficient()
+        self.worker_kb_property.k_b_1 = self.k_b_1
+        self.worker_kb_property.k_b_1 = self.k_b_2
 
 
     def run(self):
@@ -182,8 +187,8 @@ class DataUpdate(QThread):
                     self.calculate_fR(self.v1_slice, self.v2_slice, self.i1_slice, self.i2_slice)
             
                 #Calibrated hall sensors
-                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.v1_slice, self.i1_slice/1000)  
-                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.v2_slice, self.i2_slice/1000)
+                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.k_b_1, self.v1_slice, self.i1_slice/1000)  
+                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.k_b_1, self.v2_slice, self.i2_slice/1000)
                 
                 
                 #this is normalising step (still do not know whether i want to do it immidiately or not)
@@ -304,7 +309,7 @@ class SleepTimer(QObject):
         super().__init__()
         self.remaining = time_tick # get local_data_1 from global
         self.timer = QTimer(self)
-        self.timer.setInterval(msec=100)  # 100 ms per tick
+        self.timer.setInterval(100)  # 100 ms per tick
         self.timer.timeout.connect(self._tick)
         
         self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
@@ -395,6 +400,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         ####### flag init ##############################################################################
         
+        
         #for receive thread
         self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
         #for tx data
@@ -405,6 +411,16 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_getter_graph = packet_transmission.StoreArrayGraph()
         #for graph tab window (for fr)
         self.plot_object = PlotWindow()
+        #for fr setter getter
+        self.worker_fr_property = packet_transmission.fRCoefficients()
+        #for k_b setter getter
+        self.worker_k_b_property = packet_transmission.kbCoefficient()
+        #for downsampling purposes
+        self.worker_downsample_property = packet_transmission.DownSampleSpecificFlag()
+        self.tot_average = self.worker_downsample_property.tot_average
+        self.time_increment_downsample = self.worker_downsample_property.time_increment_downsample
+        
+        
         
         ####### variables for fR measurement process ###############################################
         self.mean_current1_fR = None        #in mA
@@ -435,8 +451,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.textbox_amplitude2.setPlaceholderText("Enter amplitude from 0 to 480mA")
         self.textbox_offset2.setPlaceholderText("Enter offset +-480mA")
         self.k_b_label.setText(
-            f"k<sub>b1</sub> = {packet_transmission.k_b_1}&nbsp;&nbsp;&nbsp;"
-            f"k<sub>b2</sub> = {packet_transmission.k_b_2}&nbsp;&nbsp;&nbsp;"
+            f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
+            f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
             f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
             f"f<sub>R</sub> equation = {np.poly1d(self.calculate_final_fR)}"
         )
@@ -759,11 +775,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         if sampling_frequency == '' or sampling_frequency == 0:
             pass
         else:
-            sockets_files.time_increment = 1.0/float(sampling_frequency)
-            sockets_files.tot_average = 10000 // int(sampling_frequency)
-            print("tot_average", sockets_files.tot_average)
+            self.time_increment = 1.0/float(sampling_frequency)
+            self.tot_average = 10000 // int(sampling_frequency)
+            print("tot_average", self.tot_average)
             
-            check = 5000 / int(sockets_files.tot_average)
+            check = 5000 / int(self.tot_average)
             print("check is", check)
         
         if check.is_integer():
@@ -800,8 +816,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
     def start_calibration_event(self, input_current = -400, count_recursion = 1 ):
         print("Recursion in main func:", count_recursion)
         
-        packet_transmission.k_b_1 = 0
-        packet_transmission.k_b_2 = 0
+        self.worker_k_b_property.k_b_1 = 0.0
+        self.worker_k_b_property.k_b_2 = 0.0
         
         if input_current == False:
             input_current = -400
@@ -893,14 +909,14 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 
                 k_b_1 = float ((self.mean_hall_1_400_A - self.mean_hall_1_0_A) / ((self.mean_current_1_400_A - self.mean_current_1_0_A)/1000))
                 k_b_2 = float ((self.mean_hall_2_400_A - self.mean_hall_2_0_A) / ((self.mean_current_2_400_A - self.mean_current_2_0_A)/1000))
-                packet_transmission.k_b_1 = k_b_1
-                packet_transmission.k_b_2 = k_b_2
+                self.worker_k_b_property.k_b_1 = k_b_1
+                self.worker_k_b_property.k_b_2  = k_b_2
                 print(k_b_1)
                 print(k_b_2)
                 
                 self.k_b_label.setText(
-                    f"k<sub>b1</sub> = {packet_transmission.k_b_1}&nbsp;&nbsp;&nbsp;"
-                    f"k<sub>b2</sub> = {packet_transmission.k_b_2}&nbsp;&nbsp;&nbsp;"
+                    f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1 }&nbsp;&nbsp;&nbsp;"
+                    f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
                     f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
                     f"f<sub>R</sub> equation = {np.poly1d(self.calculate_final_fR)}"
                 )
@@ -941,8 +957,9 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         #reset all f_R at first 
         if self.flag_fR == False:
-            self.flag_fR = True    
-            packet_transmission.f_R = 0
+            self.flag_fR = True  
+            self.worker_fr_property.fr0 = 0.0
+            self.worker_fr_property.fr1 = 0.0
             self.calculate_final_fR = 0
             
         ############################# send data to setter getter ######################################
@@ -1144,12 +1161,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 self.calculate_final_fR =  np.polyfit(self.calculated_angular_velocity, self.calculated_torque, 1)
                 self.popout_window(4)
                 
-                packet_transmission.fr1, packet_transmission.fr0 = self.calculate_final_fR
+                self.worker_fr_property.fr1, self.worker_fr_property.fr0 = self.calculate_final_fR
                 
                 #change textbox in the bottom of the GUI 
                 self.k_b_label.setText(
-                    f"k<sub>b1</sub> = {packet_transmission.k_b_1}&nbsp;&nbsp;&nbsp;"
-                    f"k<sub>b2</sub> = {packet_transmission.k_b_2}&nbsp;&nbsp;&nbsp;"
+                    f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
+                    f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
                     f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
                     f"f<sub>R</sub> equation = {np.poly1d(self.calculate_final_fR)}"
                 )

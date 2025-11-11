@@ -42,7 +42,6 @@ tot_count_accumulate_recv = 250
 
 
 time_increment = 0.0001
-tot_average = 1
 
 
 def init_queues():
@@ -118,24 +117,25 @@ def thread_start():
         - Threads are daemonized where appropriate to allow clean program exit.
     """
     ser1 = socket_start_connect()
+    worker_kb_property = packet_transmission.kbCoefficient()
     #Event for run time receiving data from Serial Porte
-    thread_recv = threading.Thread(target=recv_thread, args=(ser1,))
+    thread_recv = threading.Thread(target=recv_thread, args=(ser1,worker_kb_property))
     thread_recv.start()
     
     worker_flag_send = packet_transmission.TxFlag()
 
     while True:
         if worker_flag_send.flag_tx:
-            #reset the flag
-            worker_flag_send.flag_tx = False
             thread_send = threading.Thread(target=send_thread, daemon=False, args=(ser1,))
             thread_send.start()
+            #reset the flag
+            worker_flag_send.flag_tx = False
         else:
-            time.sleep(4)
+            time.sleep(1)
 
             
 
-def recv_thread(ser1):
+def recv_thread(ser1, worker_kb_property):
     """
     Continuously read incoming data from a serial connection and 
     forward it for live plotting and CSV logging.
@@ -214,7 +214,7 @@ def recv_thread(ser1):
                     print("Inside the function:", worker_data_flag.flag_running_time)
                     
                     if data_send:
-                        save_to_csv(data_send)
+                        save_to_csv(data_send, worker_kb_property)
                         data_send = None
                     print("Data written!")
             except Exception as e:
@@ -224,23 +224,15 @@ def recv_thread(ser1):
             time.sleep(0.01)
 
 
-
-def get_offset(get_offset1, get_offset2):
-    global offset_1, offset_2
-    
-    
-    offset_1 = get_offset1
-    offset_2 = get_offset2
-    
-
-
 ##########################################################################
 #thread for TCP Tx
 ##########################################################################
 def send_thread(ser1):
     worker_combined_send = packet_transmission.TxData()
+    print("here")
     #combined everything
     combined_send = worker_combined_send.combine_data()
+    print("Byte send to firmware: ", combined_send)
     #reset the flag
     try:
         ser1.write(combined_send)
@@ -322,7 +314,7 @@ def file_name_change_set(prefix, extension=".csv"):
     file_name = f"{prefix}{extension}"
     
 
-def save_to_csv(cleaned_buffer, num_columns=4):
+def save_to_csv(cleaned_buffer, worker_kb_property, num_columns=4):
     """
     Process, calibrate, average, and save measurement data to a CSV file.
 
@@ -374,7 +366,7 @@ def save_to_csv(cleaned_buffer, num_columns=4):
         If file writing fails, the error is printed to the console.
     """
     
-    global file_name, current_time, time_increment
+    global file_name
     global offset_1, offset_2
 
     data = np.array(cleaned_buffer)
@@ -398,18 +390,38 @@ def save_to_csv(cleaned_buffer, num_columns=4):
     col4_converted = packet_transmission.change_current_adc(col4)               #convert col2
     
     #Justified hall sensors
-    col1_converted = packet_transmission.calibrated_hall_sensors1(col1_converted, col3_converted/1000)  
-    col2_converted = packet_transmission.calibrated_hall_sensors2(col2_converted, col4_converted/1000)
+    col1_converted = packet_transmission.calibrated_hall_sensors1(worker_kb_property.k_b_1, col1_converted, col3_converted/1000)  
+    col2_converted = packet_transmission.calibrated_hall_sensors2(worker_kb_property.k_b_2, col2_converted, col4_converted/1000)
     
     col3_converted = packet_transmission.calibration_input_coil_1(col3_converted)
     col4_converted = packet_transmission.calibration_input_coil_2(col4_converted)
     
     #Average values to reduce amount of data saved 
     ####FOR CONSTANT SHEAR RATE 
-
-    # if flag_for_downsampling:
-    #     col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted)
     
+    
+    ########################################################## init object for setter getter ##############################################################################################################
+    #init the object
+    worker_specific_downsampling = packet_transmission.DownSampleSpecificFlag()
+    #default tot_average
+    tot_average = worker_specific_downsampling.tot_average
+    #specified tot_average
+    tot_average_specified = worker_specific_downsampling.tot_average_specified
+    #default time increment 
+    time_increment = worker_specific_downsampling.time_increment
+    #specified downsampling time increment
+    time_increment_specified = worker_specific_downsampling.time_increment_specified
+    #current time init
+    current_time = worker_specific_downsampling.current_time
+    #####################################################################################################################################################################
+    
+    
+    #check if the need for specific downsample is needed
+    if worker_specific_downsampling.flag_specific_downsample:
+        col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted, tot_average_specified)
+    else:
+        col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted, tot_average)
+        
     averaged_data = np.zeros((len(col1_converted), 4))  # shape (100,4)
     averaged_data[:, 0] = col1_converted
     averaged_data[:, 1] = col2_converted
@@ -417,16 +429,22 @@ def save_to_csv(cleaned_buffer, num_columns=4):
     averaged_data[:, 3] = col4_converted
 
     num_rows = averaged_data.shape[0]
-    time_column = np.arange(current_time, current_time + (time_increment * num_rows), time_increment).reshape(-1, 1)
-    current_time += time_increment * num_rows   
+    
+    if worker_specific_downsampling.flag_specific_downsample:
+        time_column = np.arange(current_time, current_time + (time_increment_specified * num_rows),  time_increment_specified).reshape(-1, 1)
+        current_time += time_increment_specified * num_rows   
 
-    final_data = np.hstack((time_column, averaged_data))
-    
+        final_data = np.hstack((time_column, averaged_data))
+    else:
+        time_column = np.arange(current_time, current_time + (time_increment * num_rows), time_increment).reshape(-1, 1)
+        current_time += time_increment * num_rows   
+
+        final_data = np.hstack((time_column, averaged_data))
+        
+
     #always save the data to file dir
-    project_root =  os.path.dirname(os.path.abspath(__file__))
+    project_root =  os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     file_name_full = os.path.join(project_root, "files", file_name)
-    
-    
     
     try:
         if not os.path.exists(file_name_full):
@@ -437,9 +455,7 @@ def save_to_csv(cleaned_buffer, num_columns=4):
     except Exception as e:
         print(f"The fuck?: {e}")
 
-def downsampling_values (col1, col2, col3, col4):
-    
-    global tot_average
+def downsampling_values (col1, col2, col3, col4, tot_average):
         
     col1_after_average = average_values(col1, tot_average).ravel()
     col2_after_average = average_values(col2, tot_average).ravel()

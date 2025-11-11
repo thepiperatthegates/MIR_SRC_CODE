@@ -88,6 +88,9 @@ class DataUpdate(QThread):
         self.total_current_1 = None
         self.total_current_2 = None
         
+        self.k_b_1 = 0.0
+        self.k_b_2 = 0.0
+        
         
         self.v1_slice   = np.array([], dtype=np.uint16)
         self.v2_slice   = np.array([], dtype=np.uint16)
@@ -99,8 +102,12 @@ class DataUpdate(QThread):
         self.angle_permanent_magnet_val = np.array([], dtype=np.float32)
         self.angle_magnetic_field_val = np.array([], dtype=np.float32)
         self.phase_difference_val = np.array([], dtype=np.float32)
+        
 
         self.worker_array_setter = packet_transmission.StoreArrayGraph()
+        self.worker_kb_property = packet_transmission.kbCoefficient()
+        self.worker_kb_property.k_b_1 = self.k_b_1
+        self.worker_kb_property.k_b_1 = self.k_b_2
         
 
 
@@ -177,8 +184,8 @@ class DataUpdate(QThread):
                     self.calculate_fR(self.v1_slice, self.v2_slice, self.i1_slice, self.i2_slice)
             
                 #Calibrated hall sensors
-                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.v1_slice, self.i1_slice/1000)  
-                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.v2_slice, self.i2_slice/1000)
+                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.k_b_1, self.v1_slice, self.i1_slice/1000)  
+                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.k_b_2, self.v2_slice, self.i2_slice/1000)
                 
                 
                 #this is normalising step (still do not know whether i want to do it immidiately or not)
@@ -268,6 +275,7 @@ class SleepTimer(QObject):
         self.timer.timeout.connect(self._tick)
         
         self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
+        
 
     def start(self):
         self.timer.start()
@@ -291,7 +299,11 @@ class SleepTimerVector(QObject):
         super().__init__()
         self.remaining = time_taken
         self.specified_time_sampling = specified_time_sampling
-        self.flag_sampling_time = flag_sampling_time
+        self.remaining_for_specific_downsampling = self.remaining  - self.specified_time_sampling
+        
+        #specified the flag for specified sampling time event 
+        self.flag_specific_downsample_for_backend = packet_transmission.DownSampleSpecificFlag()
+        self.flag_specific_downsample_for_backend.flag_specific_downsample = flag_sampling_time
         
         self.timer = QTimer(self)
         self.timer.setInterval(100)
@@ -307,9 +319,9 @@ class SleepTimerVector(QObject):
         self.remaining -= 0.1
         if self.remaining >= 0.0:
             self.update_time_signal_vector.emit(round(self.remaining, 1))
-        # elif self.remaining == self.specified_time__sampling:
-        #     if self.flag_sampling_time:
-        #         socket.
+            if self.remaining == self.remaining_for_specific_downsampling and self.flag_specific_downsample_for_backend.flag_specific_downsample:
+                #only occurs during specific time 
+                self.flag_specific_downsample_for_backend.flag_specific_downsample = False
         else:
             self.timer.stop()
 
@@ -393,6 +405,13 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.worker_flag_send = packet_transmission.TxFlag()
         #for data straight from graph
         self.worker_getter_graph = packet_transmission.StoreArrayGraph()
+        #for downsampling purposes
+        self.worker_downsample_property = packet_transmission.DownSampleSpecificFlag()
+        self.tot_average = self.worker_downsample_property.tot_average
+        self.tot_average_specified = self.worker_downsample_property.tot_average_specified
+        self.time_increment = self.worker_downsample_property.time_increment
+        self.time_increment_specified = self.worker_downsample_property.time_increment_specified
+        self.current_time = self.worker_downsample_property.current_time
         
         
         
@@ -570,7 +589,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         #change to frequency for MCU
         self.worker_data_block.data_2_for_MCU  = 200 #Hz
         
-        self.worker_data_block.data_current = 0, self.textbox_offset1.text(), 0, self.textbox_offset2.text()
+        self.worker_data_block.data_current = 0, self.textbox_offset_1.text(), 0, self.textbox_offset_2.text()
 
         #from combobox direction
         self.worker_data_block.data_7 = 1
@@ -697,18 +716,18 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             pass
         else:
                 
-            sockets_files.time_increment = 1.0/float(sampling_frequency)
-            sockets_files.tot_average = 10000 // int(sampling_frequency)
-            print("tot_average", sockets_files.tot_average)
+            self.time_increment = 1.0/float(sampling_frequency)
+            self.tot_average = 10000 // int(sampling_frequency)
+            print("tot_average", self.tot_average )
             
-            check = 5000 / int(sockets_files.tot_average)
+            check = 5000 / int(self.tot_average)
             print("check is", check)
         
         if check.is_integer():
             self.worker_flag_run_time.flag_running_time = True
             
             sockets_files.file_name_change_set("dummy")        #set file name from gui
-            sockets_files.current_time = 0.0
+            self.current_time = 0.0
 
 
             self.status_label.setStyleSheet("color: #7da832;")
@@ -746,8 +765,23 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             # self.button_stop.setDisabled(True)
             
             end_vector_time = float(self.textbox_vector_end_time.text())
+            
+            #for specified sampling frequency 
             input_sampling_rate = int(self.textbox_input_sampling_rate.text())
             input_sampling_time = float(self.textbox_input_sampling_time.text())
+            
+            if input_sampling_rate == '' or input_sampling_rate == 0:
+                pass
+            else:
+                self.time_increment_specified = 1.0/float(input_sampling_rate)
+                self.tot_average_specified = 10000 // int(input_sampling_rate)
+                print("tot_average", self.tot_average_specified)
+                
+                check = 5000 / int(self.time_increment_specified)
+                print("check is", check)
+                    
+            
+            
         
         
             """
@@ -782,14 +816,16 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             
             #start saving the data
             self.worker_flag_run_time.flag_running_time = True
-        
+            
+            
+            self.status_label.setStyleSheet("color: #7da832;")
+            self.status_label.setText("Creep test end vector.......")
             
             self.worker_vector_sleep = SleepTimerVector(end_vector_time, input_sampling_time, True)
             self.worker_vector_sleep.update_time_signal_vector.connect(self.update_timer_end_vector)
             self.worker_vector_sleep.start()
             
-            self.status_label.setStyleSheet("color: #7da832;")
-            self.status_label.setText("Creep test end vector.......")
+
             
             
             
