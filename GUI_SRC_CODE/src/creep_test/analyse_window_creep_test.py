@@ -75,8 +75,10 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
     
         ###############################inherited from another process 
         
-        self.fr0 = packet_transmission.fr0
-        self.fr1 = packet_transmission.fr1
+        self.worker_get_fr_coefficient = packet_transmission.fRCoefficients()
+        self.fr0 = self.worker_get_fr_coefficient.fr0
+        self.fr1 =self.worker_get_fr_coefficient.fr1
+        
         self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
             f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
         
@@ -84,9 +86,12 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.COIL_CONSTANT = packet_transmission.COIL_CONSTANT		# in T / A
         self.DIPOLE_MOMENT = packet_transmission.DIPOLE_MOMENT		# in A m^2
         self.CALIBRATION_FACTOR = packet_transmission.CALIBRATION_FACTOR		# torque calibration no units (K)
+        
+        
+        self.worker_get_offset = packet_transmission.TxData()
     
-        self.offset_1 = 0.0
-        self.offset_2 = 0.0
+        self.offset_1 = self.worker_get_offset.data_4
+        self.offset_2 = self.worker_get_offset.data_6
         
         
         #placeholder for the offsets input
@@ -344,7 +349,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.current_1 = self.data[:, 3]
         self.current_2 = self.data[:, 4]
         
-        self.offset_1, self.offset_2 = packet_transmission.get_offsets()
+        self.offset_1, self.offset_2 = self.worker_get_offset.data_4, self.worker_get_offset.data_6
         
         self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
         f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
@@ -373,8 +378,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         vis = self.viscosity.reshape(-1, 1) 
         
         #get the fr from packet tranmision
-        self.fr0, self.fr1 = packet_transmission.get_fr_coefficient()
-        
+        self.fr0 = self.worker_get_fr_coefficient.fr0
+        self.fr1 = self.worker_get_fr_coefficient.fr1
 
         #change text box for visibility
         self.textbox_offset1.setText(str(self.offset_1))
@@ -749,6 +754,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
 
 def main_3():
+    
     app3 = QApplication([])
     
     # get absolute path of project root (folder containing 'src' and 'pics')

@@ -788,7 +788,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             Send the 2nd vector 
             """
             
-            ############################# send data to setter getter ######################################
+            ############################# send data to setter getter ###################################################
             self.worker_data_block.data_1 = end_vector_time
             #make the running frequency 200 Hz, does not matter since we will produce DC current anyway
             #change to frequency for MCU
@@ -808,7 +808,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             
             #for data 10
             self.worker_data_block.data_10 = 1 
-            ######################################################################################
+            ############################################################################################################
             
             ##send all data to microcontroller
             #activate flag

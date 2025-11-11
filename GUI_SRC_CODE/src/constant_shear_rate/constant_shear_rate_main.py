@@ -413,12 +413,14 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.plot_object = PlotWindow()
         #for fr setter getter
         self.worker_fr_property = packet_transmission.fRCoefficients()
+        
+        
         #for k_b setter getter
         self.worker_k_b_property = packet_transmission.kbCoefficient()
         #for downsampling purposes
         self.worker_downsample_property = packet_transmission.DownSampleSpecificFlag()
         self.tot_average = self.worker_downsample_property.tot_average
-        self.time_increment_downsample = self.worker_downsample_property.time_increment_downsample
+        self.time_increment = self.worker_downsample_property.current_time
         
         
         
@@ -757,10 +759,10 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         else:
             print("First measurements")
             
-        ######################################################################################
+        ############################################################################################################################
             
         
-        ############################# send data to setter getter ######################################
+        ############################# send data to setter getter ############################################################################
         self.worker_data_block.data_1  = self.textbox_time.text()
         #change to frequency for MCU
         self.worker_data_block.data_2  = self.textbox_frequency.text()
@@ -768,7 +770,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_data_block.data_current = self.textbox_amplitude1.text(), self.textbox_offset1.text(), self.textbox_amplitude2.text(), self.textbox_offset2.text()
         
         self.worker_data_block.data_10 = 1 
-        ######################################################################################
+        ############################################################################################################################
 
         ######## get the desired sampling frequency from the textbox
         sampling_frequency = self.textbox_sample_frequency.text()
@@ -786,7 +788,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.worker_flag_run_time.flag_running_time = True
             
             sockets_files.file_name_change_set("dummy")        #set file name from gui
-            sockets_files.current_time = 0.0
+            self.time_increment = 0.0
 
             self.status_label.setStyleSheet("color: #7da832;")
             self.status_label.setText("Acquisition starts.......")
@@ -836,7 +838,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         data_9= 0
         data_10 = 1
         
-        ############################# send data to setter getter ######################################
+        ############################# send data to setter getter ############################################################################
         self.worker_data_block.data_1 = str(1) #seconds
         self.worker_data_block.data_2_for_MCU  = str(3) # Hz
         
@@ -855,7 +857,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_data_block.data_9 = 0
         #for data 10
         self.worker_data_block.data_10 = 1 
-        ######################################################################################
+        ############################################################################################################################
 
         ##send all data to microcontroller
         #activate flag
@@ -909,8 +911,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 
                 k_b_1 = float ((self.mean_hall_1_400_A - self.mean_hall_1_0_A) / ((self.mean_current_1_400_A - self.mean_current_1_0_A)/1000))
                 k_b_2 = float ((self.mean_hall_2_400_A - self.mean_hall_2_0_A) / ((self.mean_current_2_400_A - self.mean_current_2_0_A)/1000))
+                
+                #set the new k_b's
                 self.worker_k_b_property.k_b_1 = k_b_1
                 self.worker_k_b_property.k_b_2  = k_b_2
+                
                 print(k_b_1)
                 print(k_b_2)
                 
@@ -962,14 +967,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.worker_fr_property.fr1 = 0.0
             self.calculate_final_fR = 0
             
-        ############################# send data to setter getter ######################################
+        ############################# send data to setter getter ############################################################################
         self.worker_data_block.data_1 = str(3) #mA
         self.worker_data_block.data_2_for_MCU  = str(running_frequency) # Hz
         
         self.worker_data_block.data_current = str(200), self.textbox_offset1.text(), str(200), self.textbox_offset2.text()
-        packet_transmission.offset_1 = float(self.textbox_offset1.text())
-        packet_transmission.offset_2 = float(self.textbox_offset2.text())
-
         self.worker_data_block.data_7 = rotation_direction
             
         if self.filter_checkbox.isChecked():
@@ -980,7 +982,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_data_block.data_9 = 0
         #for data 10
         self.worker_data_block.data_10 = 1 
-        ######################################################################################
+        ############################################################################################################################
 
         ##send all data to microcontroller
         #activate flag
@@ -1003,9 +1005,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_data_block.data_2_for_MCU  = str(running_frequency) # Hz
         
         self.worker_data_block.data_current = str(200), self.textbox_offset1.text(), str(200), self.textbox_offset2.text()
-        packet_transmission.offset_1 = float(self.textbox_offset1.text())
-        packet_transmission.offset_2 = float(self.textbox_offset2.text())
-
         self.worker_data_block.data_7 = rotation_direction
             
         if self.filter_checkbox.isChecked():
