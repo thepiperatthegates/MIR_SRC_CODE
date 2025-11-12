@@ -65,6 +65,7 @@ DIPOLE_MOMENT = 8.594e-3		# in A m^2
 ELECTRONICS_FLAG = 0
 
 
+########################################################### FIRST COIL ###########################################################
 #first sensor coefficient version 1
 CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 = -4.61934
 CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 = 0.99182
@@ -76,20 +77,38 @@ CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 = 3.86547
 CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 = 0.98655
 CURRENT_COEFF_SECOND_SENSOR_C_VERSION1= 3.02401e-6
 CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 = -3.98871e-8
+######################################################################################################################
 
 
 
-#first sensor coefficient version 2
-CURRENT_COEFF_FIRST_SENSOR_A_VERSION2 = 3.59556
-CURRENT_COEFF_FIRST_SENSOR_B_VERSION2 = 0.99575
-CURRENT_COEFF_FIRST_SENSOR_C_VERSION2 =  -1.27981e-5
-CURRENT_COEFF_FIRST_SENSOR_D_VERSION2 =  -5.72566e-8
 
-#second sensor coefficient version 2
-CURRENT_COEFF_SECOND_SENSOR_A_VERSION2 = -6.34285
-CURRENT_COEFF_SECOND_SENSOR_B_VERSION2 = 0.99341
-CURRENT_COEFF_SECOND_SENSOR_C_VERSION2= 1.18014e-5
-CURRENT_COEFF_SECOND_SENSOR_D_VERSION2 = -5.62681e-8
+########################################################### SECOND COIL ###########################################################
+# #second sensor coefficient version 2 (<403 mA)
+CURRENT_COEFF_FIRST_SENSOR_A_VERSION2_LESSER = 3.14911
+CURRENT_COEFF_FIRST_SENSOR_B_VERSION2_LESSER = 0.99076
+
+
+
+#second sensor coefficient version 2 (>403 mA)
+CURRENT_COEFF_FIRST_SENSOR_A_VERSION2_GREATER = -2688.1912
+CURRENT_COEFF_FIRST_SENSOR_B_VERSION2_GREATER  = 20.1242
+CURRENT_COEFF_FIRST_SENSOR_C_VERSION2_GREATER = -0.04492
+CURRENT_COEFF_FIRST_SENSOR_D_VERSION2_GREATER  =   3.47814E-5
+
+
+
+#second sensor coefficient version 2 (<403 mA)
+CURRENT_COEFF_SECOND_SENSOR_A_VERSION2_LESSER = 308.36119
+CURRENT_COEFF_SECOND_SENSOR_B_VERSION2_LESSER = 4.10434
+CURRENT_COEFF_SECOND_SENSOR_C_VERSION2_LESSER = 0.00906
+CURRENT_COEFF_SECOND_SENSOR_D_VERSION2_LESSER = 8.11939e-6
+
+#second sensor coefficient version 2 (>403 mA)
+CURRENT_COEFF_SECOND_SENSOR_A_VERSION2_GREATER = -5.95902
+CURRENT_COEFF_SECOND_SENSOR_B_VERSION2_GREATER  = 0.98839
+######################################################################################################################
+
+
 
 
 class TxData():
@@ -407,9 +426,16 @@ class fRCoefficients():
         
 class kbCoefficient():
 
-    #default calibration factor k_b
-    _k_b_1 = 0.083597946
-    _k_b_2 = 0.084535931
+    #default calibration factor k_b 
+    
+    #MIR 1
+    # _k_b_1 = 0.083597946
+    # _k_b_2 = 0.084535931
+    
+    #MIR 2
+    _k_b_1 = 0.16423985101661842
+    _k_b_2 = 0.1666737395533449
+    
     
     @property
     def k_b_1(self):
@@ -493,10 +519,20 @@ def calibration_input_coil_1(input):
     
     global ELECTRONICS_FLAG
     
+    
     if ELECTRONICS_FLAG == 1:
         output = CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 + CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 * input + CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 * pow(input, 2) +  CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 * pow(input, 3)
     elif ELECTRONICS_FLAG == 2:
-        output = CURRENT_COEFF_FIRST_SENSOR_A_VERSION2 + CURRENT_COEFF_FIRST_SENSOR_B_VERSION2 * input + CURRENT_COEFF_FIRST_SENSOR_C_VERSION2 * pow(input, 2) +  CURRENT_COEFF_FIRST_SENSOR_D_VERSION2 * pow(input, 3)
+        output = np.where(
+            input < 403.0,
+            CURRENT_COEFF_FIRST_SENSOR_A_VERSION2_LESSER +
+            CURRENT_COEFF_FIRST_SENSOR_B_VERSION2_LESSER * input,
+            CURRENT_COEFF_FIRST_SENSOR_A_VERSION2_GREATER +
+            CURRENT_COEFF_FIRST_SENSOR_B_VERSION2_GREATER * input +
+            CURRENT_COEFF_FIRST_SENSOR_C_VERSION2_GREATER * np.power(input, 2) +
+            CURRENT_COEFF_FIRST_SENSOR_D_VERSION2_GREATER * np.power(input, 3)
+            )
+        
     return output   
 
 
@@ -507,7 +543,16 @@ def calibration_input_coil_2(input):
     if ELECTRONICS_FLAG == 1:
         output = CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 + CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 * input + CURRENT_COEFF_SECOND_SENSOR_C_VERSION1 * pow(input, 2) + CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 * pow(input, 3)
     elif ELECTRONICS_FLAG == 2:
-        output = CURRENT_COEFF_SECOND_SENSOR_A_VERSION2 + CURRENT_COEFF_SECOND_SENSOR_B_VERSION2 * input + CURRENT_COEFF_SECOND_SENSOR_C_VERSION2 * pow(input, 2) +  CURRENT_COEFF_SECOND_SENSOR_D_VERSION2 * pow(input, 3)
+        output = np.where(
+                input < - 403.0,
+                CURRENT_COEFF_SECOND_SENSOR_A_VERSION2_LESSER +
+                CURRENT_COEFF_SECOND_SENSOR_B_VERSION2_LESSER * input +
+                CURRENT_COEFF_SECOND_SENSOR_C_VERSION2_LESSER * np.power(input, 2) +
+                CURRENT_COEFF_SECOND_SENSOR_C_VERSION2_LESSER * np.power(input, 3) ,
+                CURRENT_COEFF_SECOND_SENSOR_A_VERSION2_GREATER +
+                CURRENT_COEFF_SECOND_SENSOR_B_VERSION2_GREATER * input
+            )
+            
     return output   
 
 

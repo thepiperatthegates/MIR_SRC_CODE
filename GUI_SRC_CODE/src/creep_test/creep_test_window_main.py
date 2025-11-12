@@ -25,6 +25,8 @@ from .analyse_window_creep_test import AnalyseWindow
 data_mutex = QMutex()
 
 
+
+#function receiving data through pipe from another thread
 class DataUpdate(QThread):
     """
     Thread class responsible for receiving, processing, and managing ADC data streams for Hall sensors and current sensors in real-time.
@@ -68,8 +70,10 @@ class DataUpdate(QThread):
         Object responsible for storing processed arrays for visualization.
     """
 
-    def __init__(self):
+
+    def __init__(self, main_window_ref = None):
         super().__init__()
+        self.main_window_ref = main_window_ref
         self.running = True
         self.flag_calibrate = False
 
@@ -102,13 +106,11 @@ class DataUpdate(QThread):
         self.angle_permanent_magnet_val = np.array([], dtype=np.float32)
         self.angle_magnetic_field_val = np.array([], dtype=np.float32)
         self.phase_difference_val = np.array([], dtype=np.float32)
-        
 
         self.worker_array_setter = packet_transmission.StoreArrayGraph()
         self.worker_kb_property = packet_transmission.kbCoefficient()
         self.worker_kb_property.k_b_1 = self.k_b_1
-        self.worker_kb_property.k_b_1 = self.k_b_2
-        
+        self.worker_kb_property.k_b_2 = self.k_b_2
 
 
     def run(self):
@@ -135,7 +137,6 @@ class DataUpdate(QThread):
         - Data from the queue (`q_to_graph`) must have a multiple of 4 samples, 
           corresponding to [v1, v2, i1, i2].
         """
-        
         num_columns=4
 
         data_from_pipe = [] #creating a list here because data from pipe is a list
@@ -233,7 +234,7 @@ class DataUpdate(QThread):
         self.accumulate_current_1 = np.append(self.total_current_1, store_array3_calibrate)
         self.accumulate_current_2 = np.append(self.total_current_2, store_array4_calibrate)
         
-        self.main_window.set_constant(self.accumulate_hall_1,  
+        self.main_window_ref.set_constant(self.accumulate_hall_1,  
                                     self.accumulate_hall_2,
                                     self.accumulate_current_1,
                                     self.accumulate_current_2)
@@ -244,7 +245,7 @@ class DataUpdate(QThread):
         self.accumulate_current_1 = np.append(self.total_current_1, store_array3_calibrate)
         self.accumulate_current_2 = np.append(self.total_current_2, store_array4_calibrate)
         
-        self.main_window.set_constant(self.accumulate_hall_1,  
+        self.main_window_ref.set_constant(self.accumulate_hall_1,  
                                     self.accumulate_hall_2,
                                     self.accumulate_current_1,
                                     self.accumulate_current_2)
@@ -262,7 +263,7 @@ class DataUpdate(QThread):
 
     def stop(self):
         self.running = False
-        
+
         
 class SleepTimer(QObject):
     update_time_signal = pyqtSignal(float)  # emit float countdown values
@@ -389,7 +390,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         ############################Start backend serial lines##################################################
         
         self.worker_socket = SocketThread()
-        self.worker_DataUpdate = DataUpdate()
+        self.worker_DataUpdate = DataUpdate(self)
 
         self.worker_socket.start()
         self.worker_DataUpdate.start()

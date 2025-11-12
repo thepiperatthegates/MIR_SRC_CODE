@@ -74,8 +74,9 @@ class DataUpdate(QThread):
     """
 
 
-    def __init__(self):
+    def __init__(self, main_window_ref = None):
         super().__init__()
+        self.main_window_ref = main_window_ref
         self.running = True
         self.flag_calibrate = False
 
@@ -94,9 +95,6 @@ class DataUpdate(QThread):
         self.total_current_1 = None
         self.total_current_2 = None
         
-        self.k_b_1 = 0.0
-        self.k_b_2 = 0.0
-        
         
         self.v1_slice   = np.array([], dtype=np.uint16)
         self.v2_slice   = np.array([], dtype=np.uint16)
@@ -111,8 +109,7 @@ class DataUpdate(QThread):
 
         self.worker_array_setter = packet_transmission.StoreArrayGraph()
         self.worker_kb_property = packet_transmission.kbCoefficient()
-        self.worker_kb_property.k_b_1 = self.k_b_1
-        self.worker_kb_property.k_b_1 = self.k_b_2
+
 
 
     def run(self):
@@ -187,8 +184,8 @@ class DataUpdate(QThread):
                     self.calculate_fR(self.v1_slice, self.v2_slice, self.i1_slice, self.i2_slice)
             
                 #Calibrated hall sensors
-                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.k_b_1, self.v1_slice, self.i1_slice/1000)  
-                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.k_b_1, self.v2_slice, self.i2_slice/1000)
+                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1, self.v1_slice, self.i1_slice/1000)  
+                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2, self.v2_slice, self.i2_slice/1000)
                 
                 
                 #this is normalising step (still do not know whether i want to do it immidiately or not)
@@ -236,7 +233,7 @@ class DataUpdate(QThread):
         self.accumulate_current_1 = np.append(self.total_current_1, store_array3_calibrate)
         self.accumulate_current_2 = np.append(self.total_current_2, store_array4_calibrate)
         
-        self.main_window.set_constant(self.accumulate_hall_1,  
+        self.main_window_ref.set_constant(self.accumulate_hall_1,  
                                     self.accumulate_hall_2,
                                     self.accumulate_current_1,
                                     self.accumulate_current_2)
@@ -247,7 +244,7 @@ class DataUpdate(QThread):
         self.accumulate_current_1 = np.append(self.total_current_1, store_array3_calibrate)
         self.accumulate_current_2 = np.append(self.total_current_2, store_array4_calibrate)
         
-        self.main_window.set_constant(self.accumulate_hall_1,  
+        self.main_window_ref.set_constant(self.accumulate_hall_1,  
                                     self.accumulate_hall_2,
                                     self.accumulate_current_1,
                                     self.accumulate_current_2)
@@ -518,7 +515,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #Start backend serial lines
         
         self.worker_socket = SocketThread()
-        self.worker_DataUpdate = DataUpdate()
+        self.worker_DataUpdate = DataUpdate(self)
         
         self.worker_socket.start()
         self.worker_DataUpdate.start()
@@ -839,7 +836,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         data_10 = 1
         
         ############################# send data to setter getter ############################################################################
-        self.worker_data_block.data_1 = str(1) #seconds
+        self.worker_data_block.data_1 = float(1.0) #seconds
         self.worker_data_block.data_2_for_MCU  = str(3) # Hz
         
         self.worker_data_block.data_current = str(input_current), str(0), str(input_current), str(0)
@@ -1288,8 +1285,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         if arg == 1:
             msg.setText("Successful")
         elif arg == 2:
-            msg.setText(f"k b 1 = {packet_transmission.k_b_1}\n"
-                f"k_b_2 = {packet_transmission.k_b_2}")
+            msg.setText(f"k b 1 = {self.worker_k_b_property.k_b_1}\n"
+                f"k_b_2 = {self.worker_k_b_property.k_b_2}")
         elif arg == 3:
             msg.setText(f"Friction coefficient measurement is starting innit")
         elif arg == 4:
