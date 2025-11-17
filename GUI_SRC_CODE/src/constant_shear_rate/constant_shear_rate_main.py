@@ -302,10 +302,10 @@ class SleepTimer(QObject):
     """
     update_time_signal = pyqtSignal(float)  # emit float countdown values
 
-    def __init__(self, time_tick = 0.0):
+    def __init__(self):
         super().__init__()
-        self.remaining = time_tick # get local_data_1 from global
-        
+        self.worker_remaining = packet_transmission.TxData()
+        self.remaining = self.worker_remaining.data_1 # get local_data_1 from global
         self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
         self.worker_reset_current_time = packet_transmission.DownSampleSpecificFlag()
         self.timer = QTimer(self)
@@ -798,7 +798,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             
             #start the process at the initialisation
             #FOR NOW, LETS NOT DO ACQUISTION WINDOW
-            self.worker_sleep = SleepTimer(float(self.worker_data_block.data_1))
+            self.worker_sleep = SleepTimer()
             self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
             self.worker_sleep.start()
         
@@ -875,7 +875,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
 
     def after_stabilise_calibration(self, count_recursion):
-        self.worker_sleep = SleepTimer(self.worker_data_block.data_1)
+        self.worker_sleep = SleepTimer()
         self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_calibrating(value, count_recursion))
         self.worker_sleep.start()
         
@@ -1037,7 +1037,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         
     def after_stabilise_fR_measurement(self, count_recursion, running_frequency, input_current, data_4, data_6):
-        self.worker_sleep = SleepTimer(self.worker_data_block.data_1)
+        self.worker_sleep = SleepTimer()
         self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_fR_measurement( value, count_recursion, running_frequency, input_current, data_4, data_6))
         self.worker_sleep.start()
         

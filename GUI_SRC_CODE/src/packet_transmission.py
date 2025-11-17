@@ -239,6 +239,38 @@ class TxFlag():
     def flag_tx(self, val):
         self.__class__._flag_tx = bool(val)
 
+class RemainingTimeForCreepTest():
+    _total_time_for_file_save  = None 
+    _input_sampling_time = None
+    _time_for_resetting_flag = _total_time_for_file_save - _input_sampling_time 
+    
+    
+    @property
+    def total_time_for_file_save(self):
+        return self.__class__._total_time_for_file_save
+    
+    @total_time_for_file_save.setter
+    def total_time_for_file_save(self, val):
+        self.__class__._total_time_for_file_save = val
+        
+        
+    @property
+    def input_sampling_time(self):
+        return self.__class__._input_sampling_time
+    
+    @total_time_for_file_save.setter
+    def input_sampling_time(self, val):
+        self.__class__._input_sampling_time = val
+        
+    @property
+    def time_for_resetting_flag(self):
+        return self.__class__._time_for_resetting_flag
+    
+    @total_time_for_file_save.setter
+    def time_for_resetting_flag(self, val):
+        self.__class__._time_for_resetting_flag = val
+    
+
 class ProcessUnpackingFlag():
     _flag_process = False
     
