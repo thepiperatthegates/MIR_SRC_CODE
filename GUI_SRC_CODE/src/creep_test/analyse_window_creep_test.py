@@ -630,8 +630,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
         #read current, 2nd and 3rd columns
         time =  self.time
-        current1 =  self.current_1 
-        current2 =  self.current_2
+        current1 =  self.current_1 - self.offset_1
+        current2 =  self.current_2 - self.offset_2
         
         self.canvas.axes.cla()  #clear canvas
         self.canvas.axes.set_title(r"Current sensors", fontsize=20)
@@ -673,7 +673,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         time = self.time
         phase_magnetic_field = self.angle_magnetic_field
-        phase_magnet = self.angle_magnet
+        phase_magnet = self.angle_magnet 
         phase_difference = self.phase_difference
         
         self.canvas.axes.cla()  #clear canvas

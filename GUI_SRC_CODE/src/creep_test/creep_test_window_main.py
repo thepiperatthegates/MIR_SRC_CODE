@@ -270,7 +270,7 @@ class SleepTimer(QObject):
 
     def __init__(self,  time_tick = 0.0, time_for_resetting_flag = 0.0):
         super().__init__()
-        self.remaining = time_tick # get local_data_1 from global
+        self.remaining = time_tick 
         self.timer = QTimer(self)
         self.timer.setInterval(100)  # 100 ms per tick
         self.timer.timeout.connect(self._tick)
@@ -298,6 +298,7 @@ class SleepTimer(QObject):
             
 
         else:
+            self.worker_flag_run_time.flag_running_time = False
             self.timer.stop()
         
             
@@ -557,14 +558,14 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             
     def graph_update_sensors(self):
         global data_mutex
-        # data_mutex.lock()
+        data_mutex.lock()
         
         self.curve_v1.setData(self.time_axis,self.worker_getter_graph.v1_slice)
         self.curve_v2.setData(self.time_axis,self.worker_getter_graph.v2_slice)
         
         self.curve_i1.setData(self.time_axis,self.worker_getter_graph.i1_slice)
         self.curve_i2.setData(self.time_axis,self.worker_getter_graph.i2_slice)
-        # data_mutex.unlock()
+        data_mutex.unlock()
     def auto_range_event(self):
         self.plot1.enableAutoRange(axis='y', enable=True)
         self.plot2.enableAutoRange(axis='y', enable=True)
@@ -749,11 +750,12 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
                 check3 = 5000 / int(self.worker_downsample_property.tot_average_specified)
         
         if check1.is_integer() and check3.is_integer():
+            self.worker_downsample_property.current_time = 0.0
             self.worker_flag_run_time.flag_running_time = True
             
             sockets_files.file_name_change_set("dummy")        #set file name from gui
             print("check is", check3)
-            self.worker_downsample_property.current_time = 0.0
+
 
 
             self.status_label.setStyleSheet("color: #7da832;")
@@ -868,7 +870,6 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             print("asdsa")
         
         else:
-            self.worker_flag_run_time.flag_running_time = False
             # self.button_start.setDisabled(True)
             # self.button_stop.setDisabled(True)
             print("aha")
