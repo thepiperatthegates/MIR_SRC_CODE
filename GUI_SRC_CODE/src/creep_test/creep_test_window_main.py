@@ -268,14 +268,18 @@ class DataUpdate(QThread):
 class SleepTimer(QObject):
     update_time_signal = pyqtSignal(float)  # emit float countdown values
 
-    def __init__(self,  time_tick = 0.0):
+    def __init__(self,  time_tick = 0.0, time_for_resetting_flag = 0.0):
         super().__init__()
         self.remaining = time_tick # get local_data_1 from global
         self.timer = QTimer(self)
         self.timer.setInterval(100)  # 100 ms per tick
         self.timer.timeout.connect(self._tick)
         
+        self.time_for_resetting_flag =  time_for_resetting_flag
+        
         self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
+        self.worker_reset_current_time = packet_transmission.DownSampleSpecificFlag()
+        
         
 
     def start(self):
@@ -285,26 +289,28 @@ class SleepTimer(QObject):
         self.timer.stop()
 
     def _tick(self):
-        self.remaining -= 0.1
-        if self.remaining >= 0.0:
+        self.remaining -= 0.1000000
+        if self.remaining >= 0.0000000:
+            
+            if abs(self.remaining - self.time_for_resetting_flag) < 0.00000000001:
+                self.worker_reset_current_time.flag_specific_downsample = False
             self.update_time_signal.emit(round(self.remaining, 1))
+            
+
         else:
             self.timer.stop()
-            self.worker_flag_run_time.flag_running_time = False
+        
             
 class SleepTimerVector(QObject):
     
     update_time_signal_vector = pyqtSignal(float)
     
-    def __init__(self, time_taken, specified_time_sampling, flag_sampling_time):
+    def __init__(self, time_taken, specified_time_sampling):
         super().__init__()
         self.remaining = time_taken
         self.specified_time_sampling = specified_time_sampling
         self.remaining_for_specific_downsampling = self.remaining  - self.specified_time_sampling
         
-        #specified the flag for specified sampling time event 
-        self.flag_specific_downsample_for_backend = packet_transmission.DownSampleSpecificFlag()
-        self.flag_specific_downsample_for_backend.flag_specific_downsample = flag_sampling_time
         
         self.timer = QTimer(self)
         self.timer.setInterval(100)
@@ -320,9 +326,7 @@ class SleepTimerVector(QObject):
         self.remaining -= 0.1
         if self.remaining >= 0.0:
             self.update_time_signal_vector.emit(round(self.remaining, 1))
-            if self.remaining == self.remaining_for_specific_downsampling and self.flag_specific_downsample_for_backend.flag_specific_downsample:
-                #only occurs during specific time 
-                self.flag_specific_downsample_for_backend.flag_specific_downsample = False
+            
         else:
             self.timer.stop()
 
@@ -553,13 +557,14 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             
     def graph_update_sensors(self):
         global data_mutex
-        data_mutex.lock()
+        # data_mutex.lock()
+        
         self.curve_v1.setData(self.time_axis,self.worker_getter_graph.v1_slice)
         self.curve_v2.setData(self.time_axis,self.worker_getter_graph.v2_slice)
         
         self.curve_i1.setData(self.time_axis,self.worker_getter_graph.i1_slice)
         self.curve_i2.setData(self.time_axis,self.worker_getter_graph.i2_slice)
-        data_mutex.unlock()
+        # data_mutex.unlock()
     def auto_range_event(self):
         self.plot1.enableAutoRange(axis='y', enable=True)
         self.plot2.enableAutoRange(axis='y', enable=True)
@@ -606,7 +611,9 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.worker_data_block.data_10 = 1 
         ######################################################################################
         
+        self.worker_data_block.data_offsets_creep = self.textbox_offset_1.text(), self.textbox_offset_2.text()
         
+
         ##send all data to microcontroller
         #activate flag
         self.worker_flag_send.flag_tx = True
@@ -629,7 +636,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         #change to frequency for MCU
         self.worker_data_block.data_2_for_MCU  = 200 #Hz
         
-        self.worker_data_block.data_current = 0, self.textbox_direction_start_x.text(), 0, self.textbox_direction_start_y.text()
+        self.worker_data_block.data_current = 0, float(self.textbox_direction_start_x.text()) + float(self.textbox_offset_1.text()), 0, float(self.textbox_direction_start_y.text()) + float(self.textbox_offset_2.text())
 
         #from combobox direction
         self.worker_data_block.data_7 = 1
@@ -649,6 +656,8 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         ##send all data to microcontroller
         #activate flag
         self.worker_flag_send.flag_tx = True
+        
+        
         
 
         self.status_label.setStyleSheet("color: #32a83a;")
@@ -682,6 +691,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         
         start_vector_time = float(self.textbox_vector_start_time.text())
         end_vector_time = float(self.textbox_vector_end_time.text())
+        input_sampling_time = float(self.textbox_input_sampling_time.text())
         
         
         standard_sampling_rate = int(self.textbox_standard_sampling_rate.text())
@@ -695,7 +705,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         #change to frequency for MCU
         self.worker_data_block.data_2_for_MCU  = 200 #Hz
         
-        self.worker_data_block.data_current = 0, self.textbox_direction_start_x.text(), 0, self.textbox_direction_start_y.text()
+        self.worker_data_block.data_current = self.worker_data_block.data_current = 0, float(self.textbox_direction_start_x.text()) + float(self.textbox_offset_1.text()), 0, float(self.textbox_direction_start_y.text()) + float(self.textbox_offset_2.text())
 
         #from combobox direction
         self.worker_data_block.data_7 = 1
@@ -711,36 +721,53 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.worker_data_block.data_10 = 1 
         ######################################################################################
         
+        ##send all data to microcontroller
+        #activate flag
+        self.worker_flag_send.flag_tx = True
+        
         ######## get the desired sampling frequency from the textbox
-        sampling_frequency = self.textbox_standard_sampling_rate.text()
-        if sampling_frequency == '' or sampling_frequency == 0:
+        sampling_frequency_standard = self.textbox_standard_sampling_rate.text()
+        if sampling_frequency_standard == '' or sampling_frequency_standard == 0:
             pass
         else:
                 
-            self.time_increment = 1.0/float(sampling_frequency)
-            self.tot_average = 10000 // int(sampling_frequency)
-            print("tot_average", self.tot_average )
+            self.worker_downsample_property.time_increment  = 1.0/float(sampling_frequency_standard)
+            self.worker_downsample_property.tot_average  = 10000 // int(sampling_frequency_standard)
             
-            check = 5000 / int(self.tot_average)
-            print("check is", check)
+            check1 = 5000 / int(self.worker_downsample_property.tot_average)
+            
+            #for specified sampling frequency 
+            input_sampling_rate = int(self.textbox_input_sampling_rate.text())
+            input_sampling_time = float(self.textbox_input_sampling_time.text())
+                        
+            if input_sampling_rate == '' or input_sampling_rate == 0:
+                pass
+            else:
+                self.worker_downsample_property.time_increment_specified = 1.0/float(input_sampling_rate)
+                self.worker_downsample_property.tot_average_specified = 10000 // int(input_sampling_rate)
+                
+                check3 = 5000 / int(self.worker_downsample_property.tot_average_specified)
         
-        if check.is_integer():
+        if check1.is_integer() and check3.is_integer():
             self.worker_flag_run_time.flag_running_time = True
             
             sockets_files.file_name_change_set("dummy")        #set file name from gui
-            self.current_time = 0.0
+            print("check is", check3)
+            self.worker_downsample_property.current_time = 0.0
 
 
             self.status_label.setStyleSheet("color: #7da832;")
             self.status_label.setText("Creep test starts.......")
             
-            
+            time_for_resetting_flag = total_time_for_file_save - input_sampling_time 
+            #start specific 
+            self.worker_downsample_property.flag_specific_downsample = True
             #start the overall timer (combined timer)
-            self.worker_sleep = SleepTimer()
+            self.worker_sleep = SleepTimer(self.worker_data_block.data_1, time_for_resetting_flag)
             self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
             self.worker_sleep.start()
             
-            self.worker_vector_sleep = SleepTimerVector(start_vector_time, 0, False)
+            self.worker_vector_sleep = SleepTimerVector(start_vector_time, 0)
             self.worker_vector_sleep.update_time_signal_vector.connect(self.update_time_counter_start_vector)
             self.worker_vector_sleep.start()
             
@@ -757,10 +784,10 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.lcdNumber_vector.display(val)
             
         if val not in (0, 0.1):
-            # self.button_start.setDisabled(True)
-            # self.button_stop.setDisabled(True)
-            print("oi")
-        
+            # self.button_start.setDisabled(False)
+            # self.button_stop.setDisabled(False)
+            pass
+            
         else:
             # self.button_start.setDisabled(True)
             # self.button_stop.setDisabled(True)
@@ -771,14 +798,15 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             input_sampling_rate = int(self.textbox_input_sampling_rate.text())
             input_sampling_time = float(self.textbox_input_sampling_time.text())
             
+            
+            
             if input_sampling_rate == '' or input_sampling_rate == 0:
                 pass
             else:
-                self.time_increment_specified = 1.0/float(input_sampling_rate)
-                self.tot_average_specified = 10000 // int(input_sampling_rate)
-                print("tot_average", self.tot_average_specified)
+                self.worker_downsample_property.time_increment_specified = 1.0/float(input_sampling_rate)
+                self.worker_downsample_property.tot_average_specified = 10000 // int(input_sampling_rate)
                 
-                check = 5000 / int(self.time_increment_specified)
+                check = 5000 / int(self.worker_downsample_property.tot_average_specified)
                 print("check is", check)
                     
             
@@ -795,7 +823,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             #change to frequency for MCU
             self.worker_data_block.data_2_for_MCU  = 200 #Hz
             
-            self.worker_data_block.data_current = 0, self.textbox_direction_end_x.text(), 0, self.textbox_direction_end_y.text()  
+            self.worker_data_block.data_current = 0, float(self.textbox_direction_end_x.text()) + float(self.textbox_offset_1.text()) , 0, float(self.textbox_direction_end_y.text()) + float(self.textbox_offset_2.text())
 
             #from combobox direction
             self.worker_data_block.data_7 = 1
@@ -815,14 +843,12 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             #activate flag
             self.worker_flag_send.flag_tx = True
             
-            #start saving the data
-            self.worker_flag_run_time.flag_running_time = True
             
             
             self.status_label.setStyleSheet("color: #7da832;")
             self.status_label.setText("Creep test end vector.......")
             
-            self.worker_vector_sleep = SleepTimerVector(end_vector_time, input_sampling_time, True)
+            self.worker_vector_sleep = SleepTimerVector(end_vector_time, input_sampling_time)
             self.worker_vector_sleep.update_time_signal_vector.connect(self.update_timer_end_vector)
             self.worker_vector_sleep.start()
             
@@ -839,12 +865,13 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         if val not in (0, 0.1):
             # self.button_start.setDisabled(True)
             # self.button_stop.setDisabled(True)
-            print("oi")
+            print("asdsa")
         
         else:
+            self.worker_flag_run_time.flag_running_time = False
             # self.button_start.setDisabled(True)
             # self.button_stop.setDisabled(True)
-            print("oi")
+            print("aha")
             
             
     def update_time_counter_acquisition(self, val):

@@ -305,11 +305,13 @@ class SleepTimer(QObject):
     def __init__(self, time_tick = 0.0):
         super().__init__()
         self.remaining = time_tick # get local_data_1 from global
+        
+        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
+        self.worker_reset_current_time = packet_transmission.DownSampleSpecificFlag()
         self.timer = QTimer(self)
         self.timer.setInterval(100)  # 100 ms per tick
         self.timer.timeout.connect(self._tick)
         
-        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
 
     def start(self):
         self.timer.start()
@@ -324,6 +326,7 @@ class SleepTimer(QObject):
         else:
             self.timer.stop()
             self.worker_flag_run_time.flag_running_time = False
+
             # packet_transmission.running_time_flag_setter(0)
 
 class SocketThread(QThread):
@@ -665,8 +668,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
     def graph_update_sensors(self):
         global data_mutex
-        data_mutex.lock()
 
+        data_mutex.lock()
 
         self.curve_v1.setData(self.time_axis,self.worker_getter_graph.v1_slice)
         self.curve_v2.setData(self.time_axis,self.worker_getter_graph.v2_slice)
@@ -675,6 +678,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.curve_i2.setData(self.time_axis,self.worker_getter_graph.i2_slice)
         
         data_mutex.unlock()
+        
     def auto_range_event(self):
         
         self.plot1.enableAutoRange(axis='y', enable=True)
@@ -774,18 +778,18 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         if sampling_frequency == '' or sampling_frequency == 0:
             pass
         else:
-            self.time_increment = 1.0/float(sampling_frequency)
-            self.tot_average = 10000 // int(sampling_frequency)
-            print("tot_average", self.tot_average)
+            self.worker_downsample_property.time_increment = 1.0/float(sampling_frequency)
+            self.worker_downsample_property.tot_average = int(10000 // int(sampling_frequency))
+
             
-            check = 5000 / int(self.tot_average)
-            print("check is", check)
+            check = 5000 / int(self.worker_downsample_property.tot_average)
+
         
         if check.is_integer():
             self.worker_flag_run_time.flag_running_time = True
             
             sockets_files.file_name_change_set("dummy")        #set file name from gui
-            self.time_increment = 0.0
+            self.worker_downsample_property.current_time = 0.0
 
             self.status_label.setStyleSheet("color: #7da832;")
             self.status_label.setText("Acquisition starts.......")
@@ -955,7 +959,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
     
     
     #initiation!!!!!
-    def start_friction_coeff_event_initiation(self, running_frequency = 1,  rotation_direction =  1, count_recursion = 0, input_current = 30):
+    def start_friction_coeff_event_initiation(self, running_frequency = 1,  rotation_direction =  1, count_recursion = 0, input_current = 40):
 
         #reset all f_R at first 
         if self.flag_fR == False:
@@ -992,16 +996,16 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         QtCore.QTimer.singleShot(
             3000,
-            lambda: self.start_friction_coeff_event(running_frequency, rotation_direction, count_recursion, input_current)
+            lambda: self.start_friction_coeff_event(input_current, running_frequency, rotation_direction, count_recursion)
         )
 
-    def start_friction_coeff_event(self, running_frequency = 1,  rotation_direction =  1, count_recursion = 0, input_current = 40):
+    def start_friction_coeff_event(self, input_current, running_frequency = 1,  rotation_direction =  1, count_recursion = 0) -> None:
         
         ############################# send data to setter getter ######################################
-        self.worker_data_block.data_1 = str(10)
+        self.worker_data_block.data_1 = float(10)
         self.worker_data_block.data_2_for_MCU  = str(running_frequency) # Hz
         
-        self.worker_data_block.data_current = str(200), self.textbox_offset1.text(), str(200), self.textbox_offset2.text()
+        self.worker_data_block.data_current = input_current, self.textbox_offset1.text(), input_current, self.textbox_offset2.text()
         self.worker_data_block.data_7 = rotation_direction
             
         if self.filter_checkbox.isChecked():
@@ -1015,7 +1019,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         ######################################################################################
         
         self.status_label.setText(
-            f"Recursion {count_recursion} with direction {self.worker_data_block.data_7} and frequency of {self.worker_data_block.data_2_for_MCU}"
+            f"Recursion {count_recursion} with direction {self.worker_data_block.data_7} and frequency of {self.worker_data_block.data_2}"
         )
         
         ##send all data to microcontroller

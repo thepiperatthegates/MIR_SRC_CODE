@@ -90,8 +90,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         self.worker_get_offset = packet_transmission.TxData()
     
-        self.offset_1 = self.worker_get_offset.data_4
-        self.offset_2 = self.worker_get_offset.data_6
+        self.offset_1, self.offset_2 = self.worker_get_offset.data_offsets_creep
         
         
         #placeholder for the offsets input
@@ -349,7 +348,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.current_1 = self.data[:, 3]
         self.current_2 = self.data[:, 4]
         
-        self.offset_1, self.offset_2 = self.worker_get_offset.data_4, self.worker_get_offset.data_6
+        self.offset_1, self.offset_2 = self.worker_get_offset.data_offsets_creep
         
         self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
         f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
@@ -631,7 +630,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
         #read current, 2nd and 3rd columns
         time =  self.time
-        current1 =  self.current_1
+        current1 =  self.current_1 
         current2 =  self.current_2
         
         self.canvas.axes.cla()  #clear canvas

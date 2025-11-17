@@ -41,7 +41,6 @@ p1 = None
 tot_count_accumulate_recv = 250
 
 
-time_increment = 0.0001
 
 
 def init_queues():
@@ -118,8 +117,9 @@ def thread_start():
     """
     ser1 = socket_start_connect()
     worker_kb_property = packet_transmission.kbCoefficient()
+    worker_specific_downsampling = packet_transmission.DownSampleSpecificFlag()
     #Event for run time receiving data from Serial Porte
-    thread_recv = threading.Thread(target=recv_thread, args=(ser1,worker_kb_property))
+    thread_recv = threading.Thread(target=recv_thread, args=(ser1,worker_kb_property, worker_specific_downsampling))
     thread_recv.start()
     
     worker_flag_send = packet_transmission.TxFlag()
@@ -135,7 +135,7 @@ def thread_start():
 
             
 
-def recv_thread(ser1, worker_kb_property):
+def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
     """
     Continuously read incoming data from a serial connection and 
     forward it for live plotting and CSV logging.
@@ -203,6 +203,8 @@ def recv_thread(ser1, worker_kb_property):
                 if not worker_process_flag.flag_process and received_data:
                     p1 = multiprocessing.Process(target=plot_live, args=(q_to_process, q_to_graph, q_to_csv ))
                     p1.start()
+                
+
                     worker_process_flag.flag_process = True
                 
                 q_to_process.put(obj=received_data) #send to subprocess to be unpacked
@@ -214,7 +216,7 @@ def recv_thread(ser1, worker_kb_property):
                     print("Inside the function:", worker_data_flag.flag_running_time)
                     
                     if data_send:
-                        save_to_csv(data_send, worker_kb_property)
+                        save_to_csv(data_send, worker_kb_property, worker_specific_downsampling)
                         data_send = None
                     print("Data written!")
             except Exception as e:
@@ -314,7 +316,7 @@ def file_name_change_set(prefix, extension=".csv"):
     file_name = f"{prefix}{extension}"
     
 
-def save_to_csv(cleaned_buffer, worker_kb_property, num_columns=4):
+def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling, num_columns=4):
     """
     Process, calibrate, average, and save measurement data to a CSV file.
 
@@ -367,7 +369,6 @@ def save_to_csv(cleaned_buffer, worker_kb_property, num_columns=4):
     """
     
     global file_name
-    global offset_1, offset_2
 
     data = np.array(cleaned_buffer)
     # Reshape the data to have 'num_columns' columns per row
@@ -376,25 +377,33 @@ def save_to_csv(cleaned_buffer, worker_kb_property, num_columns=4):
     
     reshaped_data = reshaped_data.astype(float)
     
-    col1 = reshaped_data[:, 0]                  #take first column (U1)
-    col2 = reshaped_data[:, 1]                  #take second column (U2)
-    col3 = reshaped_data[:, 2]                  #take third column (I1)
-    col4 = reshaped_data[:, 3]                  #take fourth column (I2)
+    col1 = reshaped_data[:, 0].astype(int)             #take first column (U1)
+    col2 = reshaped_data[:, 1].astype(int)                  #take second column (U2)
+    col3 = reshaped_data[:, 2].astype(int)                  #take third column (I1)
+    col4 = reshaped_data[:, 3].astype(int)                  #take fourth column (I2)
 
+    
+    
     #Hall Sensors
     col1_converted = -packet_transmission.change_adc_hall(col1)               #convert col1
     col2_converted = packet_transmission.change_adc_hall(col2)               #convert col2
+    
     
     #Current
     col3_converted = -packet_transmission.change_current_adc(col3)               #convert col1
     col4_converted = packet_transmission.change_current_adc(col4)               #convert col2
     
+    
     #Justified hall sensors
+
     col1_converted = packet_transmission.calibrated_hall_sensors1(worker_kb_property.k_b_1, col1_converted, col3_converted/1000)  
     col2_converted = packet_transmission.calibrated_hall_sensors2(worker_kb_property.k_b_2, col2_converted, col4_converted/1000)
     
+    
     col3_converted = packet_transmission.calibration_input_coil_1(col3_converted)
     col4_converted = packet_transmission.calibration_input_coil_2(col4_converted)
+    
+    
     
     #Average values to reduce amount of data saved 
     ####FOR CONSTANT SHEAR RATE 
@@ -402,42 +411,57 @@ def save_to_csv(cleaned_buffer, worker_kb_property, num_columns=4):
     
     ########################################################## init object for setter getter ##############################################################################################################
     #init the object
-    worker_specific_downsampling = packet_transmission.DownSampleSpecificFlag()
     #default tot_average
     tot_average = worker_specific_downsampling.tot_average
+    print("tot_average:", tot_average)
     #specified tot_average
     tot_average_specified = worker_specific_downsampling.tot_average_specified
+    print("tot_average_specified:", tot_average_specified)
     #default time increment 
     time_increment = worker_specific_downsampling.time_increment
+    print("time_increment:", time_increment)
     #specified downsampling time increment
     time_increment_specified = worker_specific_downsampling.time_increment_specified
+    print("time_increment_specified:", time_increment_specified)
     #current time init
     current_time = worker_specific_downsampling.current_time
+    print("current_time:", current_time)
     #####################################################################################################################################################################
     
     
+    
     #check if the need for specific downsample is needed
-    if worker_specific_downsampling.flag_specific_downsample:
-        col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted, tot_average_specified)
+    if worker_specific_downsampling.flag_specific_downsample is True:
+        try: 
+            col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted, worker_specific_downsampling.tot_average_specified)
+        except Exception as e:
+            print("Error with downsampling:", e)
     else:
-        col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted, tot_average)
-        
+        print("HERE")
+        try: 
+            col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted, worker_specific_downsampling.tot_average)
+        except Exception as e:
+            print("Error with downsampling:", e)
+
     averaged_data = np.zeros((len(col1_converted), 4))  # shape (100,4)
+
     averaged_data[:, 0] = col1_converted
     averaged_data[:, 1] = col2_converted
     averaged_data[:, 2] = col3_converted
     averaged_data[:, 3] = col4_converted
-
+    
     num_rows = averaged_data.shape[0]
     
-    if worker_specific_downsampling.flag_specific_downsample:
-        time_column = np.arange(current_time, current_time + (time_increment_specified * num_rows),  time_increment_specified).reshape(-1, 1)
-        current_time += time_increment_specified * num_rows   
+    if worker_specific_downsampling.flag_specific_downsample is True:
+        time_column = np.arange(worker_specific_downsampling.current_time, worker_specific_downsampling.current_time + (worker_specific_downsampling.time_increment_specified * num_rows),  worker_specific_downsampling.time_increment_specified).reshape(-1, 1)
+        worker_specific_downsampling.current_time  += worker_specific_downsampling.time_increment_specified* num_rows   
+        
+        print("The current ")
 
         final_data = np.hstack((time_column, averaged_data))
     else:
-        time_column = np.arange(current_time, current_time + (time_increment * num_rows), time_increment).reshape(-1, 1)
-        current_time += time_increment * num_rows   
+        time_column = np.arange(worker_specific_downsampling.current_time, worker_specific_downsampling.current_time + (worker_specific_downsampling.time_increment * num_rows), worker_specific_downsampling.time_increment).reshape(-1, 1)
+        worker_specific_downsampling.current_time += worker_specific_downsampling.time_increment * num_rows   
 
         final_data = np.hstack((time_column, averaged_data))
         
@@ -497,7 +521,9 @@ def average_values (col, N):
            [5.5]])
     """
 
+    print("col:", col)
     average_val = col.reshape(-1, N).mean(axis=1).reshape(-1, 1)
+    print("Average: ", average_val)
     return average_val
 
 

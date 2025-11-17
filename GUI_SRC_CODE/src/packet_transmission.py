@@ -48,11 +48,11 @@ MIN_V_AFTER_HALL = 0.0
 
 
 #default friction coefficient 
-CALIBRATION_FACTOR = 0.773              # torque calibration no units (K)
+# CALIBRATION_FACTOR = 0.773            # torque calibration no units (K)
+CALIBRATION_FACTOR = 0.875             # torque calibration no units (K)
 
 
-fr1 = 1.51e-8 # in Nm / (rad /s)
-fr0 = 5.701e-8 # in Nm / (rad /s)
+
 
 #default coefficients
 
@@ -84,28 +84,13 @@ CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 = -3.98871e-8
 
 ########################################################### SECOND COIL ###########################################################
 # #second sensor coefficient version 2 (<403 mA)
-CURRENT_COEFF_FIRST_SENSOR_A_VERSION2_LESSER = 3.14911
-CURRENT_COEFF_FIRST_SENSOR_B_VERSION2_LESSER = 0.99076
-
-
+CURRENT_COEFF_FIRST_SENSOR_A_VERSION2 = 1.2231
+CURRENT_COEFF_FIRST_SENSOR_B_VERSION2 = 0.97724
 
 #second sensor coefficient version 2 (>403 mA)
-CURRENT_COEFF_FIRST_SENSOR_A_VERSION2_GREATER = -2688.1912
-CURRENT_COEFF_FIRST_SENSOR_B_VERSION2_GREATER  = 20.1242
-CURRENT_COEFF_FIRST_SENSOR_C_VERSION2_GREATER = -0.04492
-CURRENT_COEFF_FIRST_SENSOR_D_VERSION2_GREATER  =   3.47814E-5
+CURRENT_COEFF_SECOND_SENSOR_A_VERSION2 = -3.5721
+CURRENT_COEFF_SECOND_SENSOR_B_VERSION2  = 0.97735
 
-
-
-#second sensor coefficient version 2 (<403 mA)
-CURRENT_COEFF_SECOND_SENSOR_A_VERSION2_LESSER = 308.36119
-CURRENT_COEFF_SECOND_SENSOR_B_VERSION2_LESSER = 4.10434
-CURRENT_COEFF_SECOND_SENSOR_C_VERSION2_LESSER = 0.00906
-CURRENT_COEFF_SECOND_SENSOR_D_VERSION2_LESSER = 8.11939e-6
-
-#second sensor coefficient version 2 (>403 mA)
-CURRENT_COEFF_SECOND_SENSOR_A_VERSION2_GREATER = -5.95902
-CURRENT_COEFF_SECOND_SENSOR_B_VERSION2_GREATER  = 0.98839
 ######################################################################################################################
 
 
@@ -113,7 +98,7 @@ CURRENT_COEFF_SECOND_SENSOR_B_VERSION2_GREATER  = 0.98839
 
 class TxData():
 
-    _data_1 = _data_2 = _data_3 = _data_4 = _data_5 = _data_6 = _data_7 = _data_8 = _data_9 = _data_10 = 0
+    _data_1 = _data_2 = _data_3 = _data_4 = _data_5 = _data_6 = _data_7 = _data_8 = _data_9 = _data_10 = _data_offset_creep_1 = _data_offset_creep_2 = 0
     
     @property
     def send_data(self):
@@ -135,7 +120,7 @@ class TxData():
     
     @property
     def data_2(self):
-        return self.__class_._data_2
+        return self.__class__._data_2
     
     @data_2.setter
     def data_2(self, val):
@@ -145,7 +130,7 @@ class TxData():
         
     @property
     def data_2_for_MCU(self):
-        return self.__class_._data_2
+        return self.__class__._data_2
     
     @data_2_for_MCU.setter
     def data_2_for_MCU(self, val):
@@ -206,6 +191,17 @@ class TxData():
     @data_10.setter
     def data_10(self, val):
         self.__class__._data_10 = val
+        
+        
+    @property 
+    def data_offsets_creep(self):
+        return self.__class__._data_offset_creep_1, self.__class__._data_offset_creep_2
+    
+
+    @data_offsets_creep.setter
+    def data_offsets_creep(self, val):
+        self.__class__._data_offset_creep_1, self.__class__._data_offset_creep_2 =  val
+    
         
     
     def combine_data(self):
@@ -279,7 +275,7 @@ class DownSampleSpecificFlag():
     
     _time_increment_specified = 0.0001
     
-    _current_time = None
+    _current_time = 0.0
     
     @property
     def flag_specific_downsample(self):
@@ -398,11 +394,21 @@ class StoreArrayGraph():
         self.__class__._phase_difference_val = val
         
         
+        
+        
+        
 class fRCoefficients():
     
     #default fr coefficient
-    _fr1 = 1.51e-8 # in Nm / (rad /s)
-    _fr0 = 5.701e-8 # in Nm / (rad /s)
+    # _fr1 = 1.51e-8 # in Nm / (rad /s)
+    # _fr0 = 5.701e-8 # in Nm / (rad /s)
+    
+    _fr1 = 0 # in Nm / (rad /s)
+    _fr0 = 0 # in Nm / (rad /s)
+  
+    # 3.025e-08 x + 6.131e-07
+    #1.359e-08 x - 2.577e-07
+    
     
     @property 
     def fr1(self):
@@ -488,7 +494,7 @@ def change_current_adc(digital_current_values):
 def gradient_calculate(y_intercept, y_axis, x_axis):
      
     gradient =  (y_axis - y_intercept)/x_axis
-    return float(gradient)
+    return gradient
 
 def calibrated_hall_sensors1(k_b_1, hall_voltage, actual_current):
     
@@ -523,15 +529,7 @@ def calibration_input_coil_1(input):
     if ELECTRONICS_FLAG == 1:
         output = CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 + CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 * input + CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 * pow(input, 2) +  CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 * pow(input, 3)
     elif ELECTRONICS_FLAG == 2:
-        output = np.where(
-            input < 403.0,
-            CURRENT_COEFF_FIRST_SENSOR_A_VERSION2_LESSER +
-            CURRENT_COEFF_FIRST_SENSOR_B_VERSION2_LESSER * input,
-            CURRENT_COEFF_FIRST_SENSOR_A_VERSION2_GREATER +
-            CURRENT_COEFF_FIRST_SENSOR_B_VERSION2_GREATER * input +
-            CURRENT_COEFF_FIRST_SENSOR_C_VERSION2_GREATER * np.power(input, 2) +
-            CURRENT_COEFF_FIRST_SENSOR_D_VERSION2_GREATER * np.power(input, 3)
-            )
+        output = CURRENT_COEFF_FIRST_SENSOR_A_VERSION2 + CURRENT_COEFF_FIRST_SENSOR_B_VERSION2 * input
         
     return output   
 
@@ -543,15 +541,7 @@ def calibration_input_coil_2(input):
     if ELECTRONICS_FLAG == 1:
         output = CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 + CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 * input + CURRENT_COEFF_SECOND_SENSOR_C_VERSION1 * pow(input, 2) + CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 * pow(input, 3)
     elif ELECTRONICS_FLAG == 2:
-        output = np.where(
-                input < - 403.0,
-                CURRENT_COEFF_SECOND_SENSOR_A_VERSION2_LESSER +
-                CURRENT_COEFF_SECOND_SENSOR_B_VERSION2_LESSER * input +
-                CURRENT_COEFF_SECOND_SENSOR_C_VERSION2_LESSER * np.power(input, 2) +
-                CURRENT_COEFF_SECOND_SENSOR_C_VERSION2_LESSER * np.power(input, 3) ,
-                CURRENT_COEFF_SECOND_SENSOR_A_VERSION2_GREATER +
-                CURRENT_COEFF_SECOND_SENSOR_B_VERSION2_GREATER * input
-            )
+        output = CURRENT_COEFF_SECOND_SENSOR_A_VERSION2 + CURRENT_COEFF_SECOND_SENSOR_B_VERSION2 * input 
             
     return output   
 
