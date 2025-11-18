@@ -787,10 +787,10 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         
         if check.is_integer():
+            self.worker_downsample_property.current_time = 0.0
             self.worker_flag_run_time.flag_running_time = True
             
             sockets_files.file_name_change_set("dummy")        #set file name from gui
-            self.worker_downsample_property.current_time = 0.0
 
             self.status_label.setStyleSheet("color: #7da832;")
             self.status_label.setText("Acquisition starts.......")

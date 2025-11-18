@@ -240,9 +240,14 @@ class TxFlag():
         self.__class__._flag_tx = bool(val)
 
 class RemainingTimeForCreepTest():
-    _total_time_for_file_save  = None 
-    _input_sampling_time = None
-    _time_for_resetting_flag = None
+    _total_time_for_file_save  = 0.0 
+    _input_sampling_time = 0.0
+    _ime_for_resetting_time = 0.0
+    
+    
+    _start_vector_time = 0.0
+    _end_vector_time = 0.0
+     
     
     
     @property
@@ -263,9 +268,32 @@ class RemainingTimeForCreepTest():
         self.__class__._input_sampling_time = val
         
     @property
-    def time_for_resetting_flag(self):
-        self.__class__._time_for_resetting_flag = self.__class__._total_time_for_file_save - self.__class__._input_sampling_time
-        return self.__class__._time_for_resetting_flag
+    def time_for_resetting_time(self):
+        self.__class__._time_for_resetting_time = self.__class__._total_time_for_file_save - self.__class__._input_sampling_time
+        return self.__class__._time_for_resetting_time
+    
+    @input_sampling_time.setter
+    def time_for_resetting_time(self, val):
+        self.__class__._time_for_resetting_time = val
+    
+    
+    @property
+    def start_vector_time(self):
+        return self.__class__._start_vector_time
+    
+    @start_vector_time.setter
+    def start_vector_time(self, val):
+        self.__class__._start_vector_time = val
+        
+        
+    @property
+    def end_vector_time(self):
+        return self.__class__._end_vector_time
+    
+    @end_vector_time.setter
+    def end_vector_time(self, val):
+        self.__class__._end_vector_time = val
+        
     
 
     

@@ -464,7 +464,6 @@ def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling
         time_column = np.arange(worker_specific_downsampling.current_time, worker_specific_downsampling.current_time + (worker_specific_downsampling.time_increment_specified * num_rows),  worker_specific_downsampling.time_increment_specified).reshape(-1, 1)
         worker_specific_downsampling.current_time  += worker_specific_downsampling.time_increment_specified* num_rows   
         
-
         final_data = np.hstack((time_column, averaged_data))
     else:
         print("AAAAAAA")

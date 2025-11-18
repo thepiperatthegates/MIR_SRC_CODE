@@ -151,11 +151,11 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
         if mode == "Control shear rate":
             
             self.csr_window = TabWindowConstSR()    
-            self.csr_window.showMaximized()
+            self.csr_window.showNormal()
             
         elif mode == "Creep experiment":
             self.ct_window = TabWindowCreepTest()
-            self.ct_window.showMaximized()
+            self.ct_window.showNormal()
             
             
         self.close()
