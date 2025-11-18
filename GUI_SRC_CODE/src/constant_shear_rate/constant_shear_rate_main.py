@@ -189,7 +189,7 @@ class DataUpdate(QThread):
                 
                 
                 #this is normalising step (still do not know whether i want to do it immidiately or not)
-                if self.flag_normalise == True:
+                if self.flag_normalise:
                     amplitude_voltage_1 = (np.max(a=self.v1_slice) - np.min(self.v1_slice)) / 2
                     zero_offset_voltage_1 = (np.max(self.v1_slice) + np.min(self.v1_slice)) / 2
 
@@ -305,7 +305,7 @@ class SleepTimer(QObject):
     def __init__(self):
         super().__init__()
         self.worker_remaining = packet_transmission.TxData()
-        self.remaining = self.worker_remaining.data_1 # get local_data_1 from global
+        self.remaining = float(self.worker_remaining.data_1) # get local_data_1 from global
         self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
         self.worker_reset_current_time = packet_transmission.DownSampleSpecificFlag()
         self.timer = QTimer(self)
@@ -669,7 +669,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
     def graph_update_sensors(self):
         global data_mutex
 
-        data_mutex.lock()
+        # data_mutex.lock()
 
         self.curve_v1.setData(self.time_axis,self.worker_getter_graph.v1_slice)
         self.curve_v2.setData(self.time_axis,self.worker_getter_graph.v2_slice)
@@ -677,7 +677,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.curve_i1.setData(self.time_axis,self.worker_getter_graph.i1_slice)
         self.curve_i2.setData(self.time_axis,self.worker_getter_graph.i2_slice)
         
-        data_mutex.unlock()
+        # data_mutex.unlock()
+        #
         
     def auto_range_event(self):
         

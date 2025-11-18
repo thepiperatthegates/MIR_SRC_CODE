@@ -369,6 +369,7 @@ def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling
     global file_name
 
     data = np.array(cleaned_buffer)
+    print(len(data))
     # Reshape the data to have 'num_columns' columns per row
     reshaped_data = np.array(data).reshape(-1, num_columns)
     
@@ -441,8 +442,8 @@ def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling
     #     except Exception as e:
     #         print("Error with downsampling:", e)
     
-    col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted, worker_specific_downsampling.tot_average)
-
+    # col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted, worker_specific_downsampling.tot_average)
+    #
 
     averaged_data = np.zeros((len(col1_converted), 4))  # shape (100,4)
 

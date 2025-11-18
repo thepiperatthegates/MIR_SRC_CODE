@@ -190,7 +190,7 @@ class DataUpdate(QThread):
                 
                 
                 #this is normalising step (still do not know whether i want to do it immidiately or not)
-                if self.flag_normalise == True:
+                if self.flag_normalise:
                     amplitude_voltage_1 = (np.max(a=self.v1_slice) - np.min(self.v1_slice)) / 2
                     zero_offset_voltage_1 = (np.max(self.v1_slice) + np.min(self.v1_slice)) / 2
 
@@ -270,8 +270,9 @@ class SleepTimer(QObject):
 
     def __init__(self):
         super().__init__()
+
         self.worker_remaining = packet_transmission.TxData()
-        self.remaining = self.worker_remaining.data_1
+        self.remaining = float(self.worker_remaining.data_1)
         self.timer = QTimer(self)
         self.timer.setInterval(100)  # 100 ms per tick
         self.timer.timeout.connect(self._tick)
