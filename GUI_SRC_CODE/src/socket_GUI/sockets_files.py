@@ -32,6 +32,8 @@ current_time = None
 status_connection = None
 file_name = ' '
 
+
+count_time = 0
 flag_for_process = None
 flag_for_downsampling = None
 
@@ -366,7 +368,11 @@ def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling
         If file writing fails, the error is printed to the console.
     """
     
-    global file_name
+    global file_name, count_time
+    
+    count_time = count_time +1
+    
+    print("How many times has this function been called? :", count_time)
 
     data = np.array(cleaned_buffer)
     print(len(data))
@@ -429,21 +435,21 @@ def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling
     
     
     
-    # #check if the need for specific downsample is needed
-    # if worker_specific_downsampling.flag_specific_downsample is True:
-    #     try: 
-    #         col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted, worker_specific_downsampling.tot_average_specified)
-    #     except Exception as e:
-    #         print("Error with downsampling:", e)
-    # elif worker_specific_downsampling.flag_specific_downsample is False:
-    #     print("HERE")
-    #     try: 
-    #         col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted, worker_specific_downsampling.tot_average)
-    #     except Exception as e:
-    #         print("Error with downsampling:", e)
+    #check if the need for specific downsample is needed
+    if worker_specific_downsampling.flag_specific_downsample:
+        try: 
+            col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted, worker_specific_downsampling.tot_average_specified)
+        except Exception as e:
+            print("Error with downsampling:", e)
+    elif worker_specific_downsampling.flag_specific_downsample is False:
+        print("HERE")
+        try: 
+            col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted, worker_specific_downsampling.tot_average)
+        except Exception as e:
+            print("Error with downsampling:", e)
     
-    # col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted, worker_specific_downsampling.tot_average)
-    #
+    col1_converted, col2_converted, col3_converted, col4_converted = downsampling_values(col1_converted, col2_converted, col3_converted, col4_converted, worker_specific_downsampling.tot_average)
+    
 
     averaged_data = np.zeros((len(col1_converted), 4))  # shape (100,4)
 
@@ -454,19 +460,19 @@ def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling
     
     num_rows = averaged_data.shape[0]
     
-    # if worker_specific_downsampling.flag_specific_downsample is True:
-    #     time_column = np.arange(worker_specific_downsampling.current_time, worker_specific_downsampling.current_time + (worker_specific_downsampling.time_increment_specified * num_rows),  worker_specific_downsampling.time_increment_specified).reshape(-1, 1)
-    #     worker_specific_downsampling.current_time  += worker_specific_downsampling.time_increment_specified* num_rows   
+    if worker_specific_downsampling.flag_specific_downsample:
+        time_column = np.arange(worker_specific_downsampling.current_time, worker_specific_downsampling.current_time + (worker_specific_downsampling.time_increment_specified * num_rows),  worker_specific_downsampling.time_increment_specified).reshape(-1, 1)
+        worker_specific_downsampling.current_time  += worker_specific_downsampling.time_increment_specified* num_rows   
         
-    #     print("The current ")
 
-    #     final_data = np.hstack((time_column, averaged_data))
-    # else:
-    time_column = np.arange(worker_specific_downsampling.current_time, worker_specific_downsampling.current_time + (worker_specific_downsampling.time_increment * num_rows), worker_specific_downsampling.time_increment).reshape(-1, 1)
-    worker_specific_downsampling.current_time += worker_specific_downsampling.time_increment * num_rows   
+        final_data = np.hstack((time_column, averaged_data))
+    else:
+        print("AAAAAAA")
+        time_column = np.arange(worker_specific_downsampling.current_time, worker_specific_downsampling.current_time + (worker_specific_downsampling.time_increment * num_rows), worker_specific_downsampling.time_increment).reshape(-1, 1)
+        worker_specific_downsampling.current_time += worker_specific_downsampling.time_increment * num_rows   
 
-    final_data = np.hstack((time_column, averaged_data))
-        
+        final_data = np.hstack((time_column, averaged_data))
+            
 
     #always save the data to file dir
     project_root =  os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -523,9 +529,7 @@ def average_values (col, N):
            [5.5]])
     """
 
-    print("col:", col)
     average_val = col.reshape(-1, N).mean(axis=1).reshape(-1, 1)
-    print("Average: ", average_val)
     return average_val
 
 
