@@ -367,7 +367,10 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.textbox_input_sampling_rate.setPlaceholderText("Specify the fast sampling rate!")
         self.textbox_input_sampling_time.setPlaceholderText("Counting from 0s")
         
-        self.textbox_standard_sampling_rate.setText("10000")
+        self.textbox_standard_sampling_rate.setText("100")
+        self.textbox_input_sampling_rate.setText("500")
+        self.textbox_offset_1.setText("0")
+        self.textbox_offset_2.setText("0")
         ################################################################################################
 
         ################################ SET ICON ###################################################
@@ -714,7 +717,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         #change to frequency for MCU
         self.worker_data_block.data_2_for_MCU  = 200 #Hz
         
-        self.worker_data_block.data_current = self.worker_data_block.data_current = 0, float(self.textbox_direction_start_x.text()) + float(self.textbox_offset_1.text()), 0, float(self.textbox_direction_start_y.text()) + float(self.textbox_offset_2.text())
+        self.worker_data_block.data_current = 0, float(self.textbox_direction_start_x.text()) + float(self.textbox_offset_1.text()), 0, float(self.textbox_direction_start_y.text()) + float(self.textbox_offset_2.text())
 
         #from combobox direction
         self.worker_data_block.data_7 = 1
@@ -871,10 +874,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             self.worker_vector_sleep = SleepTimerVector(self.end_vector_time)
             self.worker_vector_sleep.update_time_signal_vector.connect(self.update_timer_end_vector)
             self.worker_vector_sleep.start()
-            
 
-            
-            
             
     def update_timer_end_vector(self, val):            
         """

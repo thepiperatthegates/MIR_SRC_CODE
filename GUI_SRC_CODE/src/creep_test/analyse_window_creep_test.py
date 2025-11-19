@@ -1,8 +1,6 @@
 import numpy as np
 from PyQt5 import QtGui
-from PyQt5 import *
 from PyQt5.QtCore import QFileInfo
-from PyQt5 import uic
 from PyQt5.QtWidgets import *
 
 
@@ -170,10 +168,10 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.textbox_offset2.editingFinished.connect(self.save_offset2_event)
         
     def save_offset1_event(self):
-        self.offset_1 = self.textbox_offset1.text()
+        self.offset_1 = float(self.textbox_offset1.text())
         
     def save_offset2_event(self):
-        self.offset_2 = self.textbox_offset2.text()
+        self.offset_2 = float(self.textbox_offset2.text())
 
     def find_filename_button_pressed(self):
         self.analyse_filename = QFileDialog.getOpenFileName(filter="csv (*.csv)")[0]
@@ -586,16 +584,16 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         
     def calculate_shear_stress(self):
-        
-        self.total_torque = (self.CALIBRATION_FACTOR*            # dimensionslos 
-        self.DIPOLE_MOMENT                    # [A·m²]
-        * self.COIL_CONSTANT                    # [T/A]
-        * self.magnitude_current / 1000         # mA -> A, [A]
-        * np.sin(self.phase_difference[:, 0]))   # dimensionless
-        - self.friction_moment              # [Nm]
-        
-        
-        
+
+        self.total_torque = (
+                self.CALIBRATION_FACTOR  # dimensionless
+                * self.DIPOLE_MOMENT  # [A·m²]
+                * self.COIL_CONSTANT  # [T/A]
+                * (self.magnitude_current / 1000)  # mA → A
+                * np.sin(self.phase_difference[:, 0])  # dimensionless
+                - self.friction_moment  # [Nm]
+        )
+
         self.shear_stress =  self.total_torque * self.C_SS	# [Pa]
 
     def calculate_viscosity(self):
@@ -630,8 +628,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
         #read current, 2nd and 3rd columns
         time =  self.time
-        current1 =  self.current_1 - self.offset_1
-        current2 =  self.current_2 - self.offset_2
+        current1 =  self.current_1 - float(self.offset_1)
+        current2 =  self.current_2 - float(self.offset_2)
         
         self.canvas.axes.cla()  #clear canvas
         self.canvas.axes.set_title(r"Current sensors", fontsize=20)
