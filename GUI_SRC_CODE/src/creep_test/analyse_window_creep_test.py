@@ -350,9 +350,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
         f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
-        
-        #call normalise function 
-        self.normalise_voltage_event()
+
         self.calculate_angle()
         self.calculate_magnitude_current()
         # calculate rotation velocity
@@ -466,35 +464,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         print("Offset 2 from csv:", self.offset_2)
         print("fr0 from csv:", self.fr0)
         print("fr1 from csv:", self.fr1)
-    
-            
-        
-        
-    
-    def normalise_voltage_event(self):
-        """
-        Normalize Hall sensor voltage data.
 
-        This method reads the Hall voltage data from `self.data` (columns 1 and 2),
-        calculates the amplitude and zero offset, and then normalizes the voltage
-        so that it is centered around 0 and scaled by its amplitude.
-
-        After normalization, the voltage data in `self.data[:, 1]` and
-        `self.data[:, 2]` will be in the range [-1, 1].
-
-        :return: None
-        """
-        # #read column 2 and column 3 for the hall voltage
-        amplitude_voltage_1 = (np.max(self.data[:, 1]) - np.min(self.data[:, 1]))/2.0
-        zero_offset_voltage_1 = (np.max(self.data[:, 1]) + np.min(self.data[:, 1]))/2.0
-
-        amplitude_voltage_2 = (np.max(self.data[:, 2]) - np.min(self.data[:, 2]))/2.0
-        zero_offset_voltage_2 = (np.max(self.data[:, 2]) + np.min(self.data[:, 2]))/2.0
-
-        self.data[:, 1] = (self.data[:, 1]- zero_offset_voltage_1 )/amplitude_voltage_1
-        self.data[:, 2] = (self.data[:, 2]-  zero_offset_voltage_2 )/amplitude_voltage_2
-
-    
     def save_button_event(self):
         
        
@@ -564,7 +534,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         """
         self.angular_velocity = savgol_filter(
             self.angle_magnet[:, 0],      # your noisy angle signal
-            window_length=400,            # try 51, 101, etc. depending on how smooth you want
+            window_length=100,            # try 51, 101, etc. depending on how smooth you want
             polyorder=3,                  # 2 or 3 works well
             deriv=1,                      # first derivative
             delta=np.mean(np.diff(self.time))  # time step

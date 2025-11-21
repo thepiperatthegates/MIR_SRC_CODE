@@ -400,7 +400,6 @@ def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling
     
     
     #Justified hall sensors
-
     col1_converted = packet_transmission.calibrated_hall_sensors1(worker_kb_property.k_b_1, col1_converted, col3_converted/1000)  
     col2_converted = packet_transmission.calibrated_hall_sensors2(worker_kb_property.k_b_2, col2_converted, col4_converted/1000)
     

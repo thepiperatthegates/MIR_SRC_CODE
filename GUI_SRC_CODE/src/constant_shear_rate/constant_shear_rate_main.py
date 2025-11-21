@@ -29,7 +29,7 @@ from .graph_fr import PlotWindow
 data_mutex = QMutex()
 
 
-#function receiving data through pipe from another thread
+# function receiving data through pipe from another thread
 class DataUpdate(QThread):
     """
     Thread class responsible for receiving, processing, and managing ADC data streams for Hall sensors and current sensors in real-time.
@@ -73,36 +73,40 @@ class DataUpdate(QThread):
         Object responsible for storing processed arrays for visualization.
     """
 
-
-    def __init__(self, main_window_ref = None):
+    def __init__(self, main_window_ref=None):
         super().__init__()
         self.main_window_ref = main_window_ref
         self.running = True
         self.flag_calibrate = False
 
-
         self.flag_fR_measurement = False
-        self.accumulate_hall_1 = None
-        self.accumulate_hall_2 = None
-        self.accumulate_current_1 = None
-        self.accumulate_current_2 = None
-        
+        self.accumulate_hall_1 = 0.0
+        self.accumulate_hall_2 = 0.0
+        self.accumulate_current_1 = 0.0
+        self.accumulate_current_2 = 0.0
+
+        # for normalise properties purposes
+        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
+        self.amplitude_voltage_1 = 0.0
+        self.zero_offset_voltage_1 = 0.0
+        self.amplitude_voltage_2 = 0.0
+        self.zero_offset_voltage_2 = 0.0
+
         self.flag_normalise = False
-        
+        self.flag_normalise_measurement = False
 
         self.total_hall_1 = None
         self.total_hall_2 = None
         self.total_current_1 = None
         self.total_current_2 = None
-        
-        
-        self.v1_slice   = np.array([], dtype=np.uint16)
-        self.v2_slice   = np.array([], dtype=np.uint16)
-        self.i1_slice   = np.array([],  dtype=np.uint16)
-        self.i2_slice   = np.array([], dtype=np.uint16)
-        
+
+        self.v1_slice = np.array([], dtype=np.uint16)
+        self.v2_slice = np.array([], dtype=np.uint16)
+        self.i1_slice = np.array([], dtype=np.uint16)
+        self.i2_slice = np.array([], dtype=np.uint16)
+
         self.bytes_to_process = np.array([], dtype=np.uint16)  # Empty NumPy array for incoming data
-        
+
         self.angle_permanent_magnet_val = np.array([], dtype=np.float32)
         self.angle_magnetic_field_val = np.array([], dtype=np.float32)
         self.phase_difference_val = np.array([], dtype=np.float32)
@@ -110,14 +114,12 @@ class DataUpdate(QThread):
         self.worker_array_setter = packet_transmission.StoreArrayGraph()
         self.worker_kb_property = packet_transmission.kbCoefficient()
 
-
-
     def run(self):
-        
+
         """
         Main execution loop for the data update thread.
 
-        This function continuously retrieves data from the `q_to_graph` queue, processes 
+        This function continuously retrieves data from the `q_to_graph` queue, processes
         it, and updates the corresponding arrays. The data processing steps include:
 
         1. **Reshaping and Conversion**: Raw 16-bit ADC samples are reshaped into  voltage and current columns.
@@ -133,18 +135,18 @@ class DataUpdate(QThread):
         Notes
         -----
         - Thread synchronization is managed using `data_mutex` to ensure data integrity.
-        - Data from the queue (`q_to_graph`) must have a multiple of 4 samples, 
+        - Data from the queue (`q_to_graph`) must have a multiple of 4 samples,
           corresponding to [v1, v2, i1, i2].
         """
-        num_columns=4
+        num_columns = 4
 
-        data_from_pipe = [] #creating a list here because data from pipe is a list
+        data_from_pipe = []  # creating a list here because data from pipe is a list
         while self.running:
             data_from_pipe = q_to_graph.get()
             if not self.running:
                 break
             if data_from_pipe:
-                self.bytes_to_process = data_from_pipe   #now changes to np array so we can work with it better
+                self.bytes_to_process = data_from_pipe  # now changes to np array so we can work with it better
 
                 trimmed_size = len(self.bytes_to_process) - (len(self.bytes_to_process) % num_columns)
                 self.bytes_to_process = self.bytes_to_process[:trimmed_size]
@@ -155,115 +157,95 @@ class DataUpdate(QThread):
                 reshaped_data = reshaped_data.astype(float)
 
                 self.v1_slice = reshaped_data[:, 0]
-                self.v2_slice= reshaped_data[:, 1]
-                self.i1_slice= reshaped_data[:, 2] #STIMMT
-                self.i2_slice= reshaped_data[:, 3]   #STIMMT
-    
+                self.v2_slice = reshaped_data[:, 1]
+                self.i1_slice = reshaped_data[:, 2]  # STIMMT
+                self.i2_slice = reshaped_data[:, 3]  # STIMMT
+
                 data_mutex.lock()
 
-                #Hall Sensors
-                self.v1_slice= -packet_transmission.change_adc_hall(self.v1_slice)               #convert col1 (in V)
-                self.v2_slice = packet_transmission.change_adc_hall( self.v2_slice)               #convert col2 (in V)
-                
-                #Current
-                self.i1_slice =  -packet_transmission.change_current_adc(self.i1_slice)               #convert col3 (in mA)
-                self.i2_slice  = packet_transmission.change_current_adc(self.i2_slice)               #convert col4 (in mA)
-                
-                
-                #calibration for current sensor 
+                # Hall Sensors
+                self.v1_slice = -packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
+                self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
+
+                # Current
+                self.i1_slice = -packet_transmission.change_current_adc(self.i1_slice)  # convert col3 (in mA)
+                self.i2_slice = packet_transmission.change_current_adc(self.i2_slice)  # convert col4 (in mA)
+
+                # calibration for current sensor
                 self.i1_slice = packet_transmission.calibration_input_coil_1(self.i1_slice)
-                self.i2_slice = packet_transmission.calibration_input_coil_2( self.i2_slice )
-                
+                self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
 
-                #Calibrate process starts
-                if self.flag_calibrate:
-                    self.calculate_calibration(self.v1_slice, self.v2_slice, self.i1_slice, self.i2_slice)
-                
-                #measurement fR process starts
-                if self.flag_fR_measurement:
-                    self.calculate_fR(self.v1_slice, self.v2_slice, self.i1_slice, self.i2_slice)
-            
-                #Calibrated hall sensors
-                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1, self.v1_slice, self.i1_slice/1000)  
-                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2, self.v2_slice, self.i2_slice/1000)
-                
-                
-                #this is normalising step (still do not know whether i want to do it immidiately or not)
+                # Calibrate process starts
+                # measurement fR process starts
+                # measurement to determine the normalising parameters (for first time rotation)
+                if self.flag_calibrate or self.flag_fR_measurement or self.flag_normalise_measurement:
+                    self.accumulate_data_function(self.v1_slice, self.v2_slice, self.i1_slice, self.i2_slice)
+
+                # Calibrated hall sensors
+                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
+                                                                             self.v1_slice, self.i1_slice / 1000)
+                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
+                                                                             self.v2_slice, self.i2_slice / 1000)
+
+                # this is normalising step (still do not know whether I want to do it immidiately or not)
                 if self.flag_normalise:
-                    amplitude_voltage_1 = (np.max(a=self.v1_slice) - np.min(self.v1_slice)) / 2
-                    zero_offset_voltage_1 = (np.max(self.v1_slice) + np.min(self.v1_slice)) / 2
-
-                    amplitude_voltage_2 = (np.max(self.v2_slice) - np.min(self.v2_slice)) / 2
-                    zero_offset_voltage_2 = (np.max(self.v2_slice) + np.min(self.v2_slice)) / 2
-
-                    self.v1_slice = (self.v1_slice - zero_offset_voltage_1) / amplitude_voltage_1
-                    self.v2_slice= (self.v2_slice - zero_offset_voltage_2) / amplitude_voltage_2
-                    
+                    self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amplitude_voltage_1
+                    self.v2_slice = ( self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amplitude_voltage_2
                 #######################################################################################################
                 self.angle_permanent_magnet_val = np.arctan2(self.v2_slice, self.v1_slice)
                 self.angle_magnetic_field_val = np.arctan2(self.i2_slice, self.i1_slice)
-                
+
                 self.angle_permanent_magnet_val = np.unwrap(self.angle_permanent_magnet_val)
-                self.angle_magnetic_field_val  = np.unwrap(self.angle_magnetic_field_val)
+                self.angle_magnetic_field_val = np.unwrap(self.angle_magnetic_field_val)
                 #######################################################################################################
                 self.phase_difference_val = self.angle_magnetic_field_val - self.angle_permanent_magnet_val
-                
-                
+
                 ##send to setter class
                 self.worker_array_setter.v1_slice = self.v1_slice
                 self.worker_array_setter.v2_slice = self.v2_slice
                 self.worker_array_setter.i1_slice = self.i1_slice
                 self.worker_array_setter.i2_slice = self.i2_slice
-                
+
                 self.worker_array_setter.angle_permanent_magnet_val = self.angle_permanent_magnet_val
                 self.worker_array_setter.angle_magnetic_field_val = self.angle_magnetic_field_val
-                
+
                 self.worker_array_setter.phase_difference_val = self.phase_difference_val
-                
+
                 data_mutex.unlock()
-                
-                #Clear queue after processing
+
+                # Clear queue after processing
                 self.bytes_to_process = np.array([], dtype=np.uint16)
 
-
-    def calculate_calibration(self, store_array1_calibrate, store_array2_calibrate, store_array3_calibrate, store_array4_calibrate):
+    def accumulate_data_function(self, store_array1_calibrate, store_array2_calibrate, store_array3_calibrate,
+                                 store_array4_calibrate):
 
         self.accumulate_hall_1 = np.append(self.total_hall_1, store_array1_calibrate)
         self.accumulate_hall_2 = np.append(self.total_hall_2, store_array2_calibrate)
         self.accumulate_current_1 = np.append(self.total_current_1, store_array3_calibrate)
         self.accumulate_current_2 = np.append(self.total_current_2, store_array4_calibrate)
-        
-        self.main_window_ref.set_constant(self.accumulate_hall_1,  
-                                    self.accumulate_hall_2,
-                                    self.accumulate_current_1,
-                                    self.accumulate_current_2)
-        
-    def calculate_fR(self, store_array1_calibrate, store_array2_calibrate, store_array3_calibrate, store_array4_calibrate):
-        self.accumulate_hall_1 = np.append(self.total_hall_1, store_array1_calibrate)
-        self.accumulate_hall_2 = np.append(self.total_hall_2, store_array2_calibrate)
-        self.accumulate_current_1 = np.append(self.total_current_1, store_array3_calibrate)
-        self.accumulate_current_2 = np.append(self.total_current_2, store_array4_calibrate)
-        
-        self.main_window_ref.set_constant(self.accumulate_hall_1,  
-                                    self.accumulate_hall_2,
-                                    self.accumulate_current_1,
-                                    self.accumulate_current_2)
-        
-    def flag_special_event(self, flag_1, flag_2):
-        
-        #Set flag for calibration
-        self.flag_calibrate = flag_1
-        #Set flag for fR measurement
-        self.flag_fR_measurement = flag_2
+
+        self.main_window_ref.set_constant(self.accumulate_hall_1,
+                                          self.accumulate_hall_2,
+                                          self.accumulate_current_1,
+                                          self.accumulate_current_2)
+
+    def flag_special_event(self, flag_calibrate, flag_fR_measurement, flag_normalise_measurement):
+
+        # Set flag for calibration
+        self.flag_calibrate = flag_calibrate
+        # Set flag for fR measurement
+        self.flag_fR_measurement = flag_fR_measurement
+        # Set flag for normalise measurement event
+        self.flag_normalise_measurement = flag_normalise_measurement
 
     def flag_normalise_event(self, flag_input):
-        
+
         self.flag_normalise = flag_input
 
     def stop(self):
         self.running = False
 
-        
+
 class SleepTimer(QObject):
     """
     A countdown timer that emits time updates at fixed intervals using PyQt signals.
@@ -421,7 +403,9 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_downsample_property = packet_transmission.DownSampleSpecificFlag()
         self.tot_average = self.worker_downsample_property.tot_average
         self.time_increment = self.worker_downsample_property.current_time
-        
+
+        #for normalise properties purposes
+        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
         
         
         ####### variables for fR measurement process ###############################################
@@ -514,6 +498,14 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.button_auto_range.clicked.connect(self.auto_range_event)
         
         self.save_button.clicked.connect(self.save_button_event)
+
+        #### rotote the magnet button
+        self.button_rotate.clicked.connect(self.button_rotate_event)
+
+        #DISABLE ALL THE BUTTON BEFORE NORMALISING EVENT
+        self.button_start.setDisabled(True)
+        self.button_stop.setDisabled(True)
+        self.save_button.setDisabled(True)
 
         #Start backend serial lines
         
@@ -660,7 +652,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             
 
     def start_normalise_event(self):
-        if self.worker_DataUpdate.flag_normalise == False:
+        if not self.worker_DataUpdate.flag_normalise:
             self.worker_DataUpdate.flag_normalise_event(True)
         else:
             self.worker_DataUpdate.flag_normalise_event(False)
@@ -810,7 +802,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
     def update_time_counter_acquisition(self, val):
         self.lcdNumber.display(val)
             
-        if val in (0, 0.1):
+        if val not in (0, 0.1):
             self.button_start.setDisabled(False)
             self.button_stop.setDisabled(False)
         else:
@@ -867,7 +859,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
 
         # send flag for calibration in the thread
-        self.worker_DataUpdate.flag_special_event(flag_1=True, flag_2=False)
+        self.worker_DataUpdate.flag_special_event(True, False, False)
 
         self.status_label.setStyleSheet("color: #32a83a;")
         self.status_label.setText("Calibrating!...............")
@@ -892,7 +884,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         elif val == 0.0:  #when val is 0 and the thread is stops already
             
             #reset flags
-            self.worker_DataUpdate.flag_special_event(False, False)
+            self.worker_DataUpdate.flag_special_event(False, False, False)
 
             if count_recursion == 1:
                 self.mean_hall_1_0_A = np.mean(self.accumulate_hall_1[1000:])
@@ -1028,7 +1020,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_flag_send.flag_tx = True
         
         # send flag for calibration in the thread
-        self.worker_DataUpdate.flag_special_event(flag_1=False, flag_2=True)
+        self.worker_DataUpdate.flag_special_event(False, True, False)
 
         time_delay = 10 * 1000
         QtCore.QTimer.singleShot(time_delay, 
@@ -1082,7 +1074,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         elif val == 0.0:     # means val == 0 or val == 0.1     
             #reset flags (so that accumulate does not change here )(data integrity reason here)
-            self.worker_DataUpdate.flag_special_event(False, False)
+            self.worker_DataUpdate.flag_special_event(False, False, False)
             
             
             self.current1_fR = self.accumulate_current_1[1000:]
@@ -1233,10 +1225,80 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #send all data to microcontroller
         #activate flag
         self.worker_flag_send.flag_tx = True
-        self.status_label.setText("Stop rotation!!....") 
-        
-    
-    
+        self.status_label.setText("Stop rotation!!....")
+
+
+    def button_rotate_event(self):
+
+        ############################# send data to setter getter ######################################
+
+        self.worker_data_block.data_1 =5.0 #second
+        # make the running frequency 200 Hz, does not matter since we will produce DC current anyway
+        # change to frequency for MCU
+        self.worker_data_block.data_2_for_MCU =5 #Hz
+
+        self.worker_data_block.data_current = 300, 0, 300, 0
+
+        # from combobox direction
+        self.worker_data_block.data_7 = 1
+
+        if self.filter_checkbox.isChecked():
+            self.worker_data_block.data_8 = 0
+        else:
+            self.worker_data_block.data_8 = 2
+
+        # for data 10
+        self.worker_data_block.data_10 = 1
+        ######################################################################################
+
+        ##send all data to microcontroller
+        #activate flag
+        self.worker_flag_send.flag_tx = True
+
+        self.status_label.setStyleSheet("color: #7da832;")
+        self.status_label.setText("Rotation starts for normalising!!!!")
+
+        self.worker_sleep = SleepTimer()
+        self.worker_sleep.update_time_signal.connect(self.update_timer_rotation)
+        self.worker_sleep.start()
+
+
+        #active the flag on DataUpdate side for finding normalising parameters for the voltages
+        self.worker_DataUpdate.flag_special_event(False, False, True)
+
+    def update_timer_rotation(self, val):
+        """
+        for rotation timer purposes
+        """
+        self.lcdNumber.display(val)
+
+        if val != 0.0:
+            self.button_send.setDisabled(True)
+            self.button_start.setDisabled(True)
+            self.button_stop.setDisabled(True)
+            self.button_rotate.setDisabled(True)
+            self.normalise_button.setDisabled(True)
+
+        elif val == 0.0:
+            self.button_send.setDisabled(False)
+            self.button_start.setDisabled(False)
+            self.button_stop.setDisabled(False)
+            self.normalise_button.setDisabled(False)
+            self.save_button.setDisabled(False)
+
+
+            #mark the end of the normalise measurement event
+            self.worker_DataUpdate.flag_special_event(False, False, False)
+
+            self.worker_normalise_properties.amplitude_voltage_1 = (np.max(self.accumulate_hall_1[100:]) - np.min(self.accumulate_hall_1[100:])) / 2
+            self.worker_normalise_properties.zero_offset_voltage_1 = (np.max(self.accumulate_hall_1[100:]) + np.min(self.accumulate_hall_1[100:])) / 2
+
+            self.worker_normalise_properties.amplitude_voltage_2 = (np.max(self.accumulate_hall_2[100:]) - np.min(self.accumulate_hall_2[100:])) /  2
+            self.worker_normalise_properties.zero_offset_voltage_2 = (np.max(self.accumulate_hall_2[100:]) + np.min(self.accumulate_hall_2[100:])) / 2
+
+
+            self.popout_window(6)
+
     def graph_stop_event(self):
         if self.stop_default_state == 1:
             
@@ -1298,6 +1360,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             msg.setText(f"f_R: {np.poly1d(self.calculate_final_fR)}")
         elif arg == 5:
             msg.setText("Invalid sample frequency! Please do not use any value starting with 3, 7 or 9!")
+        elif arg == 6:
+            msg.setText("Normalise parameters completed! Please use the normalise button now!")
             
         msg.setIcon(QMessageBox.Question)
         

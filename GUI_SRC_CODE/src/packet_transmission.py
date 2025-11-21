@@ -518,7 +518,50 @@ class kbCoefficient():
     @k_b_2.setter
     def k_b_2(self, val):
         self.__class__._k_b_2 = val 
-    
+
+
+class VoltageNormaliseCoefficient():
+
+    _amplitude_voltage_1 = 0.0
+    _zero_offset_voltage_1 = 0.0
+
+    _amplitude_voltage_2 = 0.0
+    _zero_offset_voltage_2 = 0.0
+
+    @property
+    def amplitude_voltage_1(self):
+        return self.__class__._amplitude_voltage_1
+
+    @amplitude_voltage_1.setter
+    def amplitude_voltage_1(self, val):
+        self.__class__._amplitude_voltage_1 = val
+
+
+    @property
+    def zero_offset_voltage_1(self):
+        return self.__class__._zero_offset_voltage_1
+
+    @zero_offset_voltage_1.setter
+    def zero_offset_voltage_1(self, val):
+        self.__class__._zero_offset_voltage_1 = val
+
+    @property
+    def amplitude_voltage_2(self):
+        return self.__class__._amplitude_voltage_2
+
+    @amplitude_voltage_2.setter
+    def amplitude_voltage_2(self, val):
+        self.__class__._amplitude_voltage_2 = val
+
+    @property
+    def zero_offset_voltage_2(self):
+        return self.__class__._zero_offset_voltage_2
+
+    @zero_offset_voltage_2.setter
+    def zero_offset_voltage_2(self, val):
+        self.__class__._zero_offset_voltage_2 = val
+
+
 
 
 def stop_button_event(this_stop_button_flag):

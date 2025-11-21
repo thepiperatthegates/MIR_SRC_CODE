@@ -1,7 +1,7 @@
 import numpy as np
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5 import *
-from PyQt5.QtCore import QThread, pyqtSignal, QMutex, QRegularExpression, QObject, QTimer
+from PyQt5.QtCore import QThread, pyqtSignal, QMutex, QRegularExpression, QObject, QTimer, Qt
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QRegularExpressionValidator, QDoubleValidator
 import os
@@ -79,21 +79,25 @@ class DataUpdate(QThread):
 
 
         self.flag_fR_measurement = False
-        self.accumulate_hall_1 = None
-        self.accumulate_hall_2 = None
-        self.accumulate_current_1 = None
-        self.accumulate_current_2 = None
+        self.accumulate_hall_1 = 0.0
+        self.accumulate_hall_2 = 0.0
+        self.accumulate_current_1 = 0.0
+        self.accumulate_current_2 = 0.0
+
+        #for normalise properties purposes
+        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
+        self.amplitude_voltage_1 = 0.0
+        self.zero_offset_voltage_1 = 0.0
+        self.amplitude_voltage_2 = 0.0
+        self.zero_offset_voltage_2 = 0.0
         
         self.flag_normalise = False
-        
+        self.flag_normalise_measurement = False
 
         self.total_hall_1 = None
         self.total_hall_2 = None
         self.total_current_1 = None
         self.total_current_2 = None
-        
-        self.k_b_1 = 0.0
-        self.k_b_2 = 0.0
         
         
         self.v1_slice   = np.array([], dtype=np.uint16)
@@ -109,16 +113,13 @@ class DataUpdate(QThread):
 
         self.worker_array_setter = packet_transmission.StoreArrayGraph()
         self.worker_kb_property = packet_transmission.kbCoefficient()
-        self.worker_kb_property.k_b_1 = self.k_b_1
-        self.worker_kb_property.k_b_2 = self.k_b_2
-
 
     def run(self):
-        
+
         """
         Main execution loop for the data update thread.
 
-        This function continuously retrieves data from the `q_to_graph` queue, processes 
+        This function continuously retrieves data from the `q_to_graph` queue, processes
         it, and updates the corresponding arrays. The data processing steps include:
 
         1. **Reshaping and Conversion**: Raw 16-bit ADC samples are reshaped into  voltage and current columns.
@@ -134,18 +135,18 @@ class DataUpdate(QThread):
         Notes
         -----
         - Thread synchronization is managed using `data_mutex` to ensure data integrity.
-        - Data from the queue (`q_to_graph`) must have a multiple of 4 samples, 
+        - Data from the queue (`q_to_graph`) must have a multiple of 4 samples,
           corresponding to [v1, v2, i1, i2].
         """
-        num_columns=4
+        num_columns = 4
 
-        data_from_pipe = [] #creating a list here because data from pipe is a list
+        data_from_pipe = []  # creating a list here because data from pipe is a list
         while self.running:
             data_from_pipe = q_to_graph.get()
             if not self.running:
                 break
             if data_from_pipe:
-                self.bytes_to_process = data_from_pipe   #now changes to np array so we can work with it better
+                self.bytes_to_process = data_from_pipe  # now changes to np array so we can work with it better
 
                 trimmed_size = len(self.bytes_to_process) - (len(self.bytes_to_process) % num_columns)
                 self.bytes_to_process = self.bytes_to_process[:trimmed_size]
@@ -156,115 +157,99 @@ class DataUpdate(QThread):
                 reshaped_data = reshaped_data.astype(float)
 
                 self.v1_slice = reshaped_data[:, 0]
-                self.v2_slice= reshaped_data[:, 1]
-                self.i1_slice= reshaped_data[:, 2] #STIMMT
-                self.i2_slice= reshaped_data[:, 3]   #STIMMT
-    
+                self.v2_slice = reshaped_data[:, 1]
+                self.i1_slice = reshaped_data[:, 2]  # STIMMT
+                self.i2_slice = reshaped_data[:, 3]  # STIMMT
+
                 data_mutex.lock()
 
-                #Hall Sensors
-                self.v1_slice= -packet_transmission.change_adc_hall(self.v1_slice)               #convert col1 (in V)
-                self.v2_slice = packet_transmission.change_adc_hall( self.v2_slice)               #convert col2 (in V)
-                
-                #Current
-                self.i1_slice =  -packet_transmission.change_current_adc(self.i1_slice)               #convert col3 (in mA)
-                self.i2_slice  = packet_transmission.change_current_adc(self.i2_slice)               #convert col4 (in mA)
-                
-                
-                #calibration for current sensor 
+                # Hall Sensors
+                self.v1_slice = -packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
+                self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
+
+                # Current
+                self.i1_slice = -packet_transmission.change_current_adc(self.i1_slice)  # convert col3 (in mA)
+                self.i2_slice = packet_transmission.change_current_adc(self.i2_slice)  # convert col4 (in mA)
+
+                # calibration for current sensor
                 self.i1_slice = packet_transmission.calibration_input_coil_1(self.i1_slice)
-                self.i2_slice = packet_transmission.calibration_input_coil_2( self.i2_slice )
-                
+                self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
 
-                #Calibrate process starts
-                if self.flag_calibrate:
-                    self.calculate_calibration(self.v1_slice, self.v2_slice, self.i1_slice, self.i2_slice)
-                
-                #measurement fR process starts
-                if self.flag_fR_measurement:
-                    self.calculate_fR(self.v1_slice, self.v2_slice, self.i1_slice, self.i2_slice)
-            
-                #Calibrated hall sensors
-                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.k_b_1, self.v1_slice, self.i1_slice/1000)  
-                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.k_b_2, self.v2_slice, self.i2_slice/1000)
-                
-                
-                #this is normalising step (still do not know whether i want to do it immidiately or not)
+                # Calibrate process starts
+                # measurement fR process starts
+                # measurement to determine the normalising parameters (for first time rotation)
+                if self.flag_calibrate or self.flag_fR_measurement or self.flag_normalise_measurement:
+                    self.accumulate_data_function(self.v1_slice, self.v2_slice, self.i1_slice, self.i2_slice)
+
+                # Calibrated hall sensors
+                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
+                                                                             self.v1_slice, self.i1_slice / 1000)
+                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
+                                                                             self.v2_slice, self.i2_slice / 1000)
+
+
+
+                # this is normalising step (still do not know whether I want to do it immidiately or not)
                 if self.flag_normalise:
-                    amplitude_voltage_1 = (np.max(a=self.v1_slice) - np.min(self.v1_slice)) / 2
-                    zero_offset_voltage_1 = (np.max(self.v1_slice) + np.min(self.v1_slice)) / 2
-
-                    amplitude_voltage_2 = (np.max(self.v2_slice) - np.min(self.v2_slice)) / 2
-                    zero_offset_voltage_2 = (np.max(self.v2_slice) + np.min(self.v2_slice)) / 2
-
-                    self.v1_slice = (self.v1_slice - zero_offset_voltage_1) / amplitude_voltage_1
-                    self.v2_slice= (self.v2_slice - zero_offset_voltage_2) / amplitude_voltage_2
-                    
+                    self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amplitude_voltage_1
+                    self.v2_slice = (self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amplitude_voltage_2
                 #######################################################################################################
                 self.angle_permanent_magnet_val = np.arctan2(self.v2_slice, self.v1_slice)
                 self.angle_magnetic_field_val = np.arctan2(self.i2_slice, self.i1_slice)
-                
+
                 self.angle_permanent_magnet_val = np.unwrap(self.angle_permanent_magnet_val)
-                self.angle_magnetic_field_val  = np.unwrap(self.angle_magnetic_field_val)
+                self.angle_magnetic_field_val = np.unwrap(self.angle_magnetic_field_val)
                 #######################################################################################################
                 self.phase_difference_val = self.angle_magnetic_field_val - self.angle_permanent_magnet_val
-                
-                
+
                 ##send to setter class
                 self.worker_array_setter.v1_slice = self.v1_slice
                 self.worker_array_setter.v2_slice = self.v2_slice
                 self.worker_array_setter.i1_slice = self.i1_slice
                 self.worker_array_setter.i2_slice = self.i2_slice
-                
+
                 self.worker_array_setter.angle_permanent_magnet_val = self.angle_permanent_magnet_val
                 self.worker_array_setter.angle_magnetic_field_val = self.angle_magnetic_field_val
-                
+
                 self.worker_array_setter.phase_difference_val = self.phase_difference_val
-                
+
                 data_mutex.unlock()
-                
-                #Clear queue after processing
+
+                # Clear queue after processing
                 self.bytes_to_process = np.array([], dtype=np.uint16)
 
-
-    def calculate_calibration(self, store_array1_calibrate, store_array2_calibrate, store_array3_calibrate, store_array4_calibrate):
+    def accumulate_data_function(self, store_array1_calibrate, store_array2_calibrate, store_array3_calibrate,
+                              store_array4_calibrate):
 
         self.accumulate_hall_1 = np.append(self.total_hall_1, store_array1_calibrate)
         self.accumulate_hall_2 = np.append(self.total_hall_2, store_array2_calibrate)
         self.accumulate_current_1 = np.append(self.total_current_1, store_array3_calibrate)
         self.accumulate_current_2 = np.append(self.total_current_2, store_array4_calibrate)
-        
-        self.main_window_ref.set_constant(self.accumulate_hall_1,  
-                                    self.accumulate_hall_2,
-                                    self.accumulate_current_1,
-                                    self.accumulate_current_2)
-        
-    def calculate_fR(self, store_array1_calibrate, store_array2_calibrate, store_array3_calibrate, store_array4_calibrate):
-        self.accumulate_hall_1 = np.append(self.total_hall_1, store_array1_calibrate)
-        self.accumulate_hall_2 = np.append(self.total_hall_2, store_array2_calibrate)
-        self.accumulate_current_1 = np.append(self.total_current_1, store_array3_calibrate)
-        self.accumulate_current_2 = np.append(self.total_current_2, store_array4_calibrate)
-        
-        self.main_window_ref.set_constant(self.accumulate_hall_1,  
-                                    self.accumulate_hall_2,
-                                    self.accumulate_current_1,
-                                    self.accumulate_current_2)
-        
-    def flag_special_event(self, flag_1, flag_2):
-        
-        #Set flag for calibration
-        self.flag_calibrate = flag_1
-        #Set flag for fR measurement
-        self.flag_fR_measurement = flag_2
+
+        self.main_window_ref.set_constant(self.accumulate_hall_1,
+                                          self.accumulate_hall_2,
+                                          self.accumulate_current_1,
+                                          self.accumulate_current_2)
+
+    def flag_special_event(self, flag_calibrate, flag_fR_measurement, flag_normalise_measurement):
+
+        # Set flag for calibration
+        self.flag_calibrate = flag_calibrate
+        # Set flag for fR measurement
+        self.flag_fR_measurement = flag_fR_measurement
+        # Set flag for normalise measurement event
+        self.flag_normalise_measurement = flag_normalise_measurement
+
+
 
     def flag_normalise_event(self, flag_input):
-        
+
         self.flag_normalise = flag_input
 
     def stop(self):
         self.running = False
 
-        
+
 class SleepTimer(QObject):
     update_time_signal = pyqtSignal(float)  # emit float countdown values
 
@@ -350,7 +335,12 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         super().__init__()
         self.setupUi(self)
             
-            
+        self.accumulate_hall_1 = None
+        self.accumulate_hall_2 = None
+        self.accumulate_current_1 = None
+        self.accumulate_current_2 = None
+
+
         ################################HINT TYPE###################################################
         
         
@@ -371,6 +361,12 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.textbox_input_sampling_rate.setText("500")
         self.textbox_offset_1.setText("0")
         self.textbox_offset_2.setText("0")
+
+        #force everything to be disabled so one has to do the normalise event first
+        self.button_offsets.setDisabled(True)
+        self.button_send_start_vec.setDisabled(True)
+        self.button_start_acquistion.setDisabled(True)
+        
         ################################################################################################
 
         ################################ SET ICON ###################################################
@@ -389,11 +385,21 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         ################################### connected signals from widget #############################################
         
         self.button_start_acquistion.clicked.connect(self.start_creep_test)
+        self.button_start_acquistion.clicked.connect(lambda value: self.popout_window(1))
+
         self.button_offsets.clicked.connect(self.send_offsets)
+        self.button_offsets.clicked.connect(lambda value: self.popout_window(1))
+
         self.button_send_start_vec.clicked.connect(self.send_start_vector)
+        self.button_send_start_vec.clicked.connect(lambda value: self.popout_window(1))
+
+
         self.save_button.clicked.connect(self.save_button_event)
         self.graph_stop_button.clicked.connect(self.graph_stop_event)
         self.button_auto_range.clicked.connect(self.auto_range_event)
+
+        self.button_rotate.clicked.connect(self.button_rotate_event)
+        
         ####################################################################################
         
         ############################Start backend serial lines##################################################
@@ -425,12 +431,22 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         
         self.worker_remaining_time = packet_transmission.RemainingTimeForCreepTest()
         self.time_for_resetting_flag = self.worker_remaining_time.time_for_resetting_time
+        
         self.start_vector_time = self.worker_remaining_time.start_vector_time
         self.end_vector_time = self.worker_remaining_time.end_vector_time
 
-        
-        
-        
+        #for k_b setter getter
+        self.worker_k_b_property = packet_transmission.kbCoefficient()
+        self.k_b_label.setTextFormat(Qt.RichText)
+        self.k_b_label.setText(
+            f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
+            f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
+            f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
+        )
+
+
+        #for normalising properties purposes
+        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
         ################################################################################################
         
         ##### combobox for live graph mode
@@ -679,7 +695,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         """
         Send start vector for magnet
         """
-        #### delete previous dummy files before acquistion starts. 
+        #### delete previous dummy files before acquisition starts.
         path_join =  os.path.join(self.project_root, "files", "dummy.csv")
         #remove the dummy if it exists
         if os.path.exists(path_join):
@@ -807,8 +823,9 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.lcdNumber_vector.display(val)
             
         if val not in (0, 0.1):
-            # self.button_start.setDisabled(False)
-            # self.button_stop.setDisabled(False)
+            self.button_offsets.setDisabled(True)
+            self.button_send_start_vec.setDisabled(True)
+            self.button_start_acquistion.setDisabled(True)
             pass
             
         else:
@@ -883,14 +900,14 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.lcdNumber_vector.display(val)
             
         if val not in (0, 0.1):
-            # self.button_start.setDisabled(True)
-            # self.button_stop.setDisabled(True)
-            print("asdsa")
+            self.button_offsets.setDisabled(True)
+            self.button_send_start_vec.setDisabled(True)
+            self.button_start_acquistion.setDisabled(True)
         
         else:
-            # self.button_start.setDisabled(True)
-            # self.button_stop.setDisabled(True)
-            print("aha")
+            self.button_offsets.setDisabled(False)
+            self.button_send_start_vec.setDisabled(False)
+            self.button_start_acquistion.setDisabled(False)
             
             
     def update_time_counter_acquisition(self, val):
@@ -899,15 +916,111 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         """
         self.lcdNumber.display(val)
             
-        if val in (0, 0.1):
-            # self.button_start.setDisabled(False)
-            # self.button_stop.setDisabled(False)
-            print("oi")
+        if val not in (0, 0.1):
+            self.button_offsets.setDisabled(True)
+            self.button_send_start_vec.setDisabled(True)
+            self.button_start_acquistion.setDisabled(True)
         else:
-            # self.button_start.setDisabled(True)
-            # self.button_stop.setDisabled(True)
-            print("oi")
-            
+            self.button_offsets.setDisabled(False)
+            self.button_send_start_vec.setDisabled(False)
+            self.button_start_acquistion.setDisabled(False)
+
+    def button_rotate_event(self):
+
+        ############################# send data to setter getter ######################################
+
+        # self.worker_data_block.data_1 = 5.0  #second
+        self.worker_remaining_time.total_time_for_file_save  = 5.0  #second
+
+        print(self.worker_remaining_time.total_time_for_file_save)
+        # make the running frequency 200 Hz, does not matter since we will produce DC current anyway
+        # change to frequency for MCU
+        self.worker_data_block.data_2_for_MCU = 4 #Hz
+
+        self.worker_data_block.data_current = 300, 0, 300, 0
+
+        # from combobox direction
+        self.worker_data_block.data_7 = 1
+
+        if self.filter_checkbox.isChecked():
+            self.worker_data_block.data_8 = 0
+        else:
+            self.worker_data_block.data_8 = 2
+
+        # for data 10
+        self.worker_data_block.data_10 = 1
+        ######################################################################################
+
+        ##send all data to microcontroller
+        #activate flag
+        self.worker_flag_send.flag_tx = True
+
+        self.status_label.setStyleSheet("color: #7da832;")
+        self.status_label.setText("Rotation starts for normalising!!!!")
+
+        self.worker_sleep = SleepTimer()
+        self.worker_sleep.update_time_signal.connect(self.update_timer_rotation)
+        self.worker_sleep.start()
+
+
+        #active the flag on DataUpdate side for finding normalising parameters for the voltages
+        self.worker_DataUpdate.flag_special_event(False, False, True)
+
+    def update_timer_rotation(self, val):
+        """
+        for rotation timer purposes
+        """
+        self.lcdNumber.display(val)
+        print(val)
+
+        if val != 0.0:
+            self.button_offsets.setDisabled(True)
+            self.button_send_start_vec.setDisabled(True)
+            self.button_start_acquistion.setDisabled(True)
+            self.save_button.setDisabled(True)
+
+            print("WHAT")
+        elif val == 0.0:
+            self.button_offsets.setDisabled(False)
+            self.button_send_start_vec.setDisabled(False)
+            self.button_start_acquistion.setDisabled(False)
+            self.save_button.setDisabled(False)
+
+
+            #mark the end of the normalise measurement event
+            self.worker_DataUpdate.flag_special_event(False, False, False)
+
+            self.worker_normalise_properties.amplitude_voltage_1 = (np.max(self.accumulate_hall_1[100:]) - np.min(self.accumulate_hall_1[100:])) / 2
+            self.worker_normalise_properties.zero_offset_voltage_1 = (np.max(self.accumulate_hall_1[100:]) + np.min(self.accumulate_hall_1[100:])) / 2
+
+            self.worker_normalise_properties.amplitude_voltage_2 = (np.max(self.accumulate_hall_2[100:]) - np.min(self.accumulate_hall_2[100:])) /  2
+            self.worker_normalise_properties.zero_offset_voltage_2 = (np.max(self.accumulate_hall_2[100:]) + np.min(self.accumulate_hall_2[100:])) / 2
+
+            self.popout_window(6)
+
+    def set_constant(self, get_accumulate_hall_1, get_accumulate_hall_2, get_accumulate_current_1,
+                    get_accumulate_current2):
+        """
+        Set accumulated measurement values for Hall sensors and current sensors.
+
+        This method updates the internal state variables that store accumulated
+        readings for two Hall sensors and two current sensors. It is shared by
+        both ``update_time_counter_fR_measurement`` and
+        ``update_time_counter_calibrating``.
+
+        Shared by function update_time_counter_fR_measurement and update_time_counter_calibrating
+
+        :param float get_accumulate_hall_1: Accumulated value from Hall sensor 1.
+        :param float get_accumulate_hall_2: Accumulated value from Hall sensor 2.
+        :param float get_accumulate_current_1: Accumulated value from current sensor 1.
+        :param float get_accumulate_current2: Accumulated value from current sensor 2.
+        """
+
+        self.accumulate_hall_1 = get_accumulate_hall_1
+        self.accumulate_hall_2 = get_accumulate_hall_2
+        self.accumulate_current_1 = get_accumulate_current_1
+        self.accumulate_current_2 = get_accumulate_current2
+
     def graph_stop_event(self):
         if self.stop_default_state == 1:
             
@@ -964,6 +1077,26 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         if filename_saving:
             data_read = np.loadtxt(dir_dummy_csv, delimiter=';')
             np.savetxt(filename_saving, data_read, delimiter=';')
+
+    def popout_window(self, arg):
+        msg = QMessageBox()
+        if arg == 1:
+            msg.setText("Successful")
+        elif arg == 2:
+            msg.setText(f"k b 1 = {self.worker_k_b_property.k_b_1}\n"
+                        f"k_b_2 = {self.worker_k_b_property.k_b_2}")
+        elif arg == 3:
+            msg.setText(f"Friction coefficient measurement is starting innit")
+        elif arg == 4:
+            msg.setText(f"f_R: {np.poly1d(self.calculate_final_fR)}")
+        elif arg == 5:
+            msg.setText("Invalid sample frequency! Please do not use any value starting with 3, 7 or 9!")
+        elif arg == 6:
+            msg.setText("Normalise parameters completed! Please use the normalise button now!")
+
+        msg.setIcon(QMessageBox.Question)
+
+        x = msg.exec_()
         
         
 class TabWindowCreepTest(QMainWindow):
