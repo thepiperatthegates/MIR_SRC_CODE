@@ -47,10 +47,6 @@ MAX_V_AFTER_HALL = 3.3
 MIN_V_AFTER_HALL = 0.0
 
 
-#default friction coefficient 
-# CALIBRATION_FACTOR = 0.773            # torque calibration no units (K)
-CALIBRATION_FACTOR = 0.875             # torque calibration no units (K)
-
 
 
 
@@ -458,12 +454,16 @@ class StoreArrayGraph():
         
 class fRCoefficients():
     
-    #default fr coefficient
-    # _fr1 = 1.51e-8 # in Nm / (rad /s)
-    # _fr0 = 5.701e-8 # in Nm / (rad /s)
-    
-    _fr1 = 0 # in Nm / (rad /s)
-    _fr0 = 0 # in Nm / (rad /s)
+    if ELECTRONICS_FLAG == 1:
+        _fr1 = 1.51e-8 # in Nm / (rad /s)
+        _fr0 = 5.701e-8 # in Nm / (rad /s)
+        
+        _CALIBRATION_FACTOR = 0.773 # torque calibration no units (K)
+    elif ELECTRONICS_FLAG == 2:
+        _fr1 = 0 # in Nm / (rad /s)
+        _fr0 = 0 # in Nm / (rad /s)
+        
+        _CALIBRATION_FACTOR = 0.875             # torque calibration no units (K)
   
     # 3.025e-08 x + 6.131e-07
     #1.359e-08 x - 2.577e-07
@@ -485,6 +485,9 @@ class fRCoefficients():
     def fr0(self, val):
         self.__class__._fr0 = val
         
+    @property 
+    def CALIBRATION_FACTOR(self):
+        return self.__class__._CALIBRATION_FACTOR
     
     
         
@@ -493,13 +496,12 @@ class kbCoefficient():
 
     #default calibration factor k_b 
     
-    #MIR 1
-    # _k_b_1 = 0.083597946
-    # _k_b_2 = 0.084535931
-    
-    #MIR 2
-    _k_b_1 = 0.16423985101661842
-    _k_b_2 = 0.1666737395533449
+    if ELECTRONICS_FLAG == 1:
+        _k_b_1 = 0.083597946
+        _k_b_2 = 0.084535931
+    elif ELECTRONICS_FLAG == 2:
+        _k_b_1 = 0.16423985101661842
+        _k_b_2 = 0.1666737395533449
     
     
     @property
@@ -674,15 +676,15 @@ def calculate_torque_fR( current_1, current_2, hall_1, hall_2, data_4, data_6):
         :rtype: float or np.ndarray
         """
         
-        global CALIBRATION_FACTOR, DIPOLE_MOMENT, COIL_CONSTANT
+        global DIPOLE_MOMENT, COIL_CONSTANT
         
         current_1 = np.array(current_1, dtype=float)
         current_2 = np.array(current_2, dtype=float)
         hall_1    = np.array(hall_1, dtype=float)
         hall_2    = np.array(hall_2, dtype=float)
         
-        offset_1 =float(data_4)
-        offset_2 =float(data_6)
+        offset_1 =  float(data_4)
+        offset_2 =  float(data_6)
         
         #magnetic field angle - magnet angle
         phase_difference = np.arctan2(current_2, current_1) - np.arctan2(hall_2, hall_1)
@@ -691,7 +693,9 @@ def calculate_torque_fR( current_1, current_2, hall_1, hall_2, data_4, data_6):
         
         magnitude_current = np.sqrt(power_of_2)
         
-        total_torque = CALIBRATION_FACTOR * ( DIPOLE_MOMENT
+        worker_cal = fRCoefficients()
+        
+        total_torque = worker_cal.CALIBRATION_FACTOR * ( DIPOLE_MOMENT
         * COIL_CONSTANT                    # [T/A]
         * magnitude_current / 1000         # mA; -> A, [A]
         * np.sin(phase_difference)   # dimensionless

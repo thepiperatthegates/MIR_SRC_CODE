@@ -161,6 +161,8 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
         self.close()
 
 
+
+#TODO: f_R and k_b, K need to match the electronics used. 
 def main():
     """
     Entry point for the application.
