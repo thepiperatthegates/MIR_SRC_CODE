@@ -83,7 +83,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         ##########################################################
         self.COIL_CONSTANT = packet_transmission.COIL_CONSTANT		# in T / A
         self.DIPOLE_MOMENT = packet_transmission.DIPOLE_MOMENT		# in A m^2
-        self.CALIBRATION_FACTOR = self.worker_get_fr_coefficient.CALIBRATION_FACTOR.CALIBRATION_FACTOR		# torque calibration no units (K)
+        self.CALIBRATION_FACTOR = self.worker_get_fr_coefficient.CALIBRATION_FACTOR		# torque calibration no units (K)
         
         
         self.worker_get_offset = packet_transmission.TxData()
