@@ -447,56 +447,59 @@ class StoreArrayGraph():
     @phase_difference_val.setter
     def phase_difference_val(self, val):
         self.__class__._phase_difference_val = val
-        
-        
-        
-        
-        
+
+
+
+
+
 class fRCoefficients():
-    
-    if ELECTRONICS_FLAG == 1:
-        _fr1 = 1.51e-8 # in Nm / (rad /s)
-        _fr0 = 5.701e-8 # in Nm / (rad /s)
-        
-        _CALIBRATION_FACTOR = 0.773 # torque calibration no units (K)
+
+    # Class-level defaults based on the electronics flag
+    if ELECTRONICS_FLAG == 1 or ELECTRONICS_FLAG == 0:
+        _fr1 = 1.51e-8          # Nm / (rad/s)
+        _fr0 = 5.701e-8         # Nm / (rad/s)
+        _CALIBRATION_FACTOR = 0.773
     elif ELECTRONICS_FLAG == 2:
-        _fr1 = 0 # in Nm / (rad /s)
-        _fr0 = 0 # in Nm / (rad /s)
-        
-        _CALIBRATION_FACTOR = 0.875             # torque calibration no units (K)
-  
-    # 3.025e-08 x + 6.131e-07
-    #1.359e-08 x - 2.577e-07
-    
-    
-    @property 
+        _fr1 = 0.0
+        _fr0 = 0.0
+        _CALIBRATION_FACTOR = 0.875
+    else:
+        raise ValueError("Invalid ELECTRONICS_FLAG")
+
+    # --- fr1 ---
+    @property
     def fr1(self):
         return self.__class__._fr1
-    
+
     @fr1.setter
-    def fr1(self, val):
-        self.__class__._fr1 = val
-    
-    @property 
+    def fr1(self, value: float):
+        self.__class__._fr1 = float(value)
+
+    # --- fr0 ---
+    @property
     def fr0(self):
         return self.__class__._fr0
-    
-    @fr1.setter
-    def fr0(self, val):
-        self.__class__._fr0 = val
-        
-    @property 
+
+    @fr0.setter
+    def fr0(self, value: float):
+        self.__class__._fr0 = float(value)
+
+    # --- calibration factor ---
+    @property
     def CALIBRATION_FACTOR(self):
         return self.__class__._CALIBRATION_FACTOR
-    
-    
-        
-        
+
+    @CALIBRATION_FACTOR.setter
+    def CALIBRATION_FACTOR(self, value: float):
+        self.__class__._CALIBRATION_FACTOR= float(value)
+
+
+
 class kbCoefficient():
 
     #default calibration factor k_b 
     
-    if ELECTRONICS_FLAG == 1:
+    if ELECTRONICS_FLAG == 1 or ELECTRONICS_FLAG == 0:
         _k_b_1 = 0.083597946
         _k_b_2 = 0.084535931
     elif ELECTRONICS_FLAG == 2:
@@ -537,7 +540,6 @@ class VoltageNormaliseCoefficient():
     @amplitude_voltage_1.setter
     def amplitude_voltage_1(self, val):
         self.__class__._amplitude_voltage_1 = val
-
 
     @property
     def zero_offset_voltage_1(self):

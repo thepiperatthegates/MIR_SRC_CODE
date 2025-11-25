@@ -175,6 +175,11 @@ class DataUpdate(QThread):
                 self.i1_slice = packet_transmission.calibration_input_coil_1(self.i1_slice)
                 self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
 
+                # this is normalising step (still do not know whether I want to do it immidiately or not)
+                if self.flag_normalise:
+                    self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amplitude_voltage_1
+                    self.v2_slice = ( self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amplitude_voltage_2
+
                 # Calibrate process starts
                 # measurement fR process starts
                 # measurement to determine the normalising parameters (for first time rotation)
@@ -187,10 +192,6 @@ class DataUpdate(QThread):
                 self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
                                                                              self.v2_slice, self.i2_slice / 1000)
 
-                # this is normalising step (still do not know whether I want to do it immidiately or not)
-                if self.flag_normalise:
-                    self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amplitude_voltage_1
-                    self.v2_slice = ( self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amplitude_voltage_2
                 #######################################################################################################
                 self.angle_permanent_magnet_val = np.arctan2(self.v2_slice, self.v1_slice)
                 self.angle_magnetic_field_val = np.arctan2(self.i2_slice, self.i1_slice)
@@ -237,6 +238,7 @@ class DataUpdate(QThread):
         self.flag_fR_measurement = flag_fR_measurement
         # Set flag for normalise measurement event
         self.flag_normalise_measurement = flag_normalise_measurement
+
 
     def flag_normalise_event(self, flag_input):
 
@@ -425,8 +427,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         self.COIL_CONSTANT = packet_transmission.COIL_CONSTANT		# in T / A
         self.DIPOLE_MOMENT = packet_transmission.DIPOLE_MOMENT	# in A m^2
-        self.CALIBRATION_FACTOR = packet_transmission.CALIBRATION_FACTOR	# torque calibration no units (K)
-        
+        self.worker_get = packet_transmission.fRCoefficients()
+        packet_transmission.CALIBRATION_FACTOR = self.worker_get.CALIBRATION_FACTOR # torque calibration no units (K)
     
         #########################################################################################
         #placeholder text for textboxes################################################
@@ -656,6 +658,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.worker_DataUpdate.flag_normalise_event(True)
         else:
             self.worker_DataUpdate.flag_normalise_event(False)
+
+        print(self.worker_DataUpdate.flag_normalise)
                 
 
     def graph_update_sensors(self):
@@ -1122,7 +1126,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 current_map = {
                     1: 50,  2: 50,  3: 50,  4: 50,  5: 60,
                     6: 60,  7: 70,  8: 80,  9: 90,
-                    10: 40, 11: 50, 12: 50, 13: 50, 14: 50,
+                    10: 40, 11: 50, 12: 50, 13: 50, 14: 60,
                     15: 60, 16: 60, 17: 70, 18: 80, 19: 90
                 }
 
@@ -1235,7 +1239,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_data_block.data_1 =5.0 #second
         # make the running frequency 200 Hz, does not matter since we will produce DC current anyway
         # change to frequency for MCU
-        self.worker_data_block.data_2_for_MCU =5 #Hz
+        self.worker_data_block.data_2_for_MCU =2 #Hz
 
         self.worker_data_block.data_current = 300, 0, 300, 0
 
@@ -1290,11 +1294,15 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             #mark the end of the normalise measurement event
             self.worker_DataUpdate.flag_special_event(False, False, False)
 
-            self.worker_normalise_properties.amplitude_voltage_1 = (np.max(self.accumulate_hall_1[100:]) - np.min(self.accumulate_hall_1[100:])) / 2
-            self.worker_normalise_properties.zero_offset_voltage_1 = (np.max(self.accumulate_hall_1[100:]) + np.min(self.accumulate_hall_1[100:])) / 2
 
-            self.worker_normalise_properties.amplitude_voltage_2 = (np.max(self.accumulate_hall_2[100:]) - np.min(self.accumulate_hall_2[100:])) /  2
-            self.worker_normalise_properties.zero_offset_voltage_2 = (np.max(self.accumulate_hall_2[100:]) + np.min(self.accumulate_hall_2[100:])) / 2
+            self.worker_normalise_properties.amplitude_voltage_1 = (np.max(self.accumulate_hall_1[10:]) - np.min(self.accumulate_hall_1[10:])) / 2
+            self.worker_normalise_properties.zero_offset_voltage_1 = (np.max(self.accumulate_hall_1[10:]) + np.min(self.accumulate_hall_1[10:])) / 2
+
+            self.worker_normalise_properties.amplitude_voltage_2 = (np.max(self.accumulate_hall_2[10:]) - np.min(self.accumulate_hall_2[10:])) /  2
+            self.worker_normalise_properties.zero_offset_voltage_2 = (np.max(self.accumulate_hall_2[10:]) + np.min(self.accumulate_hall_2[10:])) / 2
+
+
+            self.worker_DataUpdate.flag_normalise_event(True)
 
 
             self.popout_window(6)
