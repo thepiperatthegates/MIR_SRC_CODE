@@ -82,7 +82,7 @@ class DataUpdate(QThread):
         self.accumulate_hall_1 = 0.0
         self.accumulate_hall_2 = 0.0
         self.accumulate_current_1 = 0.0
-        self.accumulate_current_2 = 0.0
+        self.accumulate_current_2 = 0.
 
         #for normalise properties purposes
         self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
@@ -183,9 +183,9 @@ class DataUpdate(QThread):
 
                 # Calibrated hall sensors
                 self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
-                                                                             self.v1_slice, self.i1_slice / 1000)
+                                                                            self.v1_slice, self.i1_slice / 1000)
                 self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
-                                                                             self.v2_slice, self.i2_slice / 1000)
+                                                                            self.v2_slice, self.i2_slice / 1000)
 
 
 
@@ -434,6 +434,9 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         
         self.start_vector_time = self.worker_remaining_time.start_vector_time
         self.end_vector_time = self.worker_remaining_time.end_vector_time
+        
+        self.worker_get = packet_transmission.fRCoefficients()
+        packet_transmission.CALIBRATION_FACTOR = self.worker_get.CALIBRATION_FACTOR # torque calibration no units (K)
 
         #for k_b setter getter
         self.worker_k_b_property = packet_transmission.kbCoefficient()

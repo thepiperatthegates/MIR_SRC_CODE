@@ -449,80 +449,111 @@ class StoreArrayGraph():
         self.__class__._phase_difference_val = val
 
 
+class fRCoefficients:
+    _initialized = False
 
+    # class-level shared variables (defaults)
+    _fr1 = None
+    _fr0 = None
+    _CALIBRATION_FACTOR = None
 
+    @classmethod
+    def _initialize(cls):
+        """Run once, based on ELECTRONICS_FLAG."""
+        global ELECTRONICS_FLAG
+        if cls._initialized:
+            return
 
-class fRCoefficients():
+        if ELECTRONICS_FLAG in (0, 1):
+            cls._fr1 = 1.51e-8
+            cls._fr0 = 5.701e-8
+            cls._CALIBRATION_FACTOR = 0.773
+        elif ELECTRONICS_FLAG == 2:
+            cls._fr1 = 0.0
+            cls._fr0 = 0.0
+            cls._CALIBRATION_FACTOR = 0.875
+        else:
+            raise ValueError(f"Invalid ELECTRONICS_FLAG = {ELECTRONICS_FLAG}")
 
-    # Class-level defaults based on the electronics flag
-    if ELECTRONICS_FLAG == 1 or ELECTRONICS_FLAG == 0:
-        _fr1 = 1.51e-8          # Nm / (rad/s)
-        _fr0 = 5.701e-8         # Nm / (rad/s)
-        _CALIBRATION_FACTOR = 0.773
-    elif ELECTRONICS_FLAG == 2:
-        _fr1 = 0.0
-        _fr0 = 0.0
-        _CALIBRATION_FACTOR = 0.875
-    else:
-        raise ValueError("Invalid ELECTRONICS_FLAG")
+        cls._initialized = True
 
-    # --- fr1 ---
+    # ---------- Properties ----------
     @property
     def fr1(self):
-        return self.__class__._fr1
+        type(self)._initialize()
+        return type(self)._fr1
 
     @fr1.setter
-    def fr1(self, value: float):
-        self.__class__._fr1 = float(value)
+    def fr1(self, value):
+        type(self)._initialize()
+        type(self)._fr1 = float(value)
 
-    # --- fr0 ---
     @property
     def fr0(self):
-        return self.__class__._fr0
+        type(self)._initialize()
+        return type(self)._fr0
 
     @fr0.setter
-    def fr0(self, value: float):
-        self.__class__._fr0 = float(value)
+    def fr0(self, value):
+        type(self)._initialize()
+        type(self)._fr0 = float(value)
 
-    # --- calibration factor ---
     @property
     def CALIBRATION_FACTOR(self):
-        return self.__class__._CALIBRATION_FACTOR
+        type(self)._initialize()
+        return type(self)._CALIBRATION_FACTOR
 
     @CALIBRATION_FACTOR.setter
-    def CALIBRATION_FACTOR(self, value: float):
-        self.__class__._CALIBRATION_FACTOR= float(value)
+    def CALIBRATION_FACTOR(self, value):
+        type(self)._initialize()
+        type(self)._CALIBRATION_FACTOR = float(value)
 
 
+class kbCoefficient:
+    _initialized = False
 
-class kbCoefficient():
+    _k_b_1 = None
+    _k_b_2 = None
 
-    #default calibration factor k_b 
-    
-    if ELECTRONICS_FLAG == 1 or ELECTRONICS_FLAG == 0:
-        _k_b_1 = 0.083597946
-        _k_b_2 = 0.084535931
-    elif ELECTRONICS_FLAG == 2:
-        _k_b_1 = 0.16423985101661842
-        _k_b_2 = 0.1666737395533449
-    
-    
+    @classmethod
+    def _initialize(cls):
+        """Run once based on the global ELECTRONICS_FLAG."""
+        global ELECTRONICS_FLAG
+        if cls._initialized:
+            return
+
+        if ELECTRONICS_FLAG in (0, 1):
+            cls._k_b_1 = 0.083597946
+            cls._k_b_2 = 0.084535931
+        elif ELECTRONICS_FLAG == 2:
+            cls._k_b_1 = 0.16423985101661842
+            cls._k_b_2 = 0.1666737395533449
+        else:
+            raise ValueError(f"Invalid ELECTRONICS_FLAG = {ELECTRONICS_FLAG}")
+
+        cls._initialized = True
+
+    # ---- k_b_1 ----
     @property
     def k_b_1(self):
-        return self.__class__._k_b_1
-    
+        type(self)._initialize()
+        return type(self)._k_b_1
+
     @k_b_1.setter
     def k_b_1(self, val):
-        self.__class__._k_b_1 = val 
-        
-        
+        type(self)._initialize()
+        type(self)._k_b_1 = float(val)
+
+    # ---- k_b_2 ----
     @property
     def k_b_2(self):
-        return self.__class__._k_b_2
-    
+        type(self)._initialize()
+        return type(self)._k_b_2
+
     @k_b_2.setter
     def k_b_2(self, val):
-        self.__class__._k_b_2 = val 
+        type(self)._initialize()
+        type(self)._k_b_2 = float(val)
 
 
 class VoltageNormaliseCoefficient():
@@ -710,7 +741,6 @@ def calculate_radial_frequency(running_frequency):
     return float(2 * np.pi * running_frequency)
 
 class DownsampleEvent():
-    
     def __init__(self, parent=None):
         super().__init__()
 

@@ -505,8 +505,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.button_rotate.clicked.connect(self.button_rotate_event)
 
         #DISABLE ALL THE BUTTON BEFORE NORMALISING EVENT
-        self.button_start.setDisabled(True)
-        self.button_stop.setDisabled(True)
+        self.button_start.setDisabled(False)
+        self.button_stop.setDisabled(False)
         self.save_button.setDisabled(True)
 
         #Start backend serial lines
@@ -807,11 +807,13 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.lcdNumber.display(val)
             
         if val not in (0, 0.1):
-            self.button_start.setDisabled(False)
-            self.button_stop.setDisabled(False)
-        else:
             self.button_start.setDisabled(True)
             self.button_stop.setDisabled(True)
+            self.save_button.setDisabled(True)
+        else:
+            self.button_start.setDisabled(False)
+            self.button_stop.setDisabled(False)
+            self.save_button.setDisabled(False)
 
     def start_calibration_event(self, input_current = -400, count_recursion = 1 ):
         print("Recursion in main func:", count_recursion)
@@ -883,7 +885,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         if val != 0.0:
             self.button_send.setDisabled(True)
             self.button_start.setDisabled(True)
-            self.button_stop.setDisabled(False)
+            self.button_stop.setDisabled(True)
 
         elif val == 0.0:  #when val is 0 and the thread is stops already
             
@@ -1179,14 +1181,14 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 #enable the button again
                 self.button_send.setDisabled(False)
                 self.button_start.setDisabled(False)
-                self.button_stop.setDisabled(True)
+                self.button_stop.setDisabled(False)
                 
                 
                 if val == 0:
                     #enable the button again
                     self.button_send.setDisabled(False)
                     self.button_start.setDisabled(False)
-                    self.button_stop.setDisabled(True)
+                    self.button_stop.setDisabled(False)
                 
         if val == 0:
             #enable the button again
@@ -1347,13 +1349,24 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         os.execv(sys.executable, ['python'] + sys.argv)
 
     def save_button_event(self):
-        filename_saving, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv)")
-    
-        dir_dummy_csv = os.path.join(self.project_root, "files", "dummy.csv")
+        # Disable immediately to prevent double clicks
+        self.save_button.setEnabled(False)
+
+        # Show the dialog (modal → blocks this function until closed)
+        filename_saving, _ = QFileDialog.getSaveFileName(
+            self, "Save File", "", "CSV Files (*.csv)"
+        )
         
+        # Re-enable after dialog is closed (save or cancel)
+        self.save_button.setEnabled(True)
+
+        # Continue only if the user selected a file
         if filename_saving:
+            dir_dummy_csv = os.path.join(self.project_root, "files", "dummy.csv")
+
             data_read = np.loadtxt(dir_dummy_csv, delimiter=';')
             np.savetxt(filename_saving, data_read, delimiter=';')
+
     
     def popout_window(self, arg):
         msg = QMessageBox()
