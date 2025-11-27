@@ -968,7 +968,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.calculate_final_fR = 0
             
         ############################# send data to setter getter ############################################################################
-        self.worker_data_block.data_1 = str(3) #mA
+        self.worker_data_block.data_1 = str(5) #mA
         self.worker_data_block.data_2_for_MCU  = str(running_frequency) # Hz
         
         self.worker_data_block.data_current = str(200), self.textbox_offset1.text(), str(200), self.textbox_offset2.text()
@@ -994,7 +994,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
 
         QtCore.QTimer.singleShot(
-            3000,
+            1000* int(self.worker_data_block.data_1),
             lambda: self.start_friction_coeff_event(input_current, running_frequency, rotation_direction, count_recursion)
         )
 
@@ -1124,15 +1124,16 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 count_recursion += 1
                 
                                 
-                                #mapping for current {count_recursion:input_current}
+                #mapping for current {count_recursion:input_current}
                 current_map = {
-                    1: 50,  2: 50,  3: 50,  4: 50,  5: 60,
-                    6: 60,  7: 70,  8: 80,  9: 90,
-                    10: 40, 11: 50, 12: 50, 13: 50, 14: 60,
-                    15: 60, 16: 60, 17: 70, 18: 80, 19: 90
+                    1: 50,  2: 50,  3: 60,  4: 60,  5: 70,
+                    6: 70,  7:80,  8: 90,  9: 100,
+                    10: 40, 11: 50, 12: 50, 13: 50, 14: 70,
+                    15: 70, 16: 70, 17: 80, 18: 90, 19: 90
                 }
 
                 input_current = current_map.get(count_recursion, 0)  # default 0 if not found
+                print("Input current is", input_current)
 
                     
                 ###recursion to the main function occurs

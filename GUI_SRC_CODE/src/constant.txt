@@ -1,0 +1,1 @@
+constant for tesla to current = 3.1
