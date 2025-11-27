@@ -196,49 +196,58 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             #HIDE THE TABLE WIDGET 
             self.table_Widget.show()
             self.canvas.hide()
+            self.offsets_update()
             self.data_mode_function()
             
         elif mode == "Currents diagram":
             #HIDE THE TABLE WIDGET 
             self.table_Widget.hide()
             self.canvas.show()
+            self.offsets_update()
             self.draw_current_diagrams()
             
             
         elif mode == "Voltage diagram":
             self.table_Widget.hide()
             self.canvas.show()
+            self.offsets_update()
             self.draw_voltage_diagrams()
             
         elif mode == "Phase diagram":
             self.table_Widget.hide()
             self.canvas.show()
+            self.offsets_update()
             self.draw_phase_diagram()
             
         elif mode == "Angular velocity diagram":
             self.table_Widget.hide()
             self.canvas.show()
+            self.offsets_update()
             self.draw_angular_velocity_diagram()
             
         elif mode == "Torque diagram":
             self.table_Widget.hide()
             self.canvas.show()
+            self.offsets_update()
             self.draw_torque_diagram()
             
         elif mode == "Shear rate diagram":
             self.table_Widget.hide()
             self.canvas.show()
+            self.offsets_update()
             self.draw_shear_rate_diagram()
 
 
         elif mode == "Shear stress diagram":
             self.table_Widget.hide()
             self.canvas.show()
+            self.offsets_update()
             self.draw_shear_stress_diagram()
 
         elif mode == "Viscosity diagram":
             self.table_Widget.hide()
             self.canvas.show()
+            self.offsets_update()
             self.draw_viscosity_diagram()
             
             
@@ -412,6 +421,23 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             self.fr0_to_be_saved, 
             self.fr1_to_be_saved
         ))
+
+
+
+    def offsets_update(self):
+        """
+        Updates the offsets from the backend and update the textboxes in the GUI
+
+        Returns: none
+
+        """
+        #get the fr from packet tranmision
+        self.fr0 = self.worker_get_fr_coefficient.fr0
+        self.fr1 = self.worker_get_fr_coefficient.fr1
+
+        #change text box for visibility
+        self.textbox_offset1.setText(str(self.offset_1))
+        self.textbox_offset2.setText(str(object=self.offset_2))
             
             
             

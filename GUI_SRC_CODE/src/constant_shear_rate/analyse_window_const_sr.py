@@ -175,49 +175,58 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             # HIDE THE TABLE WIDGET
             self.table_Widget.show()
             self.canvas.hide()
+            self.offsets_update()
             self.data_mode_function()
 
         elif mode == "Currents diagram":
             # HIDE THE TABLE WIDGET
             self.table_Widget.hide()
             self.canvas.show()
+            self.offsets_update()
             self.draw_current_diagrams()
 
 
         elif mode == "Voltage diagram":
             self.table_Widget.hide()
             self.canvas.show()
+            self.offsets_update()
             self.draw_voltage_diagrams()
 
         elif mode == "Phase diagram":
             self.table_Widget.hide()
             self.canvas.show()
+            self.offsets_update()
             self.draw_phase_diagram()
 
         elif mode == "Angular velocity diagram":
             self.table_Widget.hide()
             self.canvas.show()
+            self.offsets_update()
             self.draw_angular_velocity_diagram()
 
         elif mode == "Torque diagram":
             self.table_Widget.hide()
             self.canvas.show()
+            self.offsets_update()
             self.draw_torque_diagram()
 
         elif mode == "Shear rate diagram":
             self.table_Widget.hide()
             self.canvas.show()
+            self.offsets_update()
             self.draw_shear_rate_diagram()
 
 
         elif mode == "Shear stress diagram":
             self.table_Widget.hide()
             self.canvas.show()
+            self.offsets_update()
             self.draw_shear_stress_diagram()
 
         elif mode == "Viscosity diagram":
             self.table_Widget.hide()
             self.canvas.show()
+            self.offsets_update()
             self.draw_viscosity_diagram()
 
     def data_calculation_function(self):
@@ -410,15 +419,38 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.textbox_offset1.setText(str(self.offset_1))
         self.textbox_offset2.setText(str(object=self.offset_2))
 
+
+    def offsets_update(self):
+        """
+        Updates the offsets from the backend and update the textboxes in the GUI
+
+        Returns: none
+
+        """
+        #get the fr from packet tranmision
+        self.fr0 = self.worker_get_fr_coefficient.fr0
+        self.fr1 = self.worker_get_fr_coefficient.fr1
+
+        #change text box for visibility
+        self.offset_1 = self.worker_get_offset.data_4
+        self.offset_2 = self.worker_get_offset.data_6
+        self.textbox_offset1.setText(str(self.offset_1))
+        self.textbox_offset2.setText(str(object=self.offset_2))
+
+
         print("Offset 1 from csv:", self.offset_1)
         print("Offset 2 from csv:", self.offset_2)
         print("fr0 from csv:", self.fr0)
         print("fr1 from csv:", self.fr1)
 
+
     def save_button_event(self):
 
+        self.save_Button.setEnabled(False)
         filename, _ = QFileDialog.getSaveFileName(parent=self, caption="Save File", directory="",
                                                   filter="CSV Files (*.csv)")
+
+        self.save_Button.setEnabled(True)
         if filename:
             # Save with pandas
             df = pandas.DataFrame(self.final_data_to_save)
@@ -489,7 +521,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.shear_rate = self.angular_velocity * self.C_SR  # [1 / s]
 
     def calculate_friction_moment(self):
-        self.friction_moment = self.angular_velocity * self.fr1 - self.fr0  # - y_0        # [Nm]
+        self.friction_moment = self.angular_velocity * self.fr1 + self.fr0  # - y_0        # [Nm]
 
     def calculate_magnitude_current(self):
         power_of_2 = np.power((self.current_1 - float(self.offset_1)), 2) + np.power(
