@@ -1,14 +1,12 @@
 import numpy as np
 from PyQt5 import QtGui
-from PyQt5 import *
 from PyQt5.QtCore import QFileInfo
-from PyQt5 import uic
 from PyQt5.QtWidgets import *
 
 
 
 
-from analyse_Window import Ui_analyse_Window
+from .analyse_Window import Ui_analyse_Window
 import packet_transmission
 
 from scipy.signal import savgol_filter
@@ -75,18 +73,22 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
     
         ###############################inherited from another process 
         
-        self.fr0 = packet_transmission.fr0
-        self.fr1 = packet_transmission.fr1
+        self.worker_get_fr_coefficient = packet_transmission.fRCoefficients()
+        self.fr0 = self.worker_get_fr_coefficient.fr0
+        self.fr1 =self.worker_get_fr_coefficient.fr1
+        
         self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
             f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
         
         ##########################################################
         self.COIL_CONSTANT = packet_transmission.COIL_CONSTANT		# in T / A
         self.DIPOLE_MOMENT = packet_transmission.DIPOLE_MOMENT		# in A m^2
-        self.CALIBRATION_FACTOR = packet_transmission.CALIBRATION_FACTOR		# torque calibration no units (K)
+        self.CALIBRATION_FACTOR = self.worker_get_fr_coefficient.CALIBRATION_FACTOR		# torque calibration no units (K)
+        
+        
+        self.worker_get_offset = packet_transmission.TxData()
     
-        self.offset_1 = 0.0
-        self.offset_2 = 0.0
+        self.offset_1, self.offset_2 = self.worker_get_offset.data_offsets_creep
         
         
         #placeholder for the offsets input
@@ -166,10 +168,10 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.textbox_offset2.editingFinished.connect(self.save_offset2_event)
         
     def save_offset1_event(self):
-        self.offset_1 = self.textbox_offset1.text()
+        self.offset_1 = float(self.textbox_offset1.text())
         
     def save_offset2_event(self):
-        self.offset_2 = self.textbox_offset2.text()
+        self.offset_2 = float(self.textbox_offset2.text())
 
     def find_filename_button_pressed(self):
         self.analyse_filename = QFileDialog.getOpenFileName(filter="csv (*.csv)")[0]
@@ -344,13 +346,11 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.current_1 = self.data[:, 3]
         self.current_2 = self.data[:, 4]
         
-        self.offset_1, self.offset_2 = packet_transmission.get_offsets()
+        self.offset_1, self.offset_2 = self.worker_get_offset.data_offsets_creep
         
         self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
         f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
-        
-        #call normalise function 
-        self.normalise_voltage_event()
+
         self.calculate_angle()
         self.calculate_magnitude_current()
         # calculate rotation velocity
@@ -373,8 +373,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         vis = self.viscosity.reshape(-1, 1) 
         
         #get the fr from packet tranmision
-        self.fr0, self.fr1 = packet_transmission.get_fr_coefficient()
-        
+        self.fr0 = self.worker_get_fr_coefficient.fr0
+        self.fr1 = self.worker_get_fr_coefficient.fr1
 
         #change text box for visibility
         self.textbox_offset1.setText(str(self.offset_1))
@@ -464,35 +464,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         print("Offset 2 from csv:", self.offset_2)
         print("fr0 from csv:", self.fr0)
         print("fr1 from csv:", self.fr1)
-    
-            
-        
-        
-    
-    def normalise_voltage_event(self):
-        """
-        Normalize Hall sensor voltage data.
 
-        This method reads the Hall voltage data from `self.data` (columns 1 and 2),
-        calculates the amplitude and zero offset, and then normalizes the voltage
-        so that it is centered around 0 and scaled by its amplitude.
-
-        After normalization, the voltage data in `self.data[:, 1]` and
-        `self.data[:, 2]` will be in the range [-1, 1].
-
-        :return: None
-        """
-        # #read column 2 and column 3 for the hall voltage
-        amplitude_voltage_1 = (np.max(self.data[:, 1]) - np.min(self.data[:, 1]))/2.0
-        zero_offset_voltage_1 = (np.max(self.data[:, 1]) + np.min(self.data[:, 1]))/2.0
-
-        amplitude_voltage_2 = (np.max(self.data[:, 2]) - np.min(self.data[:, 2]))/2.0
-        zero_offset_voltage_2 = (np.max(self.data[:, 2]) + np.min(self.data[:, 2]))/2.0
-
-        self.data[:, 1] = (self.data[:, 1]- zero_offset_voltage_1 )/amplitude_voltage_1
-        self.data[:, 2] = (self.data[:, 2]-  zero_offset_voltage_2 )/amplitude_voltage_2
-
-    
     def save_button_event(self):
         
        
@@ -562,7 +534,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         """
         self.angular_velocity = savgol_filter(
             self.angle_magnet[:, 0],      # your noisy angle signal
-            window_length=400,            # try 51, 101, etc. depending on how smooth you want
+            window_length=100,            # try 51, 101, etc. depending on how smooth you want
             polyorder=3,                  # 2 or 3 works well
             deriv=1,                      # first derivative
             delta=np.mean(np.diff(self.time))  # time step
@@ -582,16 +554,16 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         
     def calculate_shear_stress(self):
-        
-        self.total_torque = (self.CALIBRATION_FACTOR*            # dimensionslos 
-        self.DIPOLE_MOMENT                    # [A·m²]
-        * self.COIL_CONSTANT                    # [T/A]
-        * self.magnitude_current / 1000         # mA -> A, [A]
-        * np.sin(self.phase_difference[:, 0]))   # dimensionless
-        - self.friction_moment              # [Nm]
-        
-        
-        
+
+        self.total_torque = (
+                self.CALIBRATION_FACTOR  # dimensionless
+                * self.DIPOLE_MOMENT  # [A·m²]
+                * self.COIL_CONSTANT  # [T/A]
+                * (self.magnitude_current / 1000)  # mA → A
+                * np.sin(self.phase_difference[:, 0])  # dimensionless
+                - self.friction_moment  # [Nm]
+        )
+
         self.shear_stress =  self.total_torque * self.C_SS	# [Pa]
 
     def calculate_viscosity(self):
@@ -626,8 +598,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
         #read current, 2nd and 3rd columns
         time =  self.time
-        current1 =  self.current_1
-        current2 =  self.current_2
+        current1 =  self.current_1 - float(self.offset_1)
+        current2 =  self.current_2 - float(self.offset_2)
         
         self.canvas.axes.cla()  #clear canvas
         self.canvas.axes.set_title(r"Current sensors", fontsize=20)
@@ -669,7 +641,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         time = self.time
         phase_magnetic_field = self.angle_magnetic_field
-        phase_magnet = self.angle_magnet
+        phase_magnet = self.angle_magnet 
         phase_difference = self.phase_difference
         
         self.canvas.axes.cla()  #clear canvas
@@ -749,6 +721,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
 
 def main_3():
+    
     app3 = QApplication([])
     
     # get absolute path of project root (folder containing 'src' and 'pics')

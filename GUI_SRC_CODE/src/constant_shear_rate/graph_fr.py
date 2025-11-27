@@ -7,7 +7,7 @@ import sys
 import os
 import multiprocessing
 import sys
-from popout_graph import Ui_MainWindow
+from .popout_graph_for_fr import Ui_MainWindow
 import matplotlib
 import matplotlib.pyplot as plt
 import pandas
@@ -51,7 +51,8 @@ class PlotWindow(QMainWindow, Ui_MainWindow):
         self.horizontalLayout.addWidget(self.mlp_toolbar)
         
         #project root dir
-        self.project_root = os.path.dirname(os.path.abspath(__file__))
+        #go two level up (chaining dirname)
+        self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         self.dir_name = os.path.join(self.project_root, "files", "results_fr.csv")
         #open results_fr.csv files
         
