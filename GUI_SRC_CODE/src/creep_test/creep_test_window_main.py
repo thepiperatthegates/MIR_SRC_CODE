@@ -26,12 +26,12 @@ data_mutex = QMutex()
 
 
 
-#function receiving data through pipe from another thread
+# function receiving data through pipe from another thread
 class DataUpdate(QThread):
     """
     Thread class responsible for receiving, processing, and managing ADC data streams for Hall sensors and current sensors in real-time.
 
-    This class reads incoming data packets from a queue, converts raw ADC values into meaningful voltage and current signals, 
+    This class reads incoming data packets from a queue, converts raw ADC values into meaningful voltage and current signals,
     applies calibration and normalization, and computes derived quantities such as magnetic field angles and phase differences.
 
     The processed data is stored in a separate worker class (`StoreArrayGraph`) for visualization or further analysis.
@@ -70,27 +70,25 @@ class DataUpdate(QThread):
         Object responsible for storing processed arrays for visualization.
     """
 
-
-    def __init__(self, main_window_ref = None):
+    def __init__(self, main_window_ref=None):
         super().__init__()
         self.main_window_ref = main_window_ref
         self.running = True
         self.flag_calibrate = False
 
-
         self.flag_fR_measurement = False
         self.accumulate_hall_1 = 0.0
         self.accumulate_hall_2 = 0.0
         self.accumulate_current_1 = 0.0
-        self.accumulate_current_2 = 0.
+        self.accumulate_current_2 = 0.0
 
-        #for normalise properties purposes
+        # for normalise properties purposes
         self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
         self.amplitude_voltage_1 = 0.0
         self.zero_offset_voltage_1 = 0.0
         self.amplitude_voltage_2 = 0.0
         self.zero_offset_voltage_2 = 0.0
-        
+
         self.flag_normalise = False
         self.flag_normalise_measurement = False
 
@@ -98,15 +96,14 @@ class DataUpdate(QThread):
         self.total_hall_2 = None
         self.total_current_1 = None
         self.total_current_2 = None
-        
-        
-        self.v1_slice   = np.array([], dtype=np.uint16)
-        self.v2_slice   = np.array([], dtype=np.uint16)
-        self.i1_slice   = np.array([],  dtype=np.uint16)
-        self.i2_slice   = np.array([], dtype=np.uint16)
-        
+
+        self.v1_slice = np.array([], dtype=np.uint16)
+        self.v2_slice = np.array([], dtype=np.uint16)
+        self.i1_slice = np.array([], dtype=np.uint16)
+        self.i2_slice = np.array([], dtype=np.uint16)
+
         self.bytes_to_process = np.array([], dtype=np.uint16)  # Empty NumPy array for incoming data
-        
+
         self.angle_permanent_magnet_val = np.array([], dtype=np.float32)
         self.angle_magnetic_field_val = np.array([], dtype=np.float32)
         self.phase_difference_val = np.array([], dtype=np.float32)
@@ -175,6 +172,11 @@ class DataUpdate(QThread):
                 self.i1_slice = packet_transmission.calibration_input_coil_1(self.i1_slice)
                 self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
 
+                # this is normalising step (still do not know whether I want to do it immidiately or not)
+                if self.flag_normalise:
+                    self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amplitude_voltage_1
+                    self.v2_slice = ( self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amplitude_voltage_2
+
                 # Calibrate process starts
                 # measurement fR process starts
                 # measurement to determine the normalising parameters (for first time rotation)
@@ -183,16 +185,10 @@ class DataUpdate(QThread):
 
                 # Calibrated hall sensors
                 self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
-                                                                            self.v1_slice, self.i1_slice / 1000)
+                                                                             self.v1_slice, self.i1_slice / 1000)
                 self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
-                                                                            self.v2_slice, self.i2_slice / 1000)
+                                                                             self.v2_slice, self.i2_slice / 1000)
 
-
-
-                # this is normalising step (still do not know whether I want to do it immidiately or not)
-                if self.flag_normalise:
-                    self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amplitude_voltage_1
-                    self.v2_slice = (self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amplitude_voltage_2
                 #######################################################################################################
                 self.angle_permanent_magnet_val = np.arctan2(self.v2_slice, self.v1_slice)
                 self.angle_magnetic_field_val = np.arctan2(self.i2_slice, self.i1_slice)
@@ -219,7 +215,7 @@ class DataUpdate(QThread):
                 self.bytes_to_process = np.array([], dtype=np.uint16)
 
     def accumulate_data_function(self, store_array1_calibrate, store_array2_calibrate, store_array3_calibrate,
-                              store_array4_calibrate):
+                                 store_array4_calibrate):
 
         self.accumulate_hall_1 = np.append(self.total_hall_1, store_array1_calibrate)
         self.accumulate_hall_2 = np.append(self.total_hall_2, store_array2_calibrate)
@@ -239,7 +235,6 @@ class DataUpdate(QThread):
         self.flag_fR_measurement = flag_fR_measurement
         # Set flag for normalise measurement event
         self.flag_normalise_measurement = flag_normalise_measurement
-
 
 
     def flag_normalise_event(self, flag_input):
@@ -409,6 +404,8 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
 
         self.worker_socket.start()
         self.worker_DataUpdate.start()
+        self.worker_sleep = None
+        self.worker_vector_sleep = None
         ################################################################################################
         
         ####### flag init ##############################################################################
@@ -928,17 +925,16 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             self.button_send_start_vec.setDisabled(False)
             self.button_start_acquistion.setDisabled(False)
 
+
     def button_rotate_event(self):
 
         ############################# send data to setter getter ######################################
 
-        # self.worker_data_block.data_1 = 5.0  #second
-        self.worker_remaining_time.total_time_for_file_save  = 5.0  #second
-
-        print(self.worker_remaining_time.total_time_for_file_save)
+        self.worker_data_block.data_1 = 5.0  # second
+        self.worker_remaining_time.total_time_for_file_save = 5.0 # second
         # make the running frequency 200 Hz, does not matter since we will produce DC current anyway
         # change to frequency for MCU
-        self.worker_data_block.data_2_for_MCU = 4 #Hz
+        self.worker_data_block.data_2_for_MCU = 2  # Hz
 
         self.worker_data_block.data_current = 300, 0, 300, 0
 
@@ -955,7 +951,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         ######################################################################################
 
         ##send all data to microcontroller
-        #activate flag
+        # activate flag
         self.worker_flag_send.flag_tx = True
 
         self.status_label.setStyleSheet("color: #7da832;")
@@ -965,8 +961,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.worker_sleep.update_time_signal.connect(self.update_timer_rotation)
         self.worker_sleep.start()
 
-
-        #active the flag on DataUpdate side for finding normalising parameters for the voltages
+        # active the flag on DataUpdate side for finding normalising parameters for the voltages
         self.worker_DataUpdate.flag_special_event(False, False, True)
 
     def update_timer_rotation(self, val):
@@ -974,7 +969,6 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         for rotation timer purposes
         """
         self.lcdNumber.display(val)
-        print(val)
 
         if val != 0.0:
             self.button_offsets.setDisabled(True)
@@ -982,27 +976,31 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             self.button_start_acquistion.setDisabled(True)
             self.save_button.setDisabled(True)
 
-            print("WHAT")
         elif val == 0.0:
             self.button_offsets.setDisabled(False)
             self.button_send_start_vec.setDisabled(False)
             self.button_start_acquistion.setDisabled(False)
             self.save_button.setDisabled(False)
 
-
-            #mark the end of the normalise measurement event
+            # mark the end of the normalise measurement event
             self.worker_DataUpdate.flag_special_event(False, False, False)
 
-            self.worker_normalise_properties.amplitude_voltage_1 = (np.max(self.accumulate_hall_1[100:]) - np.min(self.accumulate_hall_1[100:])) / 2
-            self.worker_normalise_properties.zero_offset_voltage_1 = (np.max(self.accumulate_hall_1[100:]) + np.min(self.accumulate_hall_1[100:])) / 2
+            self.worker_normalise_properties.amplitude_voltage_1 = (np.max(self.accumulate_hall_1[10:]) - np.min(
+                self.accumulate_hall_1[10:])) / 2
+            self.worker_normalise_properties.zero_offset_voltage_1 = (np.max(self.accumulate_hall_1[10:]) + np.min(
+                self.accumulate_hall_1[10:])) / 2
 
-            self.worker_normalise_properties.amplitude_voltage_2 = (np.max(self.accumulate_hall_2[100:]) - np.min(self.accumulate_hall_2[100:])) /  2
-            self.worker_normalise_properties.zero_offset_voltage_2 = (np.max(self.accumulate_hall_2[100:]) + np.min(self.accumulate_hall_2[100:])) / 2
+            self.worker_normalise_properties.amplitude_voltage_2 = (np.max(self.accumulate_hall_2[10:]) - np.min(
+                self.accumulate_hall_2[10:])) / 2
+            self.worker_normalise_properties.zero_offset_voltage_2 = (np.max(self.accumulate_hall_2[10:]) + np.min(
+                self.accumulate_hall_2[10:])) / 2
+
+            self.worker_DataUpdate.flag_normalise_event(True)
 
             self.popout_window(6)
 
     def set_constant(self, get_accumulate_hall_1, get_accumulate_hall_2, get_accumulate_current_1,
-                    get_accumulate_current2):
+                     get_accumulate_current2):
         """
         Set accumulated measurement values for Hall sensors and current sensors.
 
