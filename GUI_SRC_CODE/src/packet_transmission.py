@@ -469,8 +469,8 @@ class fRCoefficients:
             cls._fr0 = -8.577e-08
             cls._CALIBRATION_FACTOR = 0.773
         elif ELECTRONICS_FLAG == 2:
-            cls._fr1 = 0.0
-            cls._fr0 = 0.0
+            cls._fr1 = 2.613e-08
+            cls._fr0 = 1.186e-07
             cls._CALIBRATION_FACTOR = 0.875
         else:
             raise ValueError(f"Invalid ELECTRONICS_FLAG = {ELECTRONICS_FLAG}")

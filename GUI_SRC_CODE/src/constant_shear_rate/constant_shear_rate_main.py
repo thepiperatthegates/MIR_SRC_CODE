@@ -175,6 +175,13 @@ class DataUpdate(QThread):
                 self.i1_slice = packet_transmission.calibration_input_coil_1(self.i1_slice)
                 self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
 
+
+                # calibration for  hall sensors
+                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
+                                                                             self.v1_slice, self.i1_slice / 1000)
+                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
+                                                                             self.v2_slice, self.i2_slice / 1000)
+
                 # this is normalising step (still do not know whether I want to do it immidiately or not)
                 if self.flag_normalise:
                     self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amplitude_voltage_1
@@ -186,11 +193,6 @@ class DataUpdate(QThread):
                 if self.flag_calibrate or self.flag_fR_measurement or self.flag_normalise_measurement:
                     self.accumulate_data_function(self.v1_slice, self.v2_slice, self.i1_slice, self.i2_slice)
 
-                # Calibrated hall sensors
-                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
-                                                                             self.v1_slice, self.i1_slice / 1000)
-                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
-                                                                             self.v2_slice, self.i2_slice / 1000)
 
                 #######################################################################################################
                 self.angle_permanent_magnet_val = np.arctan2(self.v2_slice, self.v1_slice)
@@ -501,13 +503,15 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         self.save_button.clicked.connect(self.save_button_event)
 
+        self.button_send.setDisabled(True)
+        self.button_start.setDisabled(True)
+        self.button_stop.setDisabled(True)
+        self.button_rotate.setDisabled(False)
+        self.normalise_button.setDisabled(True)
+
+
         #### rotote the magnet button
         self.button_rotate.clicked.connect(self.button_rotate_event)
-
-        #DISABLE ALL THE BUTTON BEFORE NORMALISING EVENT
-        self.button_start.setDisabled(False)
-        self.button_stop.setDisabled(False)
-        self.save_button.setDisabled(True)
 
         #Start backend serial lines
         
@@ -1233,6 +1237,9 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #activate flag
         self.worker_flag_send.flag_tx = True
         self.status_label.setText("Stop rotation!!....")
+
+
+        self.button_rotate.setDisabled(False)
 
 
     def button_rotate_event(self):

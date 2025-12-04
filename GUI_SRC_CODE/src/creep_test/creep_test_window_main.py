@@ -172,10 +172,15 @@ class DataUpdate(QThread):
                 self.i1_slice = packet_transmission.calibration_input_coil_1(self.i1_slice)
                 self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
 
-                # this is normalising step (still do not know whether I want to do it immidiately or not)
-                if self.flag_normalise:
-                    self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amplitude_voltage_1
-                    self.v2_slice = ( self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amplitude_voltage_2
+
+
+                # calibration for hall sensors
+                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
+                                                                             self.v1_slice, self.i1_slice / 1000)
+                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
+                                                                             self.v2_slice, self.i2_slice / 1000)
+
+
 
                 # Calibrate process starts
                 # measurement fR process starts
@@ -183,11 +188,10 @@ class DataUpdate(QThread):
                 if self.flag_calibrate or self.flag_fR_measurement or self.flag_normalise_measurement:
                     self.accumulate_data_function(self.v1_slice, self.v2_slice, self.i1_slice, self.i2_slice)
 
-                # Calibrated hall sensors
-                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
-                                                                             self.v1_slice, self.i1_slice / 1000)
-                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
-                                                                             self.v2_slice, self.i2_slice / 1000)
+                # this is normalising step (still do not know whether I want to do it immidiately or not)
+                if self.flag_normalise:
+                    self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amplitude_voltage_1
+                    self.v2_slice = ( self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amplitude_voltage_2
 
                 #######################################################################################################
                 self.angle_permanent_magnet_val = np.arctan2(self.v2_slice, self.v1_slice)
@@ -1071,9 +1075,17 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         os.execv(sys.executable, ['python'] + sys.argv)
 
     def save_button_event(self):
-        filename_saving, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv)")
-    
-        dir_dummy_csv = os.path.join(self.project_root, "files", "dummy.csv")
+        # Disable immediately to prevent double clicks
+        # Disable immediately to prevent double clicks
+        self.save_button.setEnabled(False)
+
+        # Show the dialog (modal → blocks this function until closed)
+        filename_saving, _ = QFileDialog.getSaveFileName(
+            self, "Save File", "", "CSV Files (*.csv)"
+        )
+
+        # Re-enable after dialog is closed (save or cancel)
+        self.save_button.setEnabled(True)
         
         if filename_saving:
             data_read = np.loadtxt(dir_dummy_csv, delimiter=';')

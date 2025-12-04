@@ -188,6 +188,7 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
 
     worker_data_flag = packet_transmission.RunningTimeFlag()
     worker_process_flag = packet_transmission.ProcessUnpackingFlag()
+    worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
     
     #start count with zero
     count = 0
@@ -216,7 +217,7 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
                 if worker_data_flag.flag_running_time:
                     
                     if data_send:
-                        save_to_csv(data_send, worker_kb_property, worker_specific_downsampling)
+                        save_to_csv(data_send, worker_kb_property, worker_specific_downsampling, worker_normalise_properties)
                         data_send = None
                     print("Data written!")
             except Exception as e:
@@ -274,12 +275,6 @@ def start_process_live_graph(queue1, q_to_graph, q_to_csv):
         - After processing the full buffer, the collected integers are sent 
           to both output queues.
 
-    Notes:
-        - The function never terminates on its own (infinite loop).
-        - Assumes that each identifier is always followed by at least two bytes.
-        - Any bytes not matching the identifier set are ignored.
-        - Intended to run in its own process or thread for real-time streaming.
-
     """
     
 
@@ -316,58 +311,80 @@ def file_name_change_set(prefix, extension=".csv"):
     file_name = f"{prefix}{extension}"
     
 
-def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling, num_columns=4):
+def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling, worker_normalise_properties, num_columns=4):
     """
-    Process, calibrate, average, and save measurement data to a CSV file.
+    Process, calibrate, downsample, timestamp, and save measurement data to a CSV file.
 
-    This function takes a raw ADC data buffer, reshapes it into the specified number of columns,
-    converts raw ADC values into physical quantities (e.g., magnetic field, current), applies
-    calibration and averaging, appends a time column, and saves the results to a CSV file.
-
-    The function uses several global parameters and functions for calibration, conversion, and 
-    averaging. The CSV file is automatically created in the 'files' directory under the project root.
-    If the file already exists, the new data is appended.
+    This function takes a raw ADC data buffer, reshapes it into the specified number of
+    columns, converts the raw readings into calibrated physical quantities, applies
+    optional or default downsampling, generates a time column based on worker-defined
+    timing parameters, and appends the resulting data to a CSV file inside the project's
+    ``files`` directory.
 
     Parameters
     ----------
     cleaned_buffer : array_like
-        The input buffer containing ADC samples in a flat structure (1D list or NumPy array).
-        Must have a total length that is a multiple of `num_columns`.
+        Flat input buffer containing raw ADC samples. Length must be divisible by
+        ``num_columns``.
+    worker_kb_property : object
+        Object providing Hall sensor calibration constants:
+            - ``k_b_1`` : calibration coefficient for Hall sensor 1
+            - ``k_b_2`` : calibration coefficient for Hall sensor 2
+    worker_specific_downsampling : object
+        Object controlling downsampling and timing:
+            - ``flag_specific_downsample`` : whether user-specified downsampling should be used
+            - ``tot_average`` : default averaging factor
+            - ``tot_average_specified`` : user-specified averaging factor
+            - ``time_increment`` : default sample time step (s)
+            - ``time_increment_specified`` : user-specified sample time step (s)
+            - ``current_time`` : running timestamp updated after each call
+    worker_normalise_properties : object
+        Object containing:
+            - ``zero_offset_voltage_1`` : normalisation offset for Hall sensor 1
+            - ``zero_offset_voltage_2`` : normalisation offset for Hall sensor 2
+            - ``amplitude_voltage_1`` : normalisation amplitude for Hall sensor 1
+            - ``amplitude_voltage_2`` : normalisation amplitude for Hall sensor 2
     num_columns : int, optional
-        Number of columns per data row in `cleaned_buffer`. Default is 4, corresponding to:
-        - Column 1: U1 (Hall sensor 1)
-        - Column 2: U2 (Hall sensor 2)
-        - Column 3: I1 (Current sensor 1)
-        - Column 4: I2 (Current sensor 2)
+        Number of columns per row in the ADC buffer. Default is 4:
+            1. U1 (Hall sensor 1 / 1st Buffer)
+            2. U2 (Hall sensor 2 / 2nd Buffer)
+            3. I1 (Current coil 1 / 4th Buffer)
+            4. I2 (Current coil 2 / 3rd Buffer)
 
-    Global Variables
+    Processing Steps
     ----------------
-    file_name : str
-        Name of the CSV file where processed data is saved.
-    current_time : float
-        The current timestamp (in seconds) used to generate the time column.
-    tot_average : int
-        Averaging factor used to reduce the amount of saved data.
-    time_increment : float
-        Time difference between successive samples in seconds.
-    offset_1, offset_2 : float
-        Calibration offsets used in sensor conversion.
-    
-    Notes
-    -----
-    - The resulting CSV file will contain columns in the following order:
-        1. Time (s)
-        2. Calibrated Hall sensor 1 value [U1 / V]
-        3. Calibrated Hall sensor 2 value [U2 / V]
-        4. Calibrated current coil 1 value [I1 / mA]
-        5. Calibrated current coil 2 value  [I2 / mA]
+    1. Reshape buffer into rows of ``num_columns``.
+    2. Convert raw ADC readings:
+        - Hall sensors using ``packet_transmission.change_adc_hall``
+        - Current coils using ``packet_transmission.change_current_adc`` and coil-specific calibration
+    3. Apply Hall sensor justification using ``k_b_1`` and ``k_b_2``.
+    4. Apply normalisation using zero-offset and amplitude-voltage parameters.
+    5. Apply downsampling:
+        - If ``flag_specific_downsample`` is True → use ``tot_average_specified``.
+        - Otherwise → use ``tot_average``.
+    6. Construct a time column using:
+        - ``current_time`` as the starting time
+        - ``time_increment`` or ``time_increment_specified`` as the step
+    7. Update ``current_time`` inside ``worker_specific_downsampling``.
+    8. Save result as semicolon-separated CSV:
+        - If file does not exist → create it.
+        - If it exists → append new rows.
 
-    Raises
-    ------
-    Exception
-        If file writing fails, the error is printed to the console.
+    Output Format
+    -------------
+    The saved CSV contains the following columns:
+        1. Time / s
+        2. Normalised Hall sensor 1 value
+        3. Normalised Hall sensor 2 value
+        4. Calibrated current coil 1 / mA
+        5. Calibrated current coil 2 / mA
+
+    File Location
+    -------------
+    The CSV file is always saved under:
+        ``<project_root>/files/<file_name>``
     """
-    
+
     global file_name, count_time
     
     count_time = count_time +1
@@ -397,39 +414,38 @@ def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling
     #Current
     col3_converted = -packet_transmission.change_current_adc(col3)               #convert col1
     col4_converted = packet_transmission.change_current_adc(col4)               #convert col2
-    
-    
+
+    col3_converted = packet_transmission.calibration_input_coil_1(col3_converted)
+    col4_converted = packet_transmission.calibration_input_coil_2(col4_converted)
+
     #Justified hall sensors
     col1_converted = packet_transmission.calibrated_hall_sensors1(worker_kb_property.k_b_1, col1_converted, col3_converted/1000)  
     col2_converted = packet_transmission.calibrated_hall_sensors2(worker_kb_property.k_b_2, col2_converted, col4_converted/1000)
-    
-    
-    col3_converted = packet_transmission.calibration_input_coil_1(col3_converted)
-    col4_converted = packet_transmission.calibration_input_coil_2(col4_converted)
-    
-    
-    
-    #Average values to reduce amount of data saved 
+
+    col1_converted = (col1_converted- worker_normalise_properties.zero_offset_voltage_1) / worker_normalise_properties.amplitude_voltage_1
+    col2_converted = (col2_converted - worker_normalise_properties.zero_offset_voltage_2) / worker_normalise_properties.amplitude_voltage_2
+
+    #Average values to reduce amount of data saved
     ####FOR CONSTANT SHEAR RATE 
-    
-    
+
+    ########################################################## debugging purpose ##########################################################
     ########################################################## init object for setter getter ##############################################################################################################
-    #init the object
-    #default tot_average
-    tot_average = worker_specific_downsampling.tot_average
-    print("tot_average:", tot_average)
-    #specified tot_average
-    tot_average_specified = worker_specific_downsampling.tot_average_specified
-    print("tot_average_specified:", tot_average_specified)
-    #default time increment 
-    time_increment = worker_specific_downsampling.time_increment
-    print("time_increment:", time_increment)
-    #specified downsampling time increment
-    time_increment_specified = worker_specific_downsampling.time_increment_specified
-    print("time_increment_specified:", time_increment_specified)
-    #current time init
-    current_time = worker_specific_downsampling.current_time
-    print("current_time:", current_time)
+    # #init the object
+    # #default tot_average
+    # tot_average = worker_specific_downsampling.tot_average
+    # print("tot_average:", tot_average)
+    # #specified tot_average
+    # tot_average_specified = worker_specific_downsampling.tot_average_specified
+    # print("tot_average_specified:", tot_average_specified)
+    # #default time increment
+    # time_increment = worker_specific_downsampling.time_increment
+    # print("time_increment:", time_increment)
+    # #specified downsampling time increment
+    # time_increment_specified = worker_specific_downsampling.time_increment_specified
+    # print("time_increment_specified:", time_increment_specified)
+    # #current time init
+    # current_time = worker_specific_downsampling.current_time
+    # print("current_time:", current_time)
     #####################################################################################################################################################################
     
     
