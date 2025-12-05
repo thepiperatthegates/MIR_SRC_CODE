@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'main_window_test.ui'
+# Form implementation generated from reading ui file 'main_window_gui.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -61,7 +61,7 @@ class Ui_MainWindow(object):
         self.photo_label.setScaledContents(False)
         self.photo_label.setObjectName("photo_label")
         self.label_choose_electronic_2 = QtWidgets.QLabel(self.centralwidget)
-        self.label_choose_electronic_2.setGeometry(QtCore.QRect(160, 70, 221, 31))
+        self.label_choose_electronic_2.setGeometry(QtCore.QRect(130, 70, 281, 31))
         font = QtGui.QFont()
         font.setFamily("Arial")
         font.setPointSize(14)
@@ -86,7 +86,7 @@ class Ui_MainWindow(object):
         self.choose_com_comboBox.addItem("")
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 611, 37))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 611, 21))
         self.menubar.setObjectName("menubar")
         MainWindow.setMenuBar(self.menubar)
         self.statusbar = QtWidgets.QStatusBar(MainWindow)
