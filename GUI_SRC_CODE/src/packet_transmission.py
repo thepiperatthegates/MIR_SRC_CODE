@@ -737,8 +737,27 @@ def calculate_torque_fR( current_1, current_2, hall_1, hall_2, data_4, data_6):
         return total_torque, phase_difference
     
 def calculate_radial_frequency(running_frequency):
-
     return float(2 * np.pi * running_frequency)
+
+
+def set_popout_text(arg,calculate_final_fR = 0.0, k_b_1 = 0.0, k_b_2 = 0.0):
+    
+    text = None
+    
+    if arg == 1:
+        text = "Successful"
+    elif arg == 2:
+        text = f"k b 1 = {k_b_1}\n"f"k_b_2 = {k_b_2}"
+    elif arg == 3:
+        text = f"Friction coefficient measurement is starting innit"
+    elif arg == 4:
+        text = f"f_R: {np.poly1d(calculate_final_fR)}"
+    elif arg == 5:
+        text = "Invalid sample frequency! Please do not use any value starting with 3, 7 or 9!"
+    elif arg == 6:
+        text = "Normalise parameters completed!"
+        
+    return text
 
 class DownsampleEvent():
     def __init__(self, parent=None):

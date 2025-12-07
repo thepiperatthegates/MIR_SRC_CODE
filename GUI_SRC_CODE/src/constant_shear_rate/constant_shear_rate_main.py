@@ -930,7 +930,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                     f"f<sub>R</sub> equation = {np.poly1d(self.calculate_final_fR)}"
                 )
                 
-                self.popout_window(2)
+                self.popout_window(4, self.calculate_final_fR, self.worker_k_b_property.k_b_1, self.worker_k_b_property.k_b_2)
                 #enable the button again
                 self.button_send.setDisabled(False)
                 self.button_start.setDisabled(False)
@@ -1163,7 +1163,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 np.savetxt(dir_fr_results, data_to_save, delimiter=";", comments="", fmt="%.18f", header=header_text)
                 #calculate final fR
                 self.calculate_final_fR =  np.polyfit(self.calculated_angular_velocity, self.calculated_torque, 1)
-                self.popout_window(4)
+                self.popout_window(4, self.calculate_final_fR, self.worker_k_b_property.k_b_1, self.worker_k_b_property.k_b_2)
                 
                 self.worker_fr_property.fr1, self.worker_fr_property.fr0 = self.calculate_final_fR
                 
@@ -1375,26 +1375,18 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             data_read = np.loadtxt(dir_dummy_csv, delimiter=';')
             np.savetxt(filename_saving, data_read, delimiter=';')
 
-    
-    def popout_window(self, arg):
+        
+    def popout_window(self, arg, calculate_final_fR = 0.0, k_b_1 = 0.0, k_b_2 = 0.0):
+        
         msg = QMessageBox()
-        if arg == 1:
-            msg.setText("Successful")
-        elif arg == 2:
-            msg.setText(f"k b 1 = {self.worker_k_b_property.k_b_1}\n"
-                f"k_b_2 = {self.worker_k_b_property.k_b_2}")
-        elif arg == 3:
-            msg.setText(f"Friction coefficient measurement is starting innit")
-        elif arg == 4:
-            msg.setText(f"f_R: {np.poly1d(self.calculate_final_fR)}")
-        elif arg == 5:
-            msg.setText("Invalid sample frequency! Please do not use any value starting with 3, 7 or 9!")
-        elif arg == 6:
-            msg.setText("Normalise parameters completed! Please use the normalise button now!")
-            
+        
+        text = packet_transmission.set_popout_text(arg, calculate_final_fR, k_b_1, k_b_2)
+        msg.setText(text)
+        
         msg.setIcon(QMessageBox.Question)
         
-        x = msg.exec_()
+        msg.exec()
+        
 
 
 

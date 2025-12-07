@@ -1092,24 +1092,15 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             np.savetxt(filename_saving, data_read, delimiter=';')
 
     def popout_window(self, arg):
+        
         msg = QMessageBox()
-        if arg == 1:
-            msg.setText("Successful")
-        elif arg == 2:
-            msg.setText(f"k b 1 = {self.worker_k_b_property.k_b_1}\n"
-                        f"k_b_2 = {self.worker_k_b_property.k_b_2}")
-        elif arg == 3:
-            msg.setText(f"Friction coefficient measurement is starting innit")
-        elif arg == 4:
-            msg.setText(f"f_R: {np.poly1d(self.calculate_final_fR)}")
-        elif arg == 5:
-            msg.setText("Invalid sample frequency! Please do not use any value starting with 3, 7 or 9!")
-        elif arg == 6:
-            msg.setText("Normalise parameters completed! Please use the normalise button now!")
-
+        
+        text = packet_transmission.set_popout_text(arg)
+        msg.setText(text)
+        
         msg.setIcon(QMessageBox.Question)
-
-        x = msg.exec_()
+        
+        msg.exec()
         
         
 class TabWindowCreepTest(QMainWindow):
