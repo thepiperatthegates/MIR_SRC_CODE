@@ -449,12 +449,12 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.save_Button.setEnabled(False)
         filename, _ = QFileDialog.getSaveFileName(parent=self, caption="Save File", directory="",
                                                   filter="CSV Files (*.csv)")
-
-        self.save_Button.setEnabled(True)
         if filename:
             # Save with pandas
             df = pandas.DataFrame(self.final_data_to_save)
             df.to_csv(filename, sep=";", index=False, header=None)
+        print("Data saved.")
+        self.save_Button.setEnabled(True)
 
     def calculate_angle(self):
         """
