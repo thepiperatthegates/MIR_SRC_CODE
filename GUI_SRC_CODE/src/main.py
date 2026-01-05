@@ -28,9 +28,11 @@ from constant_shear_rate.constant_shear_rate_main import TabWindowConstSR
 # Source - https://stackoverflow.com/a
 # Posted by DamonJW, modified by community. See post 'Timeline' for change history
 # Retrieved 2025-12-05, License - CC BY-SA 4.0
-import ctypes
-myappid = 'mycompany.myproduct.subproduct.version' # arbitrary string
-ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+
+if sys.platform == "win32":
+    import ctypes
+    myappid = 'mycompany.myproduct.subproduct.version' # arbitrary string
+    ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
 
 from PyQt5 import QtCore, QtGui
