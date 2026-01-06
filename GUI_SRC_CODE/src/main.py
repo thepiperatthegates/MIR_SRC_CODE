@@ -21,7 +21,7 @@ import multiprocessing
 import sys
 import packet_transmission as packet_transmission
 import socket_GUI
-from main_window_gui import Ui_MainWindow
+from main_window_gui import Ui_MainWindow # pyright: ignore[reportAttributeAccessIssue]
 from creep_test.creep_test_window_main import TabWindowCreepTest
 from constant_shear_rate.constant_shear_rate_main import TabWindowConstSR
 
@@ -72,8 +72,8 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
         pixmap = QtGui.QPixmap(banner_path)
         self.photo_label.setPixmap(
             pixmap.scaled(self.photo_label.size(), 
-                        QtCore.Qt.KeepAspectRatio, 
-                        QtCore.Qt.SmoothTransformation)
+                        QtCore.Qt.KeepAspectRatio,  # type: ignore
+                        QtCore.Qt.SmoothTransformation) # type: ignore
         )
         ####################################
         # disable experiment combobox initially
