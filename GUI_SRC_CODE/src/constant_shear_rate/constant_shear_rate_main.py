@@ -503,11 +503,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         self.save_button.clicked.connect(self.save_button_event)
 
-        self.button_send.setDisabled(True)
-        self.button_start.setDisabled(True)
-        self.button_stop.setDisabled(True)
-        self.button_rotate.setDisabled(False)
-        self.normalise_button.setDisabled(True)
+        # self.button_send.setDisabled(True)
+        # self.button_start.setDisabled(True)
+        # self.button_stop.setDisabled(True)
+        # self.button_rotate.setDisabled(False)
+        # self.normalise_button.setDisabled(True)
 
 
         #### rotote the magnet button
