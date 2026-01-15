@@ -1,17 +1,79 @@
 #!/usr/bin/env bash
+#set exception if any command fails 
+
+#---------------------------------------
+# Configuration
+# ---------------------------------------
+
+#FIND THE OS USED IN THE SCRIPT
+case "$(uname)" in
+	CYGWIN*|MINGW*)
+		PROJECT_ROOT="C:/Users/Hijazi/Documents/GitHub/MIR_SRC_CODE/GUI_SRC_CODE"
+		;;
+	Darwin*)
+		PROJECT_ROOT="/Users/mac/Documents/GitHub/MIR_SRC_CODE/GUI_SRC_CODE"
+		;;
+	Linux*)
+		echo "to be worked on"
+		;;
+esac 
+		
+	
+
+VENV_DIR="$PROJECT_ROOT/.venv"
+REQUIRED_PYTHON="3.12.12"
+REQ_FILES="$PROJECT_ROOT/requirements.txt"
+MAIN_SCRIPT_PATH="$PROJECT_ROOT/src/main.py"
+
+
+
+
+#---------------------------------------
+# CHECK IF ENV EXISTS
+# ---------------------------------------
+
+#IF DIR DOES NOT EXISTS
+if [[ ! -d "$VENV_DIR" ]]; then 
+		echo "Virtual environment is not found for python script................"
+		echo "Creating virtual environment for this system............."
+		
+		python -m venv "$VENV_DIR"
+		
+		#ACTIVATE THE VIRTUAL ENVIRONMENT 
+
+    case "$(uname)" in
+      CYGWIN*|MINGW*)
+		    source "$VENV_DIR/Scripts/activate"
+        ;;
+      Darwin*|Linux*)
+		    source "$VENV_DIR/bin/activate"
+        ;;
+    esac 
+		
+    python -m pip install --upgrade pip
+
+		#INSTALL REQUIRED PACKAGES
+		pip install -r "$REQ_FILES"
+
+    echo "*" > .venv/.gitignore
+		
+else
+	#ACTIVATE THE VIRTUAL ENVIRONMENT 
+	echo "Virtual environment found........."
+    case "$(uname)" in
+      CYGWIN*|MINGW*)
+        source "$VENV_DIR/Scripts/activate"
+        ;;
+      Darwin*|Linux*)
+        source "$VENV_DIR/bin/activate"
+        ;;
+    esac 
+fi
+		
 
 # ---------------------------------------
-# Run a Python script on Windows (Git Bash / WSL)
+# Run application
 # ---------------------------------------
-
-# Path to your Python script
-SCRIPT_PATH="C:\Users\mit\Documents\MIR_SRC_CODE\GUI_SRC_CODE\src\main.py"
-
-# Optional: path to Python (use python3 or python depending on your setup)
-PYTHON_CMD="python"
-
-
-
 cat <<'EOF'
                                HHHHHHHHHHHHHH
                            $HHHHHH$$$$$$$HHHHHHH
@@ -45,11 +107,9 @@ cat <<'EOF'
     $HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH$$$H%%%%%%%%%%%%%%%%%HHHHHH "
 
 EOF
-
-
-echo "Starting MiR-GUI.............................."
+echo "[INFO] Running MiR-GUI..................................."
 echo "DO NOT CLOSE THIS WINDOW!"
-$PYTHON_CMD "$SCRIPT_PATH"
+python $MAIN_SCRIPT_PATH
 
 
 # Optionally, wait for user input before closing (useful in Git Bash)
