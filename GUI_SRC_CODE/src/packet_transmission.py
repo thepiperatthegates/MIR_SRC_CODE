@@ -94,7 +94,7 @@ CURRENT_COEFF_SECOND_SENSOR_B_VERSION2  = 0.97735
 
 class TxData():
 
-    _data_1 = _data_2 = _data_3 = _data_4 = _data_5 = _data_6 = _data_7 = _data_8 = _data_9 = _data_10 = _data_offset_creep_1 = _data_offset_creep_2 = 0
+    _data_1 = _data_2 = _data_3 = _data_4 = _data_5 = _data_6 = _data_7 = _data_8 = _data_9 = _data_10 = _data_11 = _data_offset_creep_1 = _data_offset_creep_2 = 0
     
     @property
     def send_data(self):
@@ -191,6 +191,15 @@ class TxData():
         self.__class__._data_10 = val
         
         
+    @property
+    def data_11(self):
+        return self.__class__._data_11 
+    
+    @data_11.setter 
+    def data_11(self, val):
+        self.__class__._data_11 = val
+        
+        
     @property 
     def data_offsets_creep(self):
         return self.__class__._data_offset_creep_1, self.__class__._data_offset_creep_2
@@ -219,8 +228,10 @@ class TxData():
         byte_send8 = struct.pack('>I', int(self.__class__._data_8))                 #Mode for dc or ac waves (calibration purposes)
         byte_send9 = struct.pack('>I', int(self.__class__._data_9))                 #hardware reset
         byte_send10 = struct.pack('>I', int(self.__class__._data_10))                 #mir mode
+        byte_send11 = struct.pack('<f', float(self.__class__._data_11))             # shear stress/torque reference
 
-        combined_send = b''.join([byte_send1, byte_send2, byte_send3, byte_send4, byte_send5, byte_send6, byte_send7, byte_send8, byte_send9, byte_send10])
+        combined_send = b''.join([byte_send1, byte_send2, byte_send3, 
+                                byte_send4, byte_send5, byte_send6, byte_send7, byte_send8, byte_send9, byte_send10, byte_send11])
         
         return combined_send
 
@@ -240,7 +251,7 @@ class TxFlag():
 class RemainingTimeForCreepTest():
     _total_time_for_file_save  = 0.0 
     _input_sampling_time = 0.0
-    _ime_for_resetting_time = 0.0
+    _time_for_resetting_time = 0.0
     
     
     _start_vector_time = 0.0
@@ -270,7 +281,7 @@ class RemainingTimeForCreepTest():
         self.__class__._time_for_resetting_time = self.__class__._total_time_for_file_save - self.__class__._input_sampling_time
         return self.__class__._time_for_resetting_time
     
-    @input_sampling_time.setter
+    @time_for_resetting_time.setter
     def time_for_resetting_time(self, val):
         self.__class__._time_for_resetting_time = val
     
@@ -664,6 +675,7 @@ def calibration_input_coil_1(input):
     
     global ELECTRONICS_FLAG
     
+    output = 0 
     
     if ELECTRONICS_FLAG == 1:
         output = CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 + CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 * input + CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 * pow(input, 2) +  CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 * pow(input, 3)
@@ -676,6 +688,7 @@ def calibration_input_coil_1(input):
 def calibration_input_coil_2(input):
     global ELECTRONICS_FLAG
     
+    output = 0 
     
     if ELECTRONICS_FLAG == 1:
         output = CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 + CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 * input + CURRENT_COEFF_SECOND_SENSOR_C_VERSION1 * pow(input, 2) + CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 * pow(input, 3)

@@ -72,7 +72,7 @@ fi
 		
 
 # ---------------------------------------
-# Run application
+# EXECUTE THE PYTHON SCRIPT
 # ---------------------------------------
 cat <<'EOF'
                                HHHHHHHHHHHHHH
