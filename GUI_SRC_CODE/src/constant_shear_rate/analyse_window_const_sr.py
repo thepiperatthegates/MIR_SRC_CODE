@@ -43,11 +43,17 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
         self.setupUi(self)
 
-        project_root = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
         # construct icon path
         save_icon_path = os.path.join(project_root, "pics", "save_icon.ico")
         self.save_Button.setIcon(QtGui.QIcon(save_icon_path))
+        
+        refresh_icon_path = os.path.join(project_root, "pics", "refresh_icon.ico")
+        self.refresh_Button.setIcon(QtGui.QIcon(refresh_icon_path))
+        
+        
+        
 
         ############################init variables for this class###############################
         self.data = np.array([])
@@ -147,13 +153,20 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.data_show_comboBox.setDisabled(True)
         self.save_Button.setDisabled(True)
 
-        self.textbox_offset1.editingFinished.connect(self.save_offset1_event)
-        self.textbox_offset2.editingFinished.connect(self.save_offset2_event)
+        self.textbox_offset1.editingFinished.connect(self.save_offset1_event_textbox)
+        self.textbox_offset2.editingFinished.connect(self.save_offset2_event_textbox)
+        
+        #refresh button event clicked
+        self.refresh_Button.clicked.connect(self.refresh_event)
+        #save button clicked
+        self.save_Button.clicked.connect(self.save_button_event)
+        #toggle button for radio button offsets
+        self.take_Button.toggled.connect(self.refresh_event)
 
-    def save_offset1_event(self):
+    def save_offset1_event_textbox(self):
         self.offset_1 = float(self.textbox_offset1.text())
 
-    def save_offset2_event(self):
+    def save_offset2_event_textbox(self):
         self.offset_2 = float(self.textbox_offset2.text())
 
     def find_filename_button_pressed(self):
@@ -232,13 +245,14 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
     def data_calculation_function(self):
         if self.num_column == 5:
 
+            self.determine_offsets_option()
             self.calculate_functions()
             self.calculate_all_mean()
 
             # remove last two columns
             self.final_data_to_show = self.final_data_to_save[:, :-4]
 
-            self.save_Button.clicked.connect(self.save_button_event)
+            self.take_Button.setDisabled(False)
             self.save_Button.setDisabled(False)
 
         elif self.num_column == 17:
@@ -250,7 +264,11 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             self.calculate_all_mean_after_save()
             self.reference_var_for_saved_data()
 
+            self.take_Button.setDisabled(True)
             self.save_Button.setDisabled(True)
+            
+    def refresh_event(self):
+        self.choose_option()
 
     def data_mode_function(self):
 
@@ -314,10 +332,13 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.time = self.data[:, 0]
         self.voltage_1 = self.data[:, 1]
         self.voltage_2 = self.data[:, 2]
+        
+
+        self.data[:, 3] -= self.offset_1
+        self.data[:, 4] -= self.offset_2
+
         self.current_1 = self.data[:, 3]
         self.current_2 = self.data[:, 4]
-
-        self.offset_1, self.offset_2 = self.worker_get_offset.data_offsets_creep
 
         self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
                               f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
@@ -402,6 +423,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.voltage_2 = self.final_data_to_show[:, 2]
         self.current_1 = self.final_data_to_show[:, 3]
         self.current_2 = self.final_data_to_show[:, 4]
+        self.calculate_magnitude_current()
         self.angle_magnetic_field = self.final_data_to_show[:, 5]
         self.angle_magnet = self.final_data_to_show[:, 6]
         self.phase_difference = self.final_data_to_show[:, 7]
@@ -427,15 +449,9 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         Returns: none
 
         """
-        #get the fr from packet tranmision
-        self.fr0 = self.worker_get_fr_coefficient.fr0
-        self.fr1 = self.worker_get_fr_coefficient.fr1
-
         #change text box for visibility
-        self.offset_1 = self.worker_get_offset.data_4
-        self.offset_2 = self.worker_get_offset.data_6
         self.textbox_offset1.setText(str(self.offset_1))
-        self.textbox_offset2.setText(str(object=self.offset_2))
+        self.textbox_offset2.setText(str(self.offset_2))
 
 
         print("Offset 1 from csv:", self.offset_1)
@@ -447,14 +463,30 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
     def save_button_event(self):
 
         self.save_Button.setEnabled(False)
+        
+        
         filename, _ = QFileDialog.getSaveFileName(parent=self, caption="Save File", directory="",
                                                   filter="CSV Files (*.csv)")
-
-        self.save_Button.setEnabled(True)
         if filename:
-            # Save with pandas
-            df = pandas.DataFrame(self.final_data_to_save)
-            df.to_csv(filename, sep=";", index=False, header=None)
+            try:
+                # Ensure filename ends with .csv if the user didn't type it
+                if not filename.endswith('.csv'):
+                    filename += '.csv'
+
+                df = pandas.DataFrame(self.final_data_to_save)
+                
+                # Added encoding for better compatibility
+                df.to_csv(filename, sep=";", index=False, header=None, encoding='utf-8-sig')
+                
+                print(f"File successfully saved to: {filename}")
+                
+            except PermissionError:
+                print("Error: The file is currently open in another program. Please close it and try again.")
+            except Exception as e:
+                print(f"An unexpected error occurred: {e}")
+            
+            
+        self.save_Button.setEnabled(True)
 
     def calculate_angle(self):
         """
@@ -475,9 +507,9 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             # angle from 2nd and 3rd columns (index 1 and 2)
             self.angle_magnet[row, 0] = np.arctan2(self.data[row, 2], self.data[row, 1])
 
+
             # angle from 4th and 5th columns (index 3 and 4)
-            self.angle_magnetic_field[row, 0] = np.arctan2(self.data[row, 4] - float(self.offset_2),
-                                                           self.data[row, 3] - float(self.offset_1))
+            self.angle_magnetic_field[row, 0] = np.arctan2(self.data[row, 4], self.data[row, 3])
         # TODO: OFFSETS
 
         # calculate the angles
@@ -522,12 +554,16 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
     def calculate_friction_moment(self):
         self.friction_moment = self.angular_velocity * self.fr1 + self.fr0  # - y_0        # [Nm]
-
+        
     def calculate_magnitude_current(self):
+<<<<<<< HEAD
         power_of_2 = np.power((self.current_1 - float(self.offset_1)), 2) + np.power(
             (self.current_2 - float(self.offset_2)), 2)
         
         self.magnitude_current = np.sqrt(power_of_2)
+=======
+        self.magnitude_current = np.sqrt(self.current_1**2 + self.current_2**2)
+>>>>>>> dev
 
     def calculate_shear_stress(self):
 
@@ -562,21 +598,33 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.shear_rate_mean = np.mean(self.data[:, 10])
         self.shear_stress_mean = np.mean(self.data[:, 11])
         self.viscosity_mean = np.mean(self.data[:, 12])
+        
+    def determine_offsets_option(self):
+        
+        # take from the main tab
+        if self.take_Button.isChecked():
+            self.offset_1, self.offset_2 = self.worker_get_offset.data_offsets_creep
+            self.textbox_offset1.setDisabled(True)
+            self.textbox_offset2.setDisabled(True)
+        else:
+            # take from the textbox fields
+            try:
+                self.offset_1 = int(self.textbox_offset1.text())
+                self.offset_2 = int(self.textbox_offset2.text())
+                self.textbox_offset1.setDisabled(False)
+                self.textbox_offset2.setDisabled(False)
+            except ValueError:
+                print("Invalid offset inputs")
 
     def draw_current_diagrams(self):
-
-        # read current, 2nd and 3rd columns
-        time = self.time
-        current1 = self.current_1 - float(self.offset_1)
-        current2 = self.current_2 - float(self.offset_2)
 
         self.canvas.axes.cla()  # clear canvas
         self.canvas.axes.set_title(r"Current sensors", fontsize=20)
         self.canvas.axes.set_ylabel(r"Current / mA", fontsize=20)
         self.canvas.axes.set_xlabel(r"Time / s", fontsize=20)
-        plot_1, = self.canvas.axes.plot(time, current1, color='g')
-        plot_2, = self.canvas.axes.plot(time, current2, color='#FFB6C1')
-        plot_3, = self.canvas.axes.plot(time, self.magnitude_current, color='r')
+        plot_1, = self.canvas.axes.plot(self.time, self.current_1, color='g')
+        plot_2, = self.canvas.axes.plot(self.time, self.current_2, color='#FFB6C1')
+        plot_3, = self.canvas.axes.plot(self.time, self.magnitude_current, color='r')
         plot_1.set_label(r"Current 1 $I_1$")
         plot_2.set_label(r"Current 2 $I_2$")
         plot_3.set_label(r"Magnitude $\hat I$")
@@ -586,16 +634,13 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.canvas.draw()
 
     def draw_voltage_diagrams(self):
-        time = self.time
-        voltage1 = self.voltage_1
-        voltage2 = self.voltage_2
 
         self.canvas.axes.cla()  # clear canvas
         self.canvas.axes.set_title(r"Voltage sensors", fontsize=20)
         self.canvas.axes.set_ylabel(r"Voltage /  V", fontsize=20)
         self.canvas.axes.set_xlabel(r"Time / s", fontsize=20)
-        plot_1, = self.canvas.axes.plot(time, voltage1, color='#890304')
-        plot_2, = self.canvas.axes.plot(time, voltage2, color='#00113a')
+        plot_1, = self.canvas.axes.plot(self.time, self.voltage_1, color='#890304')
+        plot_2, = self.canvas.axes.plot(self.time, self.voltage_2, color='#00113a')
         plot_1.set_label(r"Hall sensors 1 $U_1$")
         plot_2.set_label(r"Hall sensors 2 $U_2$")
         self.canvas.axes.legend(loc='upper right', bbox_to_anchor=(1, 1))
@@ -605,18 +650,13 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
     def draw_phase_diagram(self):
 
-        time = self.time
-        phase_magnetic_field = self.angle_magnetic_field
-        phase_magnet = self.angle_magnet
-        phase_difference = self.phase_difference
-
         self.canvas.axes.cla()  # clear canvas
         self.canvas.axes.set_title("Phase diagramm")
         self.canvas.axes.set_ylabel(r"Angle $\phi$ / rad")
         self.canvas.axes.set_xlabel(r"Time / $s$")
-        plot_1, = self.canvas.axes.plot(time, phase_magnetic_field, color='#890304')
-        plot_2, = self.canvas.axes.plot(time, phase_magnet, color='#00113a')
-        plot_3, = self.canvas.axes.plot(time, phase_difference, color='#7294D4')
+        plot_1, = self.canvas.axes.plot(self.time, self.angle_magnetic_field, color='#890304')
+        plot_2, = self.canvas.axes.plot(self.time, self.angle_magnet, color='#00113a')
+        plot_3, = self.canvas.axes.plot(self.time, self.phase_difference, color='#7294D4')
         plot_1.set_label(r"Angle of magnetic field $\phi_B$")
         plot_2.set_label(r"Angle of magnet $\phi_m$")
         plot_3.set_label(r"Phase difference $\Delta\phi$")
@@ -680,7 +720,6 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
     def closeEvent(self, event):
         event.accept()
-
 
 def main_3():
     app3 = QApplication([])
