@@ -55,6 +55,8 @@ MIN_V_AFTER_HALL = 0.0
 COIL_CONSTANT = 3.097e-3		# in T / A
 DIPOLE_MOMENT = 8.594e-3		# in A m^2
 
+CALIBRATION_FACTOR = 0
+
 
 
 #flag for electronics type
@@ -121,7 +123,7 @@ class TxData():
     @data_2.setter
     def data_2(self, val):
         C_SR = 37.099
-        # running_frequency = float(val)/(2*pi*C_SR)
+        running_frequency = float(val)/(2*pi*C_SR)
         
         # we will be taking the desired shear rate here directly
         self.__class__._data_2 = val

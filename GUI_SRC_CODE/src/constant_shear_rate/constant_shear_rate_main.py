@@ -435,7 +435,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #########################################################################################
         #placeholder text for textboxes################################################
         self.textbox_time.setPlaceholderText("Enter time in second")
-        self.textbox_frequency.setPlaceholderText("Enter frequency for coil currents")
+        self.textbox_frequency.setPlaceholderText("Enter shear rate frequency")
         self.textbox_amplitude1.setPlaceholderText("Enter amplitude from 0 to 480mA")
         self.textbox_offset1.setPlaceholderText("Enter offset +-480mA")
         self.textbox_amplitude2.setPlaceholderText("Enter amplitude from 0 to 480mA")
@@ -1391,7 +1391,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
 
 
-#different windows with tab 
+#Main windows with different tab 
 class TabWindowConstSR(QMainWindow):
     
     def __init__(self):

@@ -24,6 +24,7 @@ import socket_GUI
 from main_window_gui import Ui_MainWindow # pyright: ignore[reportAttributeAccessIssue]
 from creep_test.creep_test_window_main import TabWindowCreepTest
 from constant_shear_rate.constant_shear_rate_main import TabWindowConstSR
+from pid_controller_gui_dev.pid_controller_gui_main import TabWindowPID
 
 # Source - https://stackoverflow.com/a
 # Posted by DamonJW, modified by community. See post 'Timeline' for change history
@@ -167,6 +168,9 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
             self.ct_window = TabWindowCreepTest()
             self.ct_window.showNormal()
             
+        elif mode == "Pid-Controller (dev)":
+            self.pid_window = TabWindowPID()
+            self.pid_window.showNormal()
             
         self.close()
 

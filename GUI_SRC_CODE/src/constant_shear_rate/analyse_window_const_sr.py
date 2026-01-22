@@ -164,7 +164,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
     def choose_option(self):
 
-        self.data = pandas.read_csv(self.analyse_filename, sep=";", header=None).to_numpy()
+        self.data = pandas.read_csv(filepath_or_buffer=self.analyse_filename, sep=";", header=None).to_numpy()
         mode = self.data_show_comboBox.currentText()
         self.num_rows, self.num_column = self.data.shape
 
@@ -526,6 +526,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
     def calculate_magnitude_current(self):
         power_of_2 = np.power((self.current_1 - float(self.offset_1)), 2) + np.power(
             (self.current_2 - float(self.offset_2)), 2)
+        
         self.magnitude_current = np.sqrt(power_of_2)
 
     def calculate_shear_stress(self):

@@ -54,6 +54,11 @@
       <string>Dynamic</string>
      </property>
     </item>
+    <item>
+     <property name="text">
+      <string>Pid-Controller (dev)</string>
+     </property>
+    </item>
    </widget>
    <widget class="QComboBox" name="choose_electronic_comboBox">
     <property name="geometry">
