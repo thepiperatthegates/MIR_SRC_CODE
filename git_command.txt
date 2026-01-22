@@ -3,6 +3,7 @@
 -> For short list; git log --oneline
 -> For full commit log; git log
 
+
 2) To switch to a specific commit
 
 -> git checkout <commit-hash>
