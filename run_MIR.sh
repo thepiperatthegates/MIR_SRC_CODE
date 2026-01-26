@@ -8,10 +8,10 @@
 #FIND THE OS USED IN THE SCRIPT
 case "$(uname)" in
 	CYGWIN*|MINGW*)
-		PROJECT_ROOT="C:/Users/Hijazi/Documents/GitHub/MIR_SRC_CODE/GUI_SRC_CODE"
+		PROJECT_ROOT="./GUI_SRC_CODE"
 		;;
 	Darwin*)
-		PROJECT_ROOT="/Users/mac/Documents/GitHub/MIR_SRC_CODE/GUI_SRC_CODE"
+		PROJECT_ROOT="./GUI_SRC_CODE"
 		;;
 	Linux*)
 		echo "to be worked on"
