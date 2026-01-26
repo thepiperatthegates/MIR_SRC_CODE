@@ -6,4 +6,3 @@ pyqtgraph==0.13.7
 pyserial==3.5
 scipy==1.16.0
 pandas
-ctypes

@@ -9,3 +9,5 @@ GUI_SRC_CODE/src/__pycache__/constant_shear_rate.cpython-313.pyc
 GUI_SRC_CODE/src/__pycache__/popout_graph.cpython-313.pyc
 GUI_SRC_CODE/src/__pycache__/sockets_files.cpython-313.pyc
 GUI_SRC_CODE/src/__pycache__/gui_baru.cpython-313.pyc
+GUI_SRC_CODE/.venv
+GUI_SRC_CODE/src/files/results_fr.csv

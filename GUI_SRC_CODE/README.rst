@@ -22,7 +22,7 @@ For an automatic installation of all packages, copy and run following command in
 
 **Important note!**: 
 
-Code were built with Python 3.13.3 in mind (click `here <https://www.python.org/downloads/release/python-3133/>`_), use other version of Python with own risk!
+Code were built with Python 3.13.3 in mind (click `here <https://www.python.org/downloads/release/python-3133/>`_), use other version of Python with your own risk!
 
 
 
@@ -64,7 +64,7 @@ i) **Windows 10/11**
 Select Start, search `Device Manager`, find device port name under `USB COM-Port`
 
 
-ii) **MacOs or Linux**
+ii) **MacOs**
 
 Go to terminal and type 
 
@@ -83,25 +83,40 @@ Pick the ``usbmodem`` as the COM port name.
 
 Go to ``sockets_files.py`` and change the COM Port name from the global variable ``port_name``.
 
+iii) **Linux**
 
-File location
+Go to bash terminal and type 
+
+.. code-block:: sh 
+
+    ls /dev/tty.*
+
+to view all serial connection.
+
+Copy ``/dev/ttyACM0`` as the COM port name. Common problem is that the Linux kernel will not give permission for Python script to access the com port. 
+
+To fix this, simply give the read and write access to the program by typing the following in the terminal;
+
+.. code-block:: sh 
+
+    sudo chmod 666 /dev/ttyACM0
+
+Directory and file types
 ------------
 
 i) **main.py**
 
 Main files that handles the GUI
 
-ii) **sockets_files.py**
+ii) **sockets_GUI**
 
-Subfiles that handles connection and connection port between firmware and hardware
+Directory that handles connection and connection port between firmware and hardware
 
 iii) **packet_transmission.py**
 
-Subfiles to store functions for use between subfiles
+File to store functions for use between subfiles
 
+iv) **constant_shear_rate**
 
-iv) **window_show.py**
-
-Subfiles that handles the extra windows that pops out when data acquisition is commenced, and also another window with subprocess to *calculate rheological properties*
-
+Directory containing data visualization, data acquisition, and analysis files for constant shear rate experiments.
 

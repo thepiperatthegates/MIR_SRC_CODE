@@ -70,7 +70,8 @@ def socket_start_connect():
         # port_name = '/dev/tty.usbmodem355A357631331'       
     elif sys.platform == 'win32':       #simon's laptop
         port_num = port_name
-        
+    elif sys.platform == 'linux':
+        port_num = '/dev/ttyACM0'
 
     try:
         ser = serial.Serial(port=port_num, baudrate=baud_rate,timeout=None)
@@ -115,7 +116,6 @@ def thread_start():
         - The receiving thread is persistent and always active.
         - The sending thread is created on demand when the send flag is raised.
         - A small delay (`time.sleep(0.001)`) is used to reduce CPU usage.
-        - Threads are daemonized where appropriate to allow clean program exit.
     """
     ser1 = socket_start_connect()
     worker_kb_property = packet_transmission.kbCoefficient()
