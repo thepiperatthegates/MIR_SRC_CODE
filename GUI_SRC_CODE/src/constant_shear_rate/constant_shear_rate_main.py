@@ -315,19 +315,19 @@ class SleepTimer(QObject):
 
             # packet_transmission.running_time_flag_setter(0)
 
-# class SocketThread(QThread):
+class SocketThread(QThread):
     
-#     def __init__(self, parent=None):
-#         super().__init__(parent)
-#         self.running = True
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.running = True
 
-#     def run(self):
-#         if self.running:
-#             sockets_files.thread_start()
+    def run(self):
+        if self.running:
+            sockets_files.thread_start()
 
 
-#     def stop(self):
-#         self.running = False
+    def stop(self):
+        self.running = False
     
 
 
@@ -515,11 +515,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         #Start backend serial lines
         
-        # self.worker_socket = SocketThread()
-        # self.worker_DataUpdate = DataUpdate(self)
+        self.worker_socket = SocketThread()
+        self.worker_DataUpdate = DataUpdate(self)
         
-        # self.worker_socket.start()
-        # self.worker_DataUpdate.start()
+        self.worker_socket.start()
+        self.worker_DataUpdate.start()
         
         
         #combobox for live graph mode
