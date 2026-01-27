@@ -159,8 +159,6 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         #refresh button event clicked
         self.refresh_Button.clicked.connect(self.refresh_event)
-        #save button clicked
-        self.save_Button.clicked.connect(self.save_button_event)
         #toggle button for radio button offsets
         self.take_Button.toggled.connect(self.refresh_event)
 
