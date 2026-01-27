@@ -71,7 +71,7 @@ def socket_start_connect():
     elif sys.platform == 'win32':       #simon's laptop
         port_num = port_name
     elif sys.platform == 'linux':
-        port_num = '/dev/ttyACM0'
+        port_num = '/dev/ttyACM1'
 
     try:
         ser = serial.Serial(port=port_num, baudrate=baud_rate,timeout=None)
