@@ -556,14 +556,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.friction_moment = self.angular_velocity * self.fr1 + self.fr0  # - y_0        # [Nm]
         
     def calculate_magnitude_current(self):
-<<<<<<< HEAD
-        power_of_2 = np.power((self.current_1 - float(self.offset_1)), 2) + np.power(
-            (self.current_2 - float(self.offset_2)), 2)
-        
-        self.magnitude_current = np.sqrt(power_of_2)
-=======
         self.magnitude_current = np.sqrt(self.current_1**2 + self.current_2**2)
->>>>>>> dev
 
     def calculate_shear_stress(self):
 
