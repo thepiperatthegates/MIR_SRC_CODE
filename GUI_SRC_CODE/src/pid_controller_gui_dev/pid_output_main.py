@@ -101,6 +101,7 @@ class DataUpdate(QThread):
         self.v2_slice = np.array([], dtype=np.uint16)
         self.i1_slice = np.array([], dtype=np.uint16)
         self.i2_slice = np.array([], dtype=np.uint16)
+        self.phase_diff_slice = np.array([], dtype=np.float32)
 
         self.bytes_to_process = np.array([], dtype=np.uint16)  # Empty NumPy array for incoming data
 
@@ -143,20 +144,24 @@ class DataUpdate(QThread):
             if not self.running:
                 break
             if data_from_pipe:
-                self.bytes_to_process = data_from_pipe  # now changes to np array so we can work with it better
+                self.bytes_to_process = np.array(data_from_pipe, dtype=float)
+
+                num_columns = 5  # v1, v2, i1, i2, phase_diff
 
                 trimmed_size = len(self.bytes_to_process) - (len(self.bytes_to_process) % num_columns)
                 self.bytes_to_process = self.bytes_to_process[:trimmed_size]
 
-                if len(self.bytes_to_process) == 0:
+                if self.bytes_to_process.size == 0:
                     return
-                reshaped_data = np.array(self.bytes_to_process).reshape(-1, num_columns)
-                reshaped_data = reshaped_data.astype(float)
+
+                reshaped_data = self.bytes_to_process.reshape(-1, num_columns)
 
                 self.v1_slice = reshaped_data[:, 0]
                 self.v2_slice = reshaped_data[:, 1]
-                self.i1_slice = reshaped_data[:, 2]  # STIMMT
-                self.i2_slice = reshaped_data[:, 3]  # STIMMT
+                self.i1_slice = reshaped_data[:, 2]
+                self.i2_slice = reshaped_data[:, 3]
+                self.phase_diff_slice = reshaped_data[:, 4]
+                print(self.phase_diff_slice)
 
                 data_mutex.lock()
 
@@ -479,13 +484,13 @@ class PIDOutput(QMainWindow, Ui_Title):
             
             #this is to make sure x-axis is configured properly 
             if time_interval_var_int == 100:
-                sockets_files.tot_count_accumulate_recv = 250
+                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
                 self.time_axis = [i * 0.0001 for i in range(1000)]
             elif time_interval_var_int == 500:
-                sockets_files.tot_count_accumulate_recv = 5*250
+                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = 5*sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
                 self.time_axis = [i * 0.0001 for i in range(5*1000)]
             elif time_interval_var_int == 1000:
-                sockets_files.tot_count_accumulate_recv = 10*250
+                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = 10*sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
                 self.time_axis = [i * 0.0001 for i in range(10*1000)]
             
             ######################
@@ -523,13 +528,13 @@ class PIDOutput(QMainWindow, Ui_Title):
             
             #this is to make sure x-axis is configured properly 
             if time_interval_var_int == 100:
-                sockets_files.tot_count_accumulate_recv = 250
+                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
                 self.time_axis = [i * 0.0001 for i in range(1000)]
             elif time_interval_var_int == 500:
-                sockets_files.tot_count_accumulate_recv = 5*250
+                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = 5*sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
                 self.time_axis = [i * 0.0001 for i in range(5*1000)]
             elif time_interval_var_int == 1000:
-                sockets_files.tot_count_accumulate_recv = 10*250
+                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = 10*sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
                 self.time_axis = [i * 0.0001 for i in range(10*5000)]
                 
             self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Permanent magnet angle")
@@ -565,13 +570,13 @@ class PIDOutput(QMainWindow, Ui_Title):
             #this is to make sure x-axis is configured properly 
             #this is to make sure x-axis is configured properly 
             if time_interval_var_int == 100:
-                sockets_files.tot_count_accumulate_recv = 250
+                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
                 self.time_axis = [i * 0.0001 for i in range(1000)]
             elif time_interval_var_int == 500:
-                sockets_files.tot_count_accumulate_recv = 5*250
+                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = 5*sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
                 self.time_axis = [i * 0.0001 for i in range(5*1000)]
             elif time_interval_var_int == 1000:
-                sockets_files.tot_count_accumulate_recv = 10*250
+                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = 10*sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
                 self.time_axis = [i * 0.0001 for i in range(10*1000)]
                 
             self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Permanent magnet angle")
