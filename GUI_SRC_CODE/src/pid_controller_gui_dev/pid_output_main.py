@@ -449,6 +449,8 @@ class PIDOutput(QMainWindow, Ui_Title):
         self.button_auto_range.clicked.connect(self.auto_range_event)
         
         self.save_button.clicked.connect(self.save_button_event)
+    
+        self.button_rotate.clicked.connect(self.rotate_magnet_event)
 
         #Start backend serial lines
         
@@ -653,9 +655,9 @@ class PIDOutput(QMainWindow, Ui_Title):
 
         ############################# send data to setter getter ######################################
         self.worker_data_block.data_1 = 65534
-        
-        #change to frequency for MCU
+    
         self.worker_data_block.data_2  = self.textbox_shear_rate.text()
+        
         
         #from combobox direction
         if self.comboBox_direction.currentText() == "Clockwise":
@@ -684,6 +686,49 @@ class PIDOutput(QMainWindow, Ui_Title):
 
         self.status_label.setStyleSheet("color: #32a83a;")
         self.status_label.setText("Data sent!")
+        
+        
+    def rotate_magnet_event(self):
+        ############################# send data to setter getter ######################################
+        self.worker_data_block.data_1 = 65534
+        
+        #frequency rotor to 10Hz
+        self.worker_data_block.data_2  = 10
+        
+        
+        self.worker_data_block.data_current = 300,0,300,0
+        
+        #from combobox direction
+        if self.comboBox_direction.currentText() == "Clockwise":
+            self.worker_data_block.data_7 = 2
+            data_7 = self.worker_data_block.data_7
+        elif self.comboBox_direction.currentText() == "Anti-clockwise":
+            self.worker_data_block.data_7 = 1
+            data_7 = self.worker_data_block.data_7
+            
+        if self.filter_checkbox.isChecked():
+            self.worker_data_block.data_8 = 0
+        else:
+            self.worker_data_block.data_8 =  2
+            
+            
+        #for data 10
+        #HERE IS THE MOST IMPORTANT THING!!!
+        self.worker_data_block.data_10 = 2
+        self.worker_data_block.data_11 = self.textbox_shear_stress.text()
+
+        ######################################################################################
+        ##enabled stop rotating button 
+        self.button_stop.setDisabled(False)
+        
+        ##send all data to microcontroller
+        #activate flag
+        self.worker_flag_send.flag_tx = True
+        
+
+        self.status_label.setStyleSheet("color: #32a83a;")
+        self.status_label.setText("Rotating!")
+        
         
         
     def set_hardware_reset_event(self):

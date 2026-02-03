@@ -145,12 +145,28 @@ class TxData():
         self.__class__._data_3, self.__class__._data_4 , self.__class__._data_5 , self.__class__._data_6 = val 
         
     @property 
+    def data_3(self):
+        return self.__class__._data_3
+    
+    @data_3.setter
+    def data_3(self, val):
+        self.__class__._data_3 = val
+        
+    @property 
     def data_4(self):
         return self.__class__._data_4
     
     @data_4.setter
     def data_4(self, val):
         self.__class__._data_4 = val
+        
+    @property 
+    def data_5(self):
+        return self.__class__._data_5
+    
+    @data_5.setter
+    def data_5(self, val):
+        self.__class__._data_5 = val
         
     @property 
     def data_6(self):
@@ -219,6 +235,7 @@ class TxData():
         
         ## TODO: CHANGE BYTE_SEND TO FLOAT 
         print("Frequency of DAC", self.__class__._data_2)
+        print("CUrrent amplitude", self.__class__._data_3)
         
         byte_send1 = struct.pack('<f', float(self.__class__._data_1))       
         byte_send2 = struct.pack('<f', float(self.__class__._data_2))             #running frequency of MCU 
