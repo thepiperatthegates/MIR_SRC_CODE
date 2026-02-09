@@ -166,8 +166,9 @@ class DataUpdate(QThread):
                 data_mutex.lock()
 
                 # Hall Sensors
-                self.v1_slice = -packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
-                self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
+                # self.v1_slice = -packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
+                # self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
+                
 
                 # Current
                 self.i1_slice = -packet_transmission.change_current_adc(self.i1_slice)  # convert col3 (in mA)
@@ -178,11 +179,11 @@ class DataUpdate(QThread):
                 self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
 
 
-                # calibration for  hall sensors
-                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
-                                                                             self.v1_slice, self.i1_slice / 1000)
-                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
-                                                                             self.v2_slice, self.i2_slice / 1000)
+                # # calibration for  hall sensors
+                # self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
+                #                                                              self.v1_slice, self.i1_slice / 1000)
+                # self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
+                #                                                              self.v2_slice, self.i2_slice / 1000)
 
                 # this is normalising step (still do not know whether I want to do it immidiately or not)
                 if self.flag_normalise:
@@ -463,6 +464,9 @@ class PIDOutput(QMainWindow, Ui_Title):
         
         #combobox for live graph mode
         self.select_mode_comboBox.activated.connect(self.change_graph)
+    
+        # Call the handler immediately with the current index for the live graph
+        self.change_graph()
         #same as above but for time interval change
         self.timeInterval_comboBox.activated.connect(self.change_graph)
         
@@ -692,8 +696,8 @@ class PIDOutput(QMainWindow, Ui_Title):
         ############################# send data to setter getter ######################################
         self.worker_data_block.data_1 = 65534
         
-        #frequency rotor to 10Hz
-        self.worker_data_block.data_2  = 10
+        #frequency rotor to 3Hz
+        self.worker_data_block.data_2  = 3
         
         
         self.worker_data_block.data_current = 300,0,300,0

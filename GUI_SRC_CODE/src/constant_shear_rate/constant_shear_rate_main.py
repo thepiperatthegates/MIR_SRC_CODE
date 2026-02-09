@@ -524,6 +524,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         #combobox for live graph mode
         self.select_mode_comboBox.activated.connect(self.change_graph)
+        # Call the handler immediately with the current index for the live graph
+        self.change_graph()
         #same as above but for time interval change
         self.timeInterval_comboBox.activated.connect(self.change_graph)
         

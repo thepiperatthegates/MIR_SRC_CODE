@@ -168,9 +168,11 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
             self.ct_window = TabWindowCreepTest()
             self.ct_window.showNormal()
             
+            
         elif mode == "Pid-Controller (dev)":
             self.pid_window = TabWindowPID()
             self.pid_window.showNormal()
+            
             
         self.close()
 

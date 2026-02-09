@@ -49,7 +49,7 @@ NUM_ID_SEG = 5
 UINT16_BYTES = 2
 FLOAT32_BYTES = 4
 
-DATA_BYTES_NUM_PER_SAMPLE = 4 * UINT16_BYTES + FLOAT32_BYTES
+DATA_BYTES_NUM_PER_SAMPLE = (2 * UINT16_BYTES) + (3* FLOAT32_BYTES)
 
 BYTES_PER_SAMPLE = DATA_BYTES_NUM_PER_SAMPLE + NUM_ID_SEG
 
@@ -294,8 +294,8 @@ def start_process_live_graph(queue1, q_to_graph, q_to_csv):
 
     # ID → (payload_size, unpack_format)
     ID_MAP = {
-        ID_HALL_1:     (2, '<H'),
-        ID_HALL_2:     (2, '<H'),
+        ID_HALL_1:     (4, '<f'),
+        ID_HALL_2:     (4, '<f'),
         ID_CURRENT_1:  (2, '<H'),
         ID_CURRENT_2:  (2, '<H'),
         ID_PHASE_DIFF: (4, '<f'),
