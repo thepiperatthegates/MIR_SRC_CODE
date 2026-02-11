@@ -695,7 +695,7 @@ def calibration_input_coil_1(input):
     global ELECTRONICS_FLAG
     
     output = 0 
-    
+    print(ELECTRONICS_FLAG)
     if ELECTRONICS_FLAG == 1:
         output = CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 + CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 * input + CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 * pow(input, 2) +  CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 * pow(input, 3)
     elif ELECTRONICS_FLAG == 2:

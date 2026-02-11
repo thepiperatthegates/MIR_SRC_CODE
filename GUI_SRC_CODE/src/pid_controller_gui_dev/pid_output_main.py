@@ -136,7 +136,6 @@ class DataUpdate(QThread):
         - Data from the queue (`q_to_graph`) must have a multiple of 4 samples,
           corresponding to [v1, v2, i1, i2].
         """
-        num_columns = 4
 
         data_from_pipe = []  # creating a list here because data from pipe is a list
         while self.running:
@@ -204,7 +203,7 @@ class DataUpdate(QThread):
                 self.angle_permanent_magnet_val = np.unwrap(self.angle_permanent_magnet_val)
                 self.angle_magnetic_field_val = np.unwrap(self.angle_magnetic_field_val)
                 #######################################################################################################
-                self.phase_difference_val = self.angle_magnetic_field_val - self.angle_permanent_magnet_val
+                self.phase_difference_val = self.phase_diff_slice
 
                 ##send to setter class
                 self.worker_array_setter.v1_slice = self.v1_slice
@@ -700,7 +699,7 @@ class PIDOutput(QMainWindow, Ui_Title):
         self.worker_data_block.data_2  = 3
         
         
-        self.worker_data_block.data_current = 300,0,300,0
+        self.worker_data_block.data_current = 200,0,200,0
         
         #from combobox direction
         if self.comboBox_direction.currentText() == "Clockwise":
@@ -809,6 +808,7 @@ class TabWindowPID(QMainWindow):
 
         # Add your classes as tabs
         tabs.addTab(PIDOutput(), "Main GUI")
+        tabs.addTab()
         # Set central widget
         self.setCentralWidget(tabs)
         
