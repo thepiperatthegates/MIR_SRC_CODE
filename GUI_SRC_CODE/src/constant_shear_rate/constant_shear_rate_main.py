@@ -460,7 +460,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.textbox_frequency.setValidator(QDoubleValidator())
         
         #ACCEPT ONLY FLOAT FROM 0 TO 480 (unsigned)
-        self.input_validator_unsigned = QRegularExpressionValidator(    QRegularExpression(r"^(?:[0-9](?:\.[0-9]+)?|[1-9][0-9](?:\.[0-9]+)?|[1-3][0-9]{2}(?:\.[0-9]+)?|4[0-7][0-9](?:\.[0-9]+)?|480(?:\.0+)?)$"), self)
+        self.input_validator_unsigned = QRegularExpressionValidator(QRegularExpression(r"^(?:[0-9](?:\.[0-9]+)?|[1-9][0-9](?:\.[0-9]+)?|[1-3][0-9]{2}(?:\.[0-9]+)?|4[0-7][0-9](?:\.[0-9]+)?|480(?:\.0+)?)$"), self)
         #ACCEPT ONLY INTEGER FROM -480 to 480 (signed)
         self.input_validator_signed = QRegularExpressionValidator(QRegularExpression(r"^-?(?:[0-9]|[1-9][0-9]|[1-3][0-9]{2}|4[0-7][0-9]|480)$"), self)
         self.textbox_amplitude1.setValidator(self.input_validator_unsigned)
@@ -515,11 +515,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         #Start backend serial lines
         
-        # self.worker_socket = SocketThread()
-        # self.worker_DataUpdate = DataUpdate(self)
+        self.worker_socket = SocketThread()
+        self.worker_DataUpdate = DataUpdate(self)
         
-        # self.worker_socket.start()
-        # self.worker_DataUpdate.start()
+        self.worker_socket.start()
+        self.worker_DataUpdate.start()
         
         
         #combobox for live graph mode
