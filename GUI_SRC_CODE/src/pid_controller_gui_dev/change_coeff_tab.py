@@ -18,16 +18,15 @@ import socket_GUI.sockets_files as sockets_files
 from socket_GUI.sockets_files import q_to_graph
 
 import packet_transmission as backend
-from .change_coeff import CoeffWindow
+from .change_coeff import Ui_Form
 
 
-class SendPIDCoeff(QMainWindow, CoeffWindow):
+class SendPIDCoeff(QMainWindow, Ui_Form):
     
     def __init__(self):
         super().__init__()
-        self.setupUi
+        self.setupUi(self)
         
-        self.button_send.clicked.connect(self.send_data_event)
                 #for tx data
         self.worker_data_block = backend.TxData()
         #for transmitting thread
@@ -46,12 +45,10 @@ class SendPIDCoeff(QMainWindow, CoeffWindow):
         
         #for data 10
         self.worker_data_block.data_10 = 1 
-        self.worker_data_block.data_11 = self.textbox_shear_stress.text()
         
         
         ######################################################################################
-        ##enabled stop rotating button 
-        self.button_stop.setDisabled(False)
+
         
         ##send all data to microcontroller
         #activate flag
@@ -59,7 +56,6 @@ class SendPIDCoeff(QMainWindow, CoeffWindow):
         
         
         
-    
-    
+
 
 

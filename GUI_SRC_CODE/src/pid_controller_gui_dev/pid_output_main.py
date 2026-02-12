@@ -14,6 +14,7 @@ os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
 import multiprocessing
 import sys
 from .pid_output import Ui_Title
+from .change_coeff_tab import SendPIDCoeff
 
 import socket_GUI.sockets_files as sockets_files
 from socket_GUI.sockets_files import q_to_graph
@@ -454,11 +455,11 @@ class PIDOutput(QMainWindow, Ui_Title):
 
         #Start backend serial lines
         
-        self.worker_socket = SocketThread()
-        self.worker_DataUpdate = DataUpdate(self)
+        # self.worker_socket = SocketThread()
+        # self.worker_DataUpdate = DataUpdate(self)
         
-        self.worker_socket.start()
-        self.worker_DataUpdate.start()
+        # self.worker_socket.start()
+        # self.worker_DataUpdate.start()
         
         
         #combobox for live graph mode
@@ -808,7 +809,7 @@ class TabWindowPID(QMainWindow):
 
         # Add your classes as tabs
         tabs.addTab(PIDOutput(), "Main GUI")
-        tabs.addTab()
+        tabs.addTab(SendPIDCoeff(), "PID Tx")
         # Set central widget
         self.setCentralWidget(tabs)
         
