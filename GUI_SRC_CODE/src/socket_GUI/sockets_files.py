@@ -65,14 +65,18 @@ def port_name_setter(this_port_name):
 def socket_start_connect():
     global port_name
 
-    if sys.platform == 'darwin':        #hijazi's laptop
-        port_num = '/dev/tty.usbmodem355A357631331'   #for mac1
-        # port_name = '/dev/tty.usbmodem355A357631331'       
-    elif sys.platform == 'win32':       #simon's laptop
-        port_num = port_name
-    elif sys.platform == 'linux':
-        port_num = '/dev/ttyACM1'
-
+    port_num = None 
+    
+    # Detect platform and set port
+    if sys.platform == 'darwin':        # macOS
+        port_num = '/dev/tty.usbmodem355A357631331'
+    elif sys.platform == 'win32':       # Windows
+        port_num = port_name  # must be defined elsewhere
+    elif sys.platform == 'linux':       # Linux
+        for options in ['/dev/ttyACM1', '/dev/ttyACM2', '/dev/ttyACM3']:
+            if os.path.exists(options):
+                port_num = options
+                break
     try:
         ser = serial.Serial(port=port_num, baudrate=baud_rate,timeout=None)
         print(ser)
