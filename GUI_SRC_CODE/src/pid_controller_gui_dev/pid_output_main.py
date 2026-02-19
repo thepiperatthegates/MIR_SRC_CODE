@@ -340,86 +340,65 @@ class PIDOutput(QMainWindow, Ui_Title):
         super().__init__()
         self.setupUi(self)
         
+        # 1. High DPI and Pathing
+        self._configure_display()
+        self._init_paths()
+        
+        # 2. Variable Initialization
+        self._init_plot_variables()
+        self._init_data_placeholders()
+        self._init_packet_workers()
+        self._init_physics_constants()
+        
+        # 3. UI and Hardware Setup
+        self._setup_initial_ui_state()
+        self._start_backend_threads()
+        self._connect_signals()
+
+    def _configure_display(self):
+        """Handle High DPI scaling settings."""
         if hasattr(QtCore.Qt, 'AA_EnableHighDpiScaling'):
             QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
         if hasattr(QtCore.Qt, 'AA_UseHighDpiPixmaps'):
             QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)
 
-        # get absolute path of project root (folder containing 'src' and 'pics')
+    def _init_paths(self):
+        """Construct absolute paths and load button icons."""
         self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
+        # Mapping buttons to icon filenames
+        icons = {
+            self.save_button: "save_icon.ico",
+            self.button_fr_constant: "friction_icon.png",
+            self.button_cal_constant: "calibrate.png"
+        }
+        
+        for button, filename in icons.items():
+            path = os.path.join(self.project_root, "pics", filename)
+            button.setIcon(QtGui.QIcon(path))
 
-        # construct icon path
-        save_icon_path = os.path.join(self.project_root, "pics", "save_icon.ico")
-        calib_icon_path = os.path.join(self.project_root, "pics", "calibrate.png")
-        fr_icon_path = os.path.join(self.project_root, "pics", "friction_icon.png")
+    def _init_plot_variables(self):
+        """Initialize references for plotting and time axes."""
+        self.p_window_data = self.p_analyse = self.worker_sleep = None
+        self._plot_ref1 = self._plot_ref2 = self.before1 = self.before2 = None
+        self.curve_v1 = self.curve_v2 = self.curve_i1 = self.curve_i2 = None
+        self.curve_sigma_b = self.curve_sigma_m = None
         
-        self.save_button.setIcon(QtGui.QIcon(save_icon_path))
-        self.button_fr_constant.setIcon(QtGui.QIcon(fr_icon_path))
-        self.button_cal_constant.setIcon(QtGui.QIcon(calib_icon_path))
+        self.time_axis = [i * 0.0001 for i in range(1000)]
+        self.flag_fR = self.flag_K = False
 
-        self.setWindowTitle("Const Shear Rate Window")
+    def _init_data_placeholders(self):
+        """Pre-allocate arrays for torque, phase, and hall sensors."""
+        # Accumulators
+        self.accumulate_hall_1 = self.accumulate_hall_2 = None
+        self.accumulate_current_1 = self.accumulate_current_2 = None
         
-        self.button_stop.setDisabled(True)
+        # Calibration Means
+        self.mean_hall_1_0_A = self.mean_hall_2_0_A = None
+        self.mean_hall_1_400_A = None
         
-        
-          ###################################declare processes here first to keep a reference to the process
-        self.p_window_data = None
-        self.p_analyse = None
-        self.worker_sleep = None
-        self._plot_ref1 = None       
-        self._plot_ref2 = None
-        self.before1 = None
-        self.before2 = None
-        self.curve_v1 = self.curve_v2 = self.curve_i1 = self.curve_i2 = self.curve_sigma_b = self.curve_sigma_m = None
-        self.time_axis =  [i * 0.0001 for i in range(1000)]
-        self.flag_fR = False
-        self.flag_K = False
-        
-        ####### variables for reference class DataUpdate(QThread) ###########################################        
-        self.accumulate_hall_1 = None       #in V
-        self.accumulate_hall_2  = None      #in V
-        self.accumulate_current_1 = None    #in mA
-        self.accumulate_current_2 = None    #in mA
-        
-        ####### variables for calibration process ###########################################
-    
-        self.mean_hall_1_0_A = None         #in V     
-        self.mean_hall_2_0_A = None         #in V
-        self.mean_hall_1_400_A = None       #in mA
-        self.mean_hall_2_0_A = None         #in mA
-        
-        ####### flag init ##############################################################################
-        
-        
-        #for receive thread
-        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
-        #for tx data
-        self.worker_data_block = packet_transmission.TxData()
-        #for transmitting thread
-        self.worker_flag_send = packet_transmission.TxFlag()
-        #for data straight from graph
-        self.worker_getter_graph = packet_transmission.StoreArrayGraph()
-        #for fr setter getter
-        self.worker_fr_property = packet_transmission.fRCoefficients()
-        
-        
-        #for k_b setter getter
-        self.worker_k_b_property = packet_transmission.kbCoefficient()
-        #for downsampling purposes
-        self.worker_downsample_property = packet_transmission.DownSampleSpecificFlag()
-        self.tot_average = self.worker_downsample_property.tot_average
-        self.time_increment = self.worker_downsample_property.current_time
-
-        #for normalise properties purposes
-        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
-        
-        
-        ####### variables for fR measurement process ###############################################
-        self.mean_current1_fR = None        #in mA
-        self.mean_current2_fR = None        #in mA
-        self.mean_hall1_fR = None           #in V
-        self.mean_hall2_fR = None           #in V 
-        self.calculated_torque = np.zeros(20)               #in 
+        # fR Measurement arrays (20 samples)
+        self.calculated_torque = np.zeros(20)
         self.calculated_angular_velocity = np.zeros(20)
         self.mean_phase = np.zeros(20)
         self.standard_mean_phase = np.zeros(20)
@@ -427,180 +406,128 @@ class PIDOutput(QMainWindow, Ui_Title):
         self.standard_torque = np.zeros(20)
         self.standard_phase = np.zeros(20)
         self.calculate_final_fR = 0
-        
-        
-        self.COIL_CONSTANT = packet_transmission.COIL_CONSTANT		# in T / A
-        self.DIPOLE_MOMENT = packet_transmission.DIPOLE_MOMENT	# in A m^2
-        self.worker_get = packet_transmission.fRCoefficients()
-        packet_transmission.CALIBRATION_FACTOR = self.worker_get.CALIBRATION_FACTOR # torque calibration no units (K)
-    
-        #########################################################################################
-        #placeholder text for textboxes################################################
-        
-        
-        
-             #### connected functions for button
-        self.button_send.clicked.connect(self.send_parameter_event)
-        self.button_send.clicked.connect(lambda value: self.popout_window(1))
-        
 
+    def _init_packet_workers(self):
+        """Initialize all setter/getter flags from packet_transmission."""
+        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
+        self.worker_data_block = packet_transmission.TxData()
+        self.worker_flag_send = packet_transmission.TxFlag()
+        self.worker_getter_graph = packet_transmission.StoreArrayGraph()
+        self.worker_fr_property = packet_transmission.fRCoefficients()
+        self.worker_k_b_property = packet_transmission.kbCoefficient()
+        self.worker_downsample_property = packet_transmission.DownSampleSpecificFlag()
+        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
+        
+        # Sync downsampling local vars
+        self.tot_average = self.worker_downsample_property.tot_average
+        self.time_increment = self.worker_downsample_property.current_time
+
+    def _init_physics_constants(self):
+        """Load static physics constants and coefficients."""
+        self.COIL_CONSTANT = packet_transmission.COIL_CONSTANT
+        self.DIPOLE_MOMENT = packet_transmission.DIPOLE_MOMENT
+        self.worker_get = packet_transmission.fRCoefficients()
+        packet_transmission.CALIBRATION_FACTOR = self.worker_get.CALIBRATION_FACTOR
+
+    def _setup_initial_ui_state(self):
+        """Configure default window and button states."""
+        self.setWindowTitle("Const Shear Rate Window")
+        self.button_stop.setDisabled(True)
+
+    def _start_backend_threads(self):
+        """Launch serial communication and data update threads."""
+        self.worker_socket = SocketThread()
+        self.worker_DataUpdate = DataUpdate(self)
+        self.worker_socket.start()
+        self.worker_DataUpdate.start()
+
+    def _connect_signals(self):
+        """Link UI interactions to their respective methods."""
+        # Buttons
+        self.button_send.clicked.connect(self.send_parameter_event)
+        self.button_send.clicked.connect(lambda: self.popout_window(1))
+        self.button_auto_range.clicked.connect(self.auto_range_event)
+        self.save_button.clicked.connect(self.save_button_event)
+        self.button_rotate.clicked.connect(self.rotate_magnet_event)
+
+        # Actions
         self.actionHardware_reset.triggered.connect(self.set_hardware_reset_event)
         self.actionSoftware_restart.triggered.connect(self.set_software_reset_event)
         
-        self.button_auto_range.clicked.connect(self.auto_range_event)
-        
-        self.save_button.clicked.connect(self.save_button_event)
-    
-        self.button_rotate.clicked.connect(self.rotate_magnet_event)
-
-        #Start backend serial lines
-        
-        # self.worker_socket = SocketThread()
-        # self.worker_DataUpdate = DataUpdate(self)
-        
-        # self.worker_socket.start()
-        # self.worker_DataUpdate.start()
-        
-        
-        #combobox for live graph mode
+        # Live Graph Controls
         self.select_mode_comboBox.activated.connect(self.change_graph)
-    
-        # Call the handler immediately with the current index for the live graph
-        self.change_graph()
-        #same as above but for time interval change
         self.timeInterval_comboBox.activated.connect(self.change_graph)
         
+        # Initial graph trigger
+        self.change_graph()
         
-        
+
     def change_graph(self):
-        
-        #get string from combo box
-        mode = self.select_mode_comboBox.currentText()
-        time_interval_var_string = self.timeInterval_comboBox.currentText()
-        time_interval_var_int = int(time_interval_var_string[:-2])
-        
-        
-        #clear graph and stop every time the event is connected
+        """Sets up the plotting environment based on UI selection."""
+        # 1. Reset Plotting Area
         self.graphicsView.clear()
         if hasattr(self, 'timer'):
             self.timer.stop()
 
-
-        if mode == "View sensors":
-            
-            #this is to make sure x-axis is configured properly 
-            if time_interval_var_int == 100:
-                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
-                self.time_axis = [i * 0.0001 for i in range(1000)]
-            elif time_interval_var_int == 500:
-                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = 5*sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
-                self.time_axis = [i * 0.0001 for i in range(5*1000)]
-            elif time_interval_var_int == 1000:
-                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = 10*sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
-                self.time_axis = [i * 0.0001 for i in range(10*1000)]
-            
-            ######################
-            self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Hall sensors")
-            self.plot1.setLabel('left', 'Voltage', units='V')
-            self.plot1.setLabel('bottom', 'Time', units= 's')
-            self.plot1.addLegend()
-            self.plot1.showGrid(x=True, y=True)
-            self.curve_v1 = self.plot1.plot(pen='r', name="Hall sensors 1")
-            self.curve_v2 = self.plot1.plot(pen='b', name="Hall sensors 2")
-
-            
-            self.plot2 = self.graphicsView.addPlot(row=1, col=0, title="Current sensors")
-            self.plot2.setLabel('left', 'Current', units='mA')
-            self.plot2.setLabel('bottom', 'Time', units= 's')
-            self.plot2.addLegend()
-            self.plot2.showGrid(x=True, y=True)
-            
-            
-            self.curve_i1 = self.plot2.plot(pen='g', name="I1")
-            self.curve_i2 = self.plot2.plot(pen='y', name="I2")
-            
-            self.plot1.enableAutoRange(axis='x', enable=False)
-            self.plot2.enableAutoRange(axis='x', enable=False)
-            self.plot1.setXRange(0, 0.5)
-            self.plot2.setXRange(0, 0.5)
+        # 2. Extract and Parse Inputs
+        mode = self.select_mode_comboBox.currentText()
+        interval_str = self.timeInterval_comboBox.currentText()
+        interval_ms = int(interval_str[:-2])
         
-            # Create a timer for sensor updates
-            self.timer = QtCore.QTimer()
-            self.timer.setInterval(time_interval_var_int)  # 0.5 seconds interval
-            self.timer.timeout.connect(self.graph_update_sensors)
-            self.timer.start()
-
-        elif mode == "View angle":
-            
-            #this is to make sure x-axis is configured properly 
-            if time_interval_var_int == 100:
-                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
-                self.time_axis = [i * 0.0001 for i in range(1000)]
-            elif time_interval_var_int == 500:
-                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = 5*sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
-                self.time_axis = [i * 0.0001 for i in range(5*1000)]
-            elif time_interval_var_int == 1000:
-                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = 10*sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
-                self.time_axis = [i * 0.0001 for i in range(10*5000)]
-                
-            self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Permanent magnet angle")
-            self.plot1.setLabel('left', 'ϕ_m', units='rad')
-            self.plot1.setLabel('bottom', 'Time', units= 's')
-            self.plot1.addLegend()
-            self.plot1.showGrid(x=True, y=True)
-            self.curve_sigma_m = self.plot1.plot(pen='r', name="Sigma")
-    
-            
-            self.plot2 = self.graphicsView.addPlot(row=1, col=0, title="Magnetic field angle")
-            self.plot2.setLabel('left', 'ϕ_B', units='rad')
-            self.plot2.setLabel('bottom', 'Time', units= 's')
-            self.plot2.addLegend()
-            self.plot2.showGrid(x=True, y=True)
-            self.curve_sigma_b = self.plot2.plot(pen='g', name="B")
-            
-            self.plot1.enableAutoRange(axis='x', enable=False)
-            self.plot2.enableAutoRange(axis='x', enable=False)
-            self.plot1.setXRange(0, 0.5)
-            self.plot2.setXRange(0, 0.5)
-            
-            self.timer = QtCore.QTimer()
-            self.timer.setInterval(time_interval_var_int)  # 0.5 seconds interval
-            self.timer.timeout.connect(self.graph_update_angle)
-            self.timer.start()
-
-
-            
-        elif mode == "View phase difference":
-            
-            
-            #this is to make sure x-axis is configured properly 
-            #this is to make sure x-axis is configured properly 
-            if time_interval_var_int == 100:
-                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
-                self.time_axis = [i * 0.0001 for i in range(1000)]
-            elif time_interval_var_int == 500:
-                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = 5*sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
-                self.time_axis = [i * 0.0001 for i in range(5*1000)]
-            elif time_interval_var_int == 1000:
-                sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = 10*sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
-                self.time_axis = [i * 0.0001 for i in range(10*1000)]
-                
-            self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Permanent magnet angle")
-            self.plot1.setLabel('left', 'Δϕ', units='rad')
-            self.plot1.setLabel('bottom', 'Time', units= 's')
-            self.plot1.showGrid(x=True, y=True)
-            self.curve_phase_difference = self.plot1.plot(pen='g')
-            self.plot1.addLegend()
+        # 3. Handle Scaling Logic
+        # factor maps 100ms -> 1, 500ms -> 5, 1000ms -> 10
+        factor = interval_ms // 100
+        sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = factor * sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
         
-            self.plot1.enableAutoRange(axis='x', enable=False)
-            self.plot1.setXRange(0, 0.5)
+        # Mode-specific time axis length (Addressing your 'View angle' 50000 point logic)
+        range_len = 50000 if (mode == "View angle" and interval_ms == 1000) else (factor * 1000)
+        self.time_axis = [i * 0.0001 for i in range(range_len)]
 
-            # Create a timer for angle updates
-            self.timer = QtCore.QTimer()
-            self.timer.setInterval(time_interval_var_int)  # 0.5 seconds interval
-            self.timer.timeout.connect(self.graph_phase_difference)
-            self.timer.start()
-                
+        # 4. Mode Configuration Map
+        # Structure: { ModeName: (UpdateFunction, [Plot1_Setup, Plot2_Setup]) }
+        config = {
+            "View sensors": (self.graph_update_sensors, [
+                {"title": "Hall sensors", "y": "Voltage", "u": "V", "curves": [("r", "v1", "Hall 1"), ("b", "v2", "Hall 2")]},
+                {"title": "Current sensors", "y": "Current", "u": "mA", "curves": [("g", "i1", "I1"), ("y", "i2", "I2")]}
+            ]),
+            "View angle": (self.graph_update_angle, [
+                {"title": "Permanent magnet angle", "y": "ϕ_m", "u": "rad", "curves": [("r", "sigma_m", "Sigma")]},
+                {"title": "Magnetic field angle", "y": "ϕ_B", "u": "rad", "curves": [("g", "sigma_b", "B")]}
+            ]),
+            "View phase difference": (self.graph_phase_difference, [
+                {"title": "Phase Difference", "y": "Δϕ", "u": "rad", "curves": [("g", "phase_diff", "Delta")]}
+            ])
+        }
+
+        if mode not in config:
+            return
+
+        update_func, plots_setup = config[mode]
+
+        # 5. Build the UI
+        for row, setup in enumerate(plots_setup):
+            plot = self.graphicsView.addPlot(row=row, col=0, title=setup["title"])
+            self._apply_plot_style(plot, setup["y"], setup["u"])
+            
+            for color, attr_suffix, name in setup["curves"]:
+                curve = plot.plot(pen=color, name=name)
+                # Dynamically set attribute (e.g., self.curve_v1)
+                setattr(self, f"curve_{attr_suffix}", curve)
+
+        # 6. Initialize Timer
+        self.timer = QtCore.QTimer()
+        self.timer.setInterval(interval_ms)
+        self.timer.timeout.connect(update_func)
+        self.timer.start()
+
+    def _apply_plot_style(self, plot, y_label, units):
+        """Standardizes plot appearance."""
+        plot.setLabel('left', y_label, units=units)
+        plot.setLabel('bottom', 'Time', units='s')
+        plot.addLegend()
+        plot.showGrid(x=True, y=True)
+        plot.enableAutoRange(axis='x', enable=False)
+        plot.setXRange(0, 0.5)
 
     def start_normalise_event(self):
         if not self.worker_DataUpdate.flag_normalise:
@@ -612,17 +539,28 @@ class PIDOutput(QMainWindow, Ui_Title):
                 
 
     def graph_update_sensors(self):
-        global data_mutex
+    # 1. Access the slices once to minimize race condition window
+        v1 = self.worker_getter_graph.v1_slice
+        v2 = self.worker_getter_graph.v2_slice
+        i1 = self.worker_getter_graph.i1_slice
+        i2 = self.worker_getter_graph.i2_slice
 
-        # data_mutex.lock()
+        # 2. Determine the shortest length available right now
+        # We compare the time_axis and all 4 data arrays
+        min_len = min(len(self.time_axis), len(v1), len(v2), len(i1), len(i2))
 
-        self.curve_v1.setData(self.time_axis,self.worker_getter_graph.v1_slice)
-        self.curve_v2.setData(self.time_axis,self.worker_getter_graph.v2_slice)
+        # 3. Validation
+        if min_len == 0:
+            return
+
+        # 4. Slice all arrays to the same length for this frame
+        t = self.time_axis[:min_len]
         
-        self.curve_i1.setData(self.time_axis,self.worker_getter_graph.i1_slice)
-        self.curve_i2.setData(self.time_axis,self.worker_getter_graph.i2_slice)
-        
-        # data_mutex.unlock()
+        self.curve_v1.setData(t, v1[:min_len])
+        self.curve_v2.setData(t, v2[:min_len])
+        self.curve_i1.setData(t, i1[:min_len])
+        self.curve_i2.setData(t, i2[:min_len])
+            # data_mutex.unlock()
         #
         
     def auto_range_event(self):

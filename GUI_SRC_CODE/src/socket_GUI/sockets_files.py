@@ -89,7 +89,7 @@ def socket_start_connect():
     
     # Detect platform and set port
     if sys.platform == 'darwin':        # macOS
-        port_num = '/dev/tty.usbmodem355A357631331'
+        port_num = '/dev/tty.usbmodem3776345D32331'
     elif sys.platform == 'win32':       # Windows
         port_num = port_name  # must be defined elsewhere
     elif sys.platform == 'linux':       # Linux

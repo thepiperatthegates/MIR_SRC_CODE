@@ -315,19 +315,19 @@ class SleepTimer(QObject):
 
             # packet_transmission.running_time_flag_setter(0)
 
-# class SocketThread(QThread):
+class SocketThread(QThread):
     
-#     def __init__(self, parent=None):
-#         super().__init__(parent)
-#         self.running = True
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.running = True
 
-#     def run(self):
-#         if self.running:
-#             sockets_files.thread_start()
+    def run(self):
+        if self.running:
+            sockets_files.thread_start()
 
 
-#     def stop(self):
-#         self.running = False
+    def stop(self):
+        self.running = False
     
 
 
@@ -502,14 +502,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.button_auto_range.clicked.connect(self.auto_range_event)
         
         self.save_button.clicked.connect(self.save_button_event)
-
-        # self.button_send.setDisabled(True)
-        # self.button_start.setDisabled(True)
-        # self.button_stop.setDisabled(True)
-        # self.button_rotate.setDisabled(False)
-        # self.normalise_button.setDisabled(True)
-
-
+        
         #### rotote the magnet button
         self.button_rotate.clicked.connect(self.button_rotate_event)
 
