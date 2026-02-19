@@ -477,7 +477,15 @@ class fRCoefficients:
             raise ValueError(f"Invalid ELECTRONICS_FLAG = {ELECTRONICS_FLAG}")
 
         cls._initialized = True
-
+        
+    
+    # ----- Reload ---------
+    @classmethod
+    def reload(cls):
+        cls._initialized = False
+        cls._initialize()
+        
+        
     # ---------- Properties ----------
     @property
     def fr1(self):
@@ -513,8 +521,8 @@ class fRCoefficients:
 class kbCoefficient:
     _initialized = False
 
-    _k_b_1 = None
-    _k_b_2 = None
+    _k_b_1 = 0.0
+    _k_b_2 = 0.0
 
     @classmethod
     def _initialize(cls):
@@ -545,6 +553,13 @@ class kbCoefficient:
         cls._k_b_2 = float(row["k_b_2"])
 
         cls._initialized = True
+        
+        
+    # ---- reload ----
+    @classmethod
+    def reload(cls):
+        cls._initialized = False
+        cls._initialize()
 
     # ---- k_b_1 ----
     @property
@@ -572,10 +587,10 @@ class kbCoefficient:
 class VoltageNormaliseCoefficient:
     _initialized = False
     
-    _amp_voltage_1 = None
-    _zero_offset_voltage_1 = None
-    _amp_voltage_2 = None
-    _zero_offset_voltage_2 = None
+    _amp_voltage_1 = 0.0
+    _zero_offset_voltage_1 = 0.0
+    _amp_voltage_2 = 0.0
+    _zero_offset_voltage_2 = 0.0
     
     
     @classmethod 
@@ -583,24 +598,29 @@ class VoltageNormaliseCoefficient:
         
         if cls._initialized:
             return
-        
-        project_root = os.path.dirname(os.path.abspath(__file__))
-        
-        filepath = os.path.join(project_root, "files", "normalise_voltage_constant.csv")
-        
-                
-        if not os.path.exists(filepath):
-            raise FileNotFoundError(f"{filepath} not found")
-        
-        data = np.genfromtxt(filepath, delimiter=';', names=True)
-            
-        cls._amp_voltage_1 = float(data["voltage_amp_1[V]"])
-        cls._zero_offset_voltage_1 = float(data["voltage_zero_offset_1[V]"])
-        cls._amp_voltage_2 = float( data ["voltage_amp_2[V]"])
-        cls._zero_offset_voltage_2 = float ( data ["voltage_zero_offset_2[V]"])
 
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        filepath = os.path.join(project_root, "files", "normalise_voltage_constant.csv")
+
+        # If file exists → load values
+        if os.path.exists(filepath):
+            data = np.genfromtxt(filepath, delimiter=';', names=True)
+
+            cls._amp_voltage_1 = float(data["voltage_amp_1_V"])
+            cls._zero_offset_voltage_1 = float(data["voltage_zero_offset_1_V"])
+            cls._amp_voltage_2 = float(data["voltage_amp_2_V"])
+            cls._zero_offset_voltage_2 = float(data["voltage_zero_offset_2_V"])
+        
         
         cls._initialized = True
+        
+        
+    # ---- reload ----
+    @classmethod
+    def reload(cls):
+        cls._initialized = False
+        cls._initialize()
+
         
     # ---- voltage 1 ----
         

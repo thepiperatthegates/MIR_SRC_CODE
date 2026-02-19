@@ -164,6 +164,7 @@ class DataUpdate(QThread):
                 data_mutex.lock()
 
                 # Hall Sensors
+                #TODO: NEW FIRMWARE ITERACTIONS MUST NOT BE NEGATIVE FOR I1!!!!!!!!!
                 self.v1_slice = -packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
                 self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
 
@@ -313,8 +314,6 @@ class SleepTimer(QObject):
             self.timer.stop()
             self.worker_flag_run_time.flag_running_time = False
 
-            # packet_transmission.running_time_flag_setter(0)
-
 class SocketThread(QThread):
     
     def __init__(self, parent=None):
@@ -337,22 +336,22 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         super().__init__()
         self.setupUi(self)
         
-        # 1. System & Paths
+        # -------- System & Paths --------------------
         self._init_system_settings()
         
-        # 2. State & Data Variables (Your "Class Variables")
+        # -------- State & Data Variables --------------
         self._init_state_variables()
         self._init_measurement_variables()
         
-        # 3. Hardware/Worker Interfaces
+        # --------  Hardware/Worker Interfaces.  -------------
         self._init_workers()
         
-        # 4. UI Polish & Logic
+        # --------  UI Polish & Logic ---------------
         self._setup_ui_elements()
         self._setup_validators()
         self._connect_signals()
 
-        # 5. Start Background Services
+        # --------  Start Background Services. ------------
         self._start_services()
 
     def _init_system_settings(self):
@@ -414,24 +413,24 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_downsample_property = packet_transmission.DownSampleSpecificFlag()
         self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
         
-        # Constants
+        #--------- Constants ---------
         self.tot_average = self.worker_downsample_property.tot_average
         self.time_increment = self.worker_downsample_property.current_time
         self.COIL_CONSTANT = packet_transmission.COIL_CONSTANT
         self.DIPOLE_MOMENT = packet_transmission.DIPOLE_MOMENT
         
-        # Global sync
+        #--------- Global sync ---------
         packet_transmission.CALIBRATION_FACTOR = self.worker_fr_property.CALIBRATION_FACTOR
 
     def _setup_ui_elements(self):
         """Set icons, placeholders, and labels."""
-        # Icons
+        #--------- Icons. ------------------
         get_path = lambda x: os.path.join(self.project_root, "pics", x)
         self.save_button.setIcon(QtGui.QIcon(get_path("save_icon.ico")))
         self.button_fr_constant.setIcon(QtGui.QIcon(get_path("friction_icon.png")))
         self.button_cal_constant.setIcon(QtGui.QIcon(get_path("calibrate.png")))
 
-        # Text/Labels
+        #--------- Text/Labels  ---------
         self.button_stop.setDisabled(True)
         self.textbox_time.setPlaceholderText("Enter time in second")
         self.textbox_sample_frequency.setText("10000")
@@ -451,7 +450,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         v_time.setNotation(QDoubleValidator.StandardNotation)
         self.textbox_time.setValidator(v_time)
         
-        # Regex Validators
+        #--------- Regex Validators --------- 
         u_reg = QRegularExpression(r"^(?:[0-9](\.[0-9]+)?|[1-9][0-9](\.[0-9]+)?|[1-3][0-9]{2}(\.[0-9]+)?|4[0-7][0-9](\.[0-9]+)?|480(\.0+)?)$")
         s_reg = QRegularExpression(r"^-?(?:[0-9]|[1-9][0-9]|[1-3][0-9]{2}|4[0-7][0-9]|480)$")
         
@@ -466,7 +465,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.button_start.clicked.connect(self.start_data_event)
         self.button_stop.clicked.connect(self.stop_button_push_event)
         
-        # Add popouts
+        #--------- Add popouts ---------
         for btn in [self.button_send, self.button_start, self.button_stop, self.button_cal_constant]:
             btn.clicked.connect(lambda: self.popout_window(1))
 
@@ -481,6 +480,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.select_mode_comboBox.activated.connect(self.change_graph)
         self.timeInterval_comboBox.activated.connect(self.change_graph)
         self.save_button.clicked.connect(self.save_button_event)
+        self.button_rotate.clicked.connect(self.button_rotate_event)
 
     def _start_services(self):
         """Launch background threads."""
@@ -488,7 +488,16 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_socket.start()
         
         self.worker_DataUpdate = DataUpdate(self)
-        self.worker_DataUpdate.flag_normalise_event(True)
+        
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        normalise_filepath = os.path.join(project_root, "files", "normalise_voltage_constant.csv")
+
+        # If file exists → load values
+        if os.path.exists(normalise_filepath):
+            self.worker_DataUpdate.flag_normalise_event(True)
+        else:
+            self.worker_DataUpdate.flag_normalise_event(False)
+        
         self.worker_DataUpdate.start()
         
         self.change_graph()
@@ -629,8 +638,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.worker_DataUpdate.flag_normalise_event(True)
         else:
             self.worker_DataUpdate.flag_normalise_event(False)
-
-        print(self.worker_DataUpdate.flag_normalise)
                 
 
     def graph_update_sensors(self):
@@ -670,121 +677,100 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.curve_phase_difference.setData(self.time_axis, self.worker_getter_graph.phase_difference_val)
         
         data_mutex.unlock()
+        
+        
     def send_parameter_event(self):
         
         """ 
-        Send data event to STM32H7575XI MCU/backend such as the amplitude and offsets for the two pair of coils, the frequency of DAC, the 
-        rotation of the magnet and whether to use FIR filtering or not. 
-        
+        Sends magnet control parameters (amplitude, offsets, frequency, rotation, FIR) 
+        to the STM32H757XI MCU backend.
         """
-
-        ############################# send data to setter getter ######################################
+        
+        #------ Map UI states to MCU constants using dictionaries. -------
+        dir_map = {"Clockwise": 2, "Anti-clockwise": 1}
+        
+        # ----- Assign values to the worker data block --------
         self.worker_data_block.data_1 = 65534
+        self.worker_data_block.data_2 = self.textbox_frequency.text()
         
-        #change to frequency for MCU
-        self.worker_data_block.data_2  = self.textbox_frequency.text()
-        
-        self.worker_data_block.data_current = self.textbox_amplitude1.text(), self.textbox_offset1.text(), self.textbox_amplitude2.text(), self.textbox_offset2.text()
+        # ------ Pack currents/offsets directly into a tuple. --------
+        self.worker_data_block.data_current = (
+            self.textbox_amplitude1.text(), self.textbox_offset1.text(),
+            self.textbox_amplitude2.text(), self.textbox_offset2.text()
+        )
 
-        #from combobox direction
-        if self.comboBox_direction.currentText() == "Clockwise":
-            self.worker_data_block.data_7 = 2
-            data_7 = self.worker_data_block.data_7
-        elif self.comboBox_direction.currentText() == "Anti-clockwise":
-            self.worker_data_block.data_7 = 1
-            data_7 = self.worker_data_block.data_7
-            
-        if self.filter_checkbox.isChecked():
-            self.worker_data_block.data_8 = 0
-        else:
-            self.worker_data_block.data_8 =  2
-        
-        #for data 10
+        # --------- Apply direction and filter logic --------
+        self.worker_data_block.data_7 = dir_map.get(self.comboBox_direction.currentText(), 1)
+        self.worker_data_block.data_8 = 0 if self.filter_checkbox.isChecked() else 2
         self.worker_data_block.data_10 = 1 
-        ######################################################################################
-        ##enabled stop rotating button 
-        self.button_stop.setDisabled(False)
-        
-        ##send all data to microcontroller
-        #activate flag
-        self.worker_flag_send.flag_tx = True
-        
 
-        self.status_label.setStyleSheet("color: #32a83a;")
+        # ---------- Hardware and UI triggers. ------------
+        self.button_stop.setDisabled(False)  # Enable stop button
+        self.worker_flag_send.flag_tx = True  # Activate transmission flag
+        
+        #------------ Update Status   ----------------------
+        self.status_label.setStyleSheet("color: #32a83a; font-weight: bold;")
         self.status_label.setText("Data sent!")
-    
+        
     def start_data_event(self):
-        
-        
-        ##################### delete previous dummy files before acquistion starts. ######################################
-        path_join =  os.path.join(self.project_root, "files", "dummy.csv")
-        #remove the dummy if it exists
-        if os.path.exists(path_join):
+
+        #  --------- Cleanup old files  --------------
+        dummy_path = os.path.join(self.project_root, "files", "dummy.csv")
+        if os.path.exists(dummy_path):
             try:
-                os.remove(path_join)
-                print("dummy.csv deleted")
+                os.remove(dummy_path)
             except OSError as e:
-                print(f"Error deleting file csv: {e}")
-        else:
-            print("First measurements")
-            
-        ############################################################################################################################
-            
+                print(f"File cleanup failed: {e}")
+
+        #  --------- Gather Inputs & Safety Check  ------------
+        fs_text = self.textbox_sample_frequency.text()
+        if not fs_text or int(fs_text) == 0:
+            return  # Silently exit if frequency is invalid/empty
+
+        #  --------- Downsampling Logic & Validation.  ---------
+        fs = float(fs_text)
+        tot_avg = 10000 // int(fs)
         
-        ############################# send data to setter getter ############################################################################
-        self.worker_data_block.data_1  = self.textbox_time.text()
-        #change to frequency for MCU
-        self.worker_data_block.data_2  = self.textbox_frequency.text()
-        
-        self.worker_data_block.data_current = self.textbox_amplitude1.text(), self.textbox_offset1.text(), self.textbox_amplitude2.text(), self.textbox_offset2.text()
-        
+        #  --------- Validation: Ensure 5000 is divisible by tot_average  ---------
+        if not (5000 / tot_avg).is_integer():
+            return self.popout_window(5)
+
+        #   --------- Assignment (Success Path).  ------------------
+        # --------- Mapping textbox data to worker block ---------
+        self.worker_data_block.data_1 = self.textbox_time.text()
+        self.worker_data_block.data_2 = self.textbox_frequency.text()
+        self.worker_data_block.data_current = (
+            self.textbox_amplitude1.text(), self.textbox_offset1.text(),
+            self.textbox_amplitude2.text(), self.textbox_offset2.text()
+        )
         self.worker_data_block.data_10 = 1 
-        ############################################################################################################################
 
-        ######## get the desired sampling frequency from the textbox
-        sampling_frequency = self.textbox_sample_frequency.text()
-        if sampling_frequency == '' or sampling_frequency == 0:
-            pass
-        else:
-            self.worker_downsample_property.time_increment = 1.0/float(sampling_frequency)
-            self.worker_downsample_property.tot_average = int(10000 // int(sampling_frequency))
-
-            
-            check = 5000 / int(self.worker_downsample_property.tot_average)
-
+        # --------- Setting downsample properties ---------
+        self.worker_downsample_property.time_increment = 1.0 / fs
+        self.worker_downsample_property.tot_average = tot_avg
+        self.worker_downsample_property.current_time = 0.0
+        self.worker_flag_run_time.flag_running_time = True
         
-        if check.is_integer():
-            self.worker_downsample_property.current_time = 0.0
-            self.worker_flag_run_time.flag_running_time = True
-            
-            sockets_files.file_name_change_set("dummy")        #set file name from gui
+        sockets_files.file_name_change_set("dummy")
 
-            self.status_label.setStyleSheet("color: #7da832;")
-            self.status_label.setText("Acquisition starts.......")
-
-
-            
-            #start the process at the initialisation
-            #FOR NOW, LETS NOT DO ACQUISTION WINDOW
-            self.worker_sleep = SleepTimer()
-            self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
-            self.worker_sleep.start()
+        #--------- UI and Timer Execution.  ------------------
+        self.status_label.setStyleSheet("color: #7da832;")
+        self.status_label.setText("Acquisition starts.......")
         
-        ## Error handling when invalid sampling frequency is being input
-        else:
-            self.popout_window(5)
-        
+        self.worker_sleep = SleepTimer()
+        self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
+        self.worker_sleep.start()
+            
     def update_time_counter_acquisition(self, val):
         self.lcdNumber.display(val)
             
-        if val not in (0, 0.1):
-            self.button_start.setDisabled(True)
-            self.button_stop.setDisabled(True)
-            self.save_button.setDisabled(True)
-        else:
-            self.button_start.setDisabled(False)
-            self.button_stop.setDisabled(False)
-            self.save_button.setDisabled(False)
+        #---------  Determine if the process is "Active" (True if val is not 0 or 0.1) --------- 
+        is_active = val not in (0, 0.1)
+        
+        #---------  Disable buttons during activity, enable them when finished ------------------ 
+        self.button_start.setDisabled(is_active)
+        self.button_stop.setDisabled(is_active)
+        self.save_button.setDisabled(is_active)
 
     def start_calibration_event(self, input_current = -400, count_recursion = 1 ):
         print("Recursion in main func:", count_recursion)
@@ -794,11 +780,9 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         if input_current == False:
             input_current = -400
-            
         
         print("Input current for calibration:", input_current)
-        
-
+    
         #from combobox direction
         if self.comboBox_direction.currentText() == "Clockwise":
             data_7 = 2
@@ -898,7 +882,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                         ("k_b_2", "f8")
                     ])
                     
-                #get the current used eletronic flags
+                #---- get the current used eletronic flags ----
                 
                 electronic_flags = packet_transmission.get_electronics_flag()
                 index = data["ELECTRONICS_FLAG"] == electronic_flags
@@ -913,7 +897,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                     )
                     data = np.concatenate((data, new_row))
 
-                #Save the file again
+                #---- Save the file again ----
                 np.savetxt(
                     path_to_save_kb,
                     data,
@@ -929,6 +913,9 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                     f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
                     f"f<sub>R</sub> equation = {np.poly1d(self.calculate_final_fR)}"
                 )
+                
+                #---- reload the file ----
+                packet_transmission.kbCoefficient.reload()
                 
                 self.popout_window(4, self.calculate_final_fR, self.worker_k_b_property.k_b_1, self.worker_k_b_property.k_b_2)
                 #enable the button again
@@ -1172,10 +1159,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 #refresh the graph
                 self.plot_object.refresh_graph()
                 
-                
                 #reset the flag again
                 self.flag_fR = False
-                
                 
                 #enable the button again
                 self.button_send.setDisabled(False)
@@ -1238,15 +1223,16 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
     def button_rotate_event(self):
         
-        
+        #Reset the normalise event state 
+        self.worker_DataUpdate.flag_normalise_event(False)
 
         ############################# send data to setter getter ######################################
         self.worker_data_block.data_1 =5.0 #second
         # make the running frequency 200 Hz, does not matter since we will produce DC current anyway
         # change to frequency for MCU
-        self.worker_data_block.data_2_for_MCU =2 #Hz
+        self.worker_data_block.data_2_for_MCU = 1 #Hz
 
-        self.worker_data_block.data_current = 300, 0, 300, 0
+        self.worker_data_block.data_current = 200, 0, 200, 0
 
         # from combobox direction
         self.worker_data_block.data_7 = 1
@@ -1307,7 +1293,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.worker_normalise_properties.zero_offset_voltage_2 = (np.max(self.accumulate_hall_2[10:]) + np.min(self.accumulate_hall_2[10:])) / 2
 
             #File path for saving
-            header_text = "voltage_amp_1[V];voltage_zero_offset_1[V];voltage_amp_2[V];voltage_zero_offset_2"
+            header_text = "voltage_amp_1_V;voltage_zero_offset_1_V;voltage_amp_2_V;voltage_zero_offset_2_V"
             dir_save_normalisation = os.path.join(self.project_root, "files", "normalise_voltage_constant.csv")
             
             data_to_save = np.column_stack((self.worker_normalise_properties.amp_voltage_1, self.worker_normalise_properties.zero_offset_voltage_1,
@@ -1315,7 +1301,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
             # Save to CSV      
             np.savetxt(dir_save_normalisation, data_to_save, delimiter=";", comments="", fmt="%.18f", header=header_text)
-
+            
+            packet_transmission.VoltageNormaliseCoefficient.reload()
 
             self.worker_DataUpdate.flag_normalise_event(True)
 
