@@ -331,7 +331,7 @@ class SocketThread(QThread):
 
     def stop(self):
         self.running = False
-    
+
 
 
 class PIDOutput(QMainWindow, Ui_Title):
@@ -340,17 +340,17 @@ class PIDOutput(QMainWindow, Ui_Title):
         super().__init__()
         self.setupUi(self)
         
-        # 1. High DPI and Pathing
+        #----------------------- High DPI and Pathing -----------------------
         self._configure_display()
         self._init_paths()
         
-        # 2. Variable Initialization
+        #----------------------- Variable Initialization -----------------------
         self._init_plot_variables()
         self._init_data_placeholders()
         self._init_packet_workers()
         self._init_physics_constants()
         
-        # 3. UI and Hardware Setup
+        #----------------------- UI and Hardware Setup -----------------------
         self._setup_initial_ui_state()
         self._start_backend_threads()
         self._connect_signals()
@@ -366,7 +366,7 @@ class PIDOutput(QMainWindow, Ui_Title):
         """Construct absolute paths and load button icons."""
         self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
-        # Mapping buttons to icon filenames
+        #----------------------- Mapping buttons to icon filenames -----------------------
         icons = {
             self.save_button: "save_icon.ico",
             self.button_fr_constant: "friction_icon.png",
@@ -389,15 +389,15 @@ class PIDOutput(QMainWindow, Ui_Title):
 
     def _init_data_placeholders(self):
         """Pre-allocate arrays for torque, phase, and hall sensors."""
-        # Accumulators
+        # ----------------------- Accumulators -----------------------
         self.accumulate_hall_1 = self.accumulate_hall_2 = None
         self.accumulate_current_1 = self.accumulate_current_2 = None
         
-        # Calibration Means
+        # ----------------------- Calibration Means -----------------------
         self.mean_hall_1_0_A = self.mean_hall_2_0_A = None
         self.mean_hall_1_400_A = None
         
-        # fR Measurement arrays (20 samples)
+        # ----------------------- fR Measurement arrays (20 samples) -----------------------
         self.calculated_torque = np.zeros(20)
         self.calculated_angular_velocity = np.zeros(20)
         self.mean_phase = np.zeros(20)
@@ -418,7 +418,7 @@ class PIDOutput(QMainWindow, Ui_Title):
         self.worker_downsample_property = packet_transmission.DownSampleSpecificFlag()
         self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
         
-        # Sync downsampling local vars
+        # ----------------------- Sync downsampling local vars -----------------------
         self.tot_average = self.worker_downsample_property.tot_average
         self.time_increment = self.worker_downsample_property.current_time
 
@@ -443,47 +443,47 @@ class PIDOutput(QMainWindow, Ui_Title):
 
     def _connect_signals(self):
         """Link UI interactions to their respective methods."""
-        # Buttons
+        # ----------------------- Buttons -----------------------
         self.button_send.clicked.connect(self.send_parameter_event)
         self.button_send.clicked.connect(lambda: self.popout_window(1))
         self.button_auto_range.clicked.connect(self.auto_range_event)
         self.save_button.clicked.connect(self.save_button_event)
         self.button_rotate.clicked.connect(self.rotate_magnet_event)
 
-        # Actions
+        # ----------------------- Actions -----------------------
         self.actionHardware_reset.triggered.connect(self.set_hardware_reset_event)
         self.actionSoftware_restart.triggered.connect(self.set_software_reset_event)
         
-        # Live Graph Controls
+        # ----------------------- Live Graph Controls -----------------------
         self.select_mode_comboBox.activated.connect(self.change_graph)
         self.timeInterval_comboBox.activated.connect(self.change_graph)
         
-        # Initial graph trigger
+        # ----------------------- Initial graph trigger -----------------------
         self.change_graph()
         
 
     def change_graph(self):
         """Sets up the plotting environment based on UI selection."""
-        # 1. Reset Plotting Area
+        # -----------------------  Reset Plotting Area -----------------------
         self.graphicsView.clear()
         if hasattr(self, 'timer'):
             self.timer.stop()
 
-        # 2. Extract and Parse Inputs
+        # ----------------------- Extract and Parse Inputs -----------------------
         mode = self.select_mode_comboBox.currentText()
         interval_str = self.timeInterval_comboBox.currentText()
         interval_ms = int(interval_str[:-2])
         
-        # 3. Handle Scaling Logic
+        #  ----------------------- Handle Scaling Logic -----------------------
         # factor maps 100ms -> 1, 500ms -> 5, 1000ms -> 10
         factor = interval_ms // 100
         sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = factor * sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
         
-        # Mode-specific time axis length (Addressing your 'View angle' 50000 point logic)
+        #  ----------------------- Mode-specific time axis length  -----------------------
         range_len = 50000 if (mode == "View angle" and interval_ms == 1000) else (factor * 1000)
         self.time_axis = [i * 0.0001 for i in range(range_len)]
 
-        # 4. Mode Configuration Map
+        # ----------------------- Mode Configuration Map -----------------------
         # Structure: { ModeName: (UpdateFunction, [Plot1_Setup, Plot2_Setup]) }
         config = {
             "View sensors": (self.graph_update_sensors, [
@@ -504,7 +504,7 @@ class PIDOutput(QMainWindow, Ui_Title):
 
         update_func, plots_setup = config[mode]
 
-        # 5. Build the UI
+        # ----------------------- Build the UI -----------------------
         for row, setup in enumerate(plots_setup):
             plot = self.graphicsView.addPlot(row=row, col=0, title=setup["title"])
             self._apply_plot_style(plot, setup["y"], setup["u"])
@@ -514,7 +514,7 @@ class PIDOutput(QMainWindow, Ui_Title):
                 # Dynamically set attribute (e.g., self.curve_v1)
                 setattr(self, f"curve_{attr_suffix}", curve)
 
-        # 6. Initialize Timer
+        # ----------------------- Initialize Timer -----------------------
         self.timer = QtCore.QTimer()
         self.timer.setInterval(interval_ms)
         self.timer.timeout.connect(update_func)
@@ -539,13 +539,13 @@ class PIDOutput(QMainWindow, Ui_Title):
                 
 
     def graph_update_sensors(self):
-    # 1. Access the slices once to minimize race condition window
+    # ----------------------- Access the slices once to minimize race condition window -----------------------
         v1 = self.worker_getter_graph.v1_slice
         v2 = self.worker_getter_graph.v2_slice
         i1 = self.worker_getter_graph.i1_slice
         i2 = self.worker_getter_graph.i2_slice
 
-        # 2. Determine the shortest length available right now
+        # ----------------------- Determine the shortest length available right now -----------------------
         # We compare the time_axis and all 4 data arrays
         min_len = min(len(self.time_axis), len(v1), len(v2), len(i1), len(i2))
 
@@ -586,90 +586,84 @@ class PIDOutput(QMainWindow, Ui_Title):
         self.curve_phase_difference.setData(self.time_axis, self.worker_getter_graph.phase_difference_val)
         
         data_mutex.unlock()
+
     def send_parameter_event(self):
-        
-        
-        """ 
-        Send data event to STM32H7575XI MCU/backend such as the amplitude and offsets for the two pair of coils, the frequency of DAC, the 
-        rotation of the magnet and whether to use FIR filtering or not. 
-        
         """
+        Validates UI inputs and transmits parameters to the STM32H757XI MCU.
+        Handles shear rate, direction, filtering, and shear stress.
+        """
+        try:
+            # --------------------- Parse and Validate Inputs ---------------------
+            # Using float() or int() conversion here prevents sending garbage data to the MCU
+            shear_rate = float(self.textbox_shear_rate.text() or 0)
+            shear_stress = float(self.textbox_shear_stress.text() or 0)
 
-        ############################# send data to setter getter ######################################
-        self.worker_data_block.data_1 = 65534
-    
-        self.worker_data_block.data_2  = self.textbox_shear_rate.text()
-        
-        
-        #from combobox direction
-        if self.comboBox_direction.currentText() == "Clockwise":
-            self.worker_data_block.data_7 = 2
-            data_7 = self.worker_data_block.data_7
-        elif self.comboBox_direction.currentText() == "Anti-clockwise":
-            self.worker_data_block.data_7 = 1
-            data_7 = self.worker_data_block.data_7
-            
-        if self.filter_checkbox.isChecked():
-            self.worker_data_block.data_8 = 0
-        else:
-            self.worker_data_block.data_8 =  2
-        
-        #for data 10
-        self.worker_data_block.data_10 = 1 
-        self.worker_data_block.data_11 = self.textbox_shear_stress.text()
-        ######################################################################################
-        ##enabled stop rotating button 
-        self.button_stop.setDisabled(False)
-        
-        ##send all data to microcontroller
-        #activate flag
-        self.worker_flag_send.flag_tx = True
-        
+            # --------------------- Map UI States to Hardware Codes ---------------------
+            # Direction: Anti-clockwise = 1, Clockwise = 2
+            direction_code = 2 if self.comboBox_direction.currentText() == "Clockwise" else 1
 
-        self.status_label.setStyleSheet("color: #32a83a;")
-        self.status_label.setText("Data sent!")
-        
-        
+            # --------------------- FIR Filter: Checked = 0 (On), Unchecked = 2 (Off) ---------------------
+            filter_code = 0 if self.filter_checkbox.isChecked() else 2
+
+            # --------------------- Update the Data Worker ---------------------
+            self.worker_data_block.data_1 = 65534  # Header/ID
+            self.worker_data_block.data_2 = shear_rate
+            self.worker_data_block.data_7 = direction_code
+            self.worker_data_block.data_8 = filter_code
+            self.worker_data_block.data_10 = 1  # Command/Mode selector
+            self.worker_data_block.data_11 = shear_stress
+
+            #---------------------  Physical Transmission ---------------------
+            # Setting the flag triggers the actual transmission thread
+            self.worker_flag_send.flag_tx = True
+
+            # 5. UI Feedback
+            self._update_transmission_ui(success=True)
+
+        except ValueError:
+            # --------------------- If the user entered invalid text in the textboxes ---------------------
+            self._update_transmission_ui(success=False, message="Invalid Input! Numbers only.")
+
     def rotate_magnet_event(self):
-        ############################# send data to setter getter ######################################
-        self.worker_data_block.data_1 = 65534
-        
-        #frequency rotor to 3Hz
-        self.worker_data_block.data_2  = 3
-        
-        
-        self.worker_data_block.data_current = 200,0,200,0
-        
-        #from combobox direction
-        if self.comboBox_direction.currentText() == "Clockwise":
-            self.worker_data_block.data_7 = 2
-            data_7 = self.worker_data_block.data_7
-        elif self.comboBox_direction.currentText() == "Anti-clockwise":
-            self.worker_data_block.data_7 = 1
-            data_7 = self.worker_data_block.data_7
-            
-        if self.filter_checkbox.isChecked():
-            self.worker_data_block.data_8 = 0
+        """
+        Forces the magnet into rotation mode (3Hz) with specific coil currents.
+        """
+        try:
+            shear_stress = float(self.textbox_shear_stress.text() or 0)
+
+            # --------------------- Map UI logic ------------------------
+            direction = 2 if self.comboBox_direction.currentText() == "Clockwise" else 1
+            filter_val = 0 if self.filter_checkbox.isChecked() else 2
+
+            #--------------------- Update the Data Worker ---------------------
+            self.worker_data_block.data_1 = 65534
+            self.worker_data_block.data_2 = 3  # Forced 3Hz Frequency
+            self.worker_data_block.data_current = (200, 0, 200, 0)  # Coil currents
+
+            self.worker_data_block.data_7 = direction
+            self.worker_data_block.data_8 = filter_val
+            self.worker_data_block.data_10 = 2  # Rotation Mode (CRITICAL)
+            self.worker_data_block.data_11 = shear_stress
+
+            # ---------------------  Physical Transmission ---------------------
+            # Setting the flag triggers the actual transmission thread
+            self.worker_flag_send.flag_tx = True
+            self._update_transmission_ui(True, "Rotating!")
+
+        except ValueError:
+            # --------------------- If the user entered invalid text in the textboxes ---------------------
+            self._update_transmission_ui(False, "Input Error: Check Stress value!")
+
+
+    def _update_transmission_ui(self, success, message="Data sent!"):
+        """Handles button states and status labels."""
+        if success:
+            self.button_stop.setEnabled(True)
+            self.status_label.setStyleSheet("color: #32a83a;")  # Green
+            self.status_label.setText(message)
         else:
-            self.worker_data_block.data_8 =  2
-            
-            
-        #for data 10
-        #HERE IS THE MOST IMPORTANT THING!!!
-        self.worker_data_block.data_10 = 2
-        self.worker_data_block.data_11 = self.textbox_shear_stress.text()
-
-        ######################################################################################
-        ##enabled stop rotating button 
-        self.button_stop.setDisabled(False)
-        
-        ##send all data to microcontroller
-        #activate flag
-        self.worker_flag_send.flag_tx = True
-        
-
-        self.status_label.setStyleSheet("color: #32a83a;")
-        self.status_label.setText("Rotating!")
+            self.status_label.setStyleSheet("color: #a83232;")  # Red
+            self.status_label.setText(message)
         
         
         
@@ -717,18 +711,18 @@ class PIDOutput(QMainWindow, Ui_Title):
             data_read = np.loadtxt(dir_dummy_csv, delimiter=';')
             np.savetxt(filename_saving, data_read, delimiter=';')
 
-        
+
     def popout_window(self, arg, calculate_final_fR = 0.0, k_b_1 = 0.0, k_b_2 = 0.0):
-        
+
         msg = QMessageBox()
-        
+
         text = packet_transmission.set_popout_text(arg, calculate_final_fR, k_b_1, k_b_2)
         msg.setText(text)
-        
+
         msg.setIcon(QMessageBox.Question)
-        
+
         msg.exec()
-        
+
 
 
 
