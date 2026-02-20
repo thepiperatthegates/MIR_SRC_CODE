@@ -161,14 +161,14 @@ class DataUpdate(QThread):
                 self.i1_slice = reshaped_data[:, 2]
                 self.i2_slice = reshaped_data[:, 3]
                 self.phase_diff_slice = reshaped_data[:, 4]
-                print(self.phase_diff_slice)
+                print(self.v1_slice)
 
                 data_mutex.lock()
 
                 # Hall Sensors
-                # self.v1_slice = -packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
-                # self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
-                
+                #TODO: NEW FIRMWARE ITERACTIONS MUST NOT BE NEGATIVE FOR I1!!!!!!!!!
+                self.v1_slice = -packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
+                self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
 
                 # Current
                 self.i1_slice = -packet_transmission.change_current_adc(self.i1_slice)  # convert col3 (in mA)
@@ -179,16 +179,16 @@ class DataUpdate(QThread):
                 self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
 
 
-                # # calibration for  hall sensors
-                # self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
-                #                                                              self.v1_slice, self.i1_slice / 1000)
-                # self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
-                #                                                              self.v2_slice, self.i2_slice / 1000)
+                # calibration for  hall sensors
+                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
+                                                                             self.v1_slice, self.i1_slice / 1000)
+                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
+                                                                             self.v2_slice, self.i2_slice / 1000)
 
                 # this is normalising step (still do not know whether I want to do it immidiately or not)
-                if self.flag_normalise:
-                    self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amplitude_voltage_1
-                    self.v2_slice = ( self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amplitude_voltage_2
+                # if self.flag_normalise:
+                #     self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amplitude_voltage_1
+                #     self.v2_slice = ( self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amplitude_voltage_2
 
                 # Calibrate process starts
                 # measurement fR process starts
@@ -596,7 +596,10 @@ class PIDOutput(QMainWindow, Ui_Title):
             # --------------------- Parse and Validate Inputs ---------------------
             # Using float() or int() conversion here prevents sending garbage data to the MCU
             shear_rate = float(self.textbox_shear_rate.text() or 0)
-            shear_stress = float(self.textbox_shear_stress.text() or 0)
+            delta_phi = float(self.textbox_phase_difference.text() or 0)
+            torque_ref = float(self.textbox_input_torque.text() or 0)
+            print(torque_ref)
+            print(type(torque_ref))
 
             # --------------------- Map UI States to Hardware Codes ---------------------
             # Direction: Anti-clockwise = 1, Clockwise = 2
@@ -606,12 +609,12 @@ class PIDOutput(QMainWindow, Ui_Title):
             filter_code = 0 if self.filter_checkbox.isChecked() else 2
 
             # --------------------- Update the Data Worker ---------------------
-            self.worker_data_block.data_1 = 65534  # Header/ID
+            self.worker_data_block.data_1 = torque_ref  #
             self.worker_data_block.data_2 = shear_rate
             self.worker_data_block.data_7 = direction_code
             self.worker_data_block.data_8 = filter_code
-            self.worker_data_block.data_10 = 1  # Command/Mode selector
-            self.worker_data_block.data_11 = shear_stress
+            self.worker_data_block.data_10 = 1  # Command/Mode selector (PID CONTROLLER ON)
+            self.worker_data_block.data_11 = delta_phi
 
             #---------------------  Physical Transmission ---------------------
             # Setting the flag triggers the actual transmission thread

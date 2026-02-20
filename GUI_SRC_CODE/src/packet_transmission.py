@@ -1,45 +1,42 @@
 #3rd party lazy modules
-
 from math import sin, cos, pi
 import struct
 import numpy as np
-
-
-
-#for button event flag 
+import os
+#---------------------- for button event flag ----------------------
 flag_send = 0
 running_time_flag = 0
 
-#for run time flag
+#---------------------- for run time flag ----------------------
 run_time_gui = 0 
 
-#for file name flag
+#---------------------- for file name flag ----------------------
 file_name_flag = 0
 
-#for clean up raw data flag
+#---------------------- for clean up raw data flag ----------------------
 clean_up_flag = 0
 
 
-#stop button flag
+#---------------------- stop button flag ----------------------
 stop_button_flag = 1
 
-#for start event
+#---------------------- for start event----------------------
 start_flag_rx = 0
 start_flag_send = 0
 
 
-#b
+#---------------------- b ----------------------
 RESB_16 = 65535
 RESB_12 = 4095
 
-#for impedance matching adc current 
+#---------------------- for impedance matching adc current ----------------------
 MAX_V_BEFORE_CURRENT = 5.0
 MIN_V_BEFORE_CURRENT = -5.0   #or y-intercept
 
 MAX_V_AFTER_CURRENT = 3.3
 MIN_V_AFTER_CURRENT = 0.0
 
-#for impedance matching hall voltage
+#---------------------- for impedance matching hall voltage ----------------------
 MAX_V_BEFORE_HALL = -2.5
 MIN_V_BEFORE_HALL = 2.5   #or y-intercept
 
@@ -59,7 +56,7 @@ CALIBRATION_FACTOR = 0
 
 
 
-#flag for electronics type
+#---------------------- flag for electronics type ----------------------
 ELECTRONICS_FLAG = 0
 
 
@@ -125,7 +122,7 @@ class TxData():
         C_SR = 37.099
         running_frequency = float(val)/(2*pi*C_SR)
         
-        # we will be taking the desired shear rate here directly
+        # ---------------------- we will be taking the desired shear rate here directly ----------------------
         self.__class__._data_2 = val
         
     @property
@@ -235,9 +232,9 @@ class TxData():
         
         ## TODO: CHANGE BYTE_SEND TO FLOAT 
         print("Frequency of DAC", self.__class__._data_2)
-        print("CUrrent amplitude", self.__class__._data_3)
+
         
-        byte_send1 = struct.pack('<f', float(self.__class__._data_1))       
+        byte_send1 = struct.pack('<f', float(self.__class__._data_1))               #for torque reference
         byte_send2 = struct.pack('<f', float(self.__class__._data_2))             #running frequency of MCU 
         byte_send3 = struct.pack('<f', float(self.__class__._data_3))              #amplitude1
         byte_send4 = struct.pack('<f', float(self.__class__._data_4))              #offset1

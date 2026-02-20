@@ -16,6 +16,7 @@ from pathlib import Path
 
 
 # #fix cache problem with MATHPLOTLIB
+from PyQt5 import QtCore, QtGui
 os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
 import multiprocessing
 import sys
@@ -36,7 +37,6 @@ if sys.platform == "win32":
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
 
-from PyQt5 import QtCore, QtGui
 
 class FirstGUI(QMainWindow, Ui_MainWindow): 
     """
