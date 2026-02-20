@@ -150,6 +150,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.canvas.hide()
         self.horizontalLayout.addWidget(self.mpl_toolbar)
         self.csv_Button.clicked.connect(self.find_filename_button_pressed)
+        self.save_Button.clicked.connect(self.save_button_event)
         self.data_show_comboBox.setDisabled(True)
         self.save_Button.setDisabled(True)
 
@@ -158,8 +159,6 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         #refresh button event clicked
         self.refresh_Button.clicked.connect(self.refresh_event)
-        #save button clicked
-        self.save_Button.clicked.connect(self.save_button_event)
         #toggle button for radio button offsets
         self.take_Button.toggled.connect(self.refresh_event)
 
@@ -177,70 +176,39 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
     def choose_option(self):
 
-        self.data = pandas.read_csv(filepath_or_buffer=self.analyse_filename, sep=";", header=None).to_numpy()
+        self.data = pandas.read_csv(self.analyse_filename, sep=";", header=None).to_numpy()
         mode = self.data_show_comboBox.currentText()
         self.num_rows, self.num_column = self.data.shape
 
         self.data_calculation_function()
-
+        
+        diagram_map = {
+            "Currents diagram" : self.draw_current_diagrams,
+            "Voltage diagram" : self.draw_voltage_diagrams,
+            "Phase diagram" : self.draw_phase_diagram,
+            "Angular velocity diagram" :  self.draw_angular_velocity_diagram,
+            "Torque diagram" :          self.draw_torque_diagram,
+            "Shear rate diagram":       self.draw_shear_rate_diagram,
+            "Shear stress diagram":     self.draw_shear_stress_diagram,
+            "Viscosity diagram":   self.draw_viscosity_diagram,
+        }
+        
+        
+        self.offsets_update()
         # first mode
         if mode == "Data table":
             # HIDE THE TABLE WIDGET
             self.table_Widget.show()
             self.canvas.hide()
-            self.offsets_update()
             self.data_mode_function()
-
-        elif mode == "Currents diagram":
-            # HIDE THE TABLE WIDGET
+            
+        elif mode in diagram_map:
+            # DRAW THE GRAPH
             self.table_Widget.hide()
             self.canvas.show()
-            self.offsets_update()
-            self.draw_current_diagrams()
-
-
-        elif mode == "Voltage diagram":
-            self.table_Widget.hide()
-            self.canvas.show()
-            self.offsets_update()
-            self.draw_voltage_diagrams()
-
-        elif mode == "Phase diagram":
-            self.table_Widget.hide()
-            self.canvas.show()
-            self.offsets_update()
-            self.draw_phase_diagram()
-
-        elif mode == "Angular velocity diagram":
-            self.table_Widget.hide()
-            self.canvas.show()
-            self.offsets_update()
-            self.draw_angular_velocity_diagram()
-
-        elif mode == "Torque diagram":
-            self.table_Widget.hide()
-            self.canvas.show()
-            self.offsets_update()
-            self.draw_torque_diagram()
-
-        elif mode == "Shear rate diagram":
-            self.table_Widget.hide()
-            self.canvas.show()
-            self.offsets_update()
-            self.draw_shear_rate_diagram()
-
-
-        elif mode == "Shear stress diagram":
-            self.table_Widget.hide()
-            self.canvas.show()
-            self.offsets_update()
-            self.draw_shear_stress_diagram()
-
-        elif mode == "Viscosity diagram":
-            self.table_Widget.hide()
-            self.canvas.show()
-            self.offsets_update()
-            self.draw_viscosity_diagram()
+            diagram_map[mode]()
+            
+            
 
     def data_calculation_function(self):
         if self.num_column == 5:
@@ -530,7 +498,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
         Steps:
             1. Apply Savitzky-Golay filter to estimate angular velocity.
-            2. Compute shear rate as angular_velocity * shear rate coefficient [C_SR].
+            2. Compute shear rate as angulalabelr_velocity * shear rate coefficient [C_SR].
 
         Updates Attributes:
             self.angular_velocity : np.ndarray
@@ -544,8 +512,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         """
         self.angular_velocity = savgol_filter(
             self.angle_magnet[:, 0],  # your noisy angle signal
-            window_length=400,  # try 51, 101, etc. depending on how smooth you want
-            polyorder=3,  # 2 or 3 works well
+            window_length=101,  # try 51, 101, etc. depending on how smooth you want
+            polyorder=2,  # 2 or 3 works well
             deriv=1,  # first derivative
             delta=np.mean(np.diff(self.time))  # time step
         )  # [rad /s]
@@ -608,108 +576,112 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
                 self.textbox_offset2.setDisabled(False)
             except ValueError:
                 print("Invalid offset inputs")
+                
+                
+    def template_draw_diagram(self, title, ylabel, lines, xlabel=r"Time / s"):
+        
+        self.canvas.axes.cla()
+        self.canvas.axes.set_title(title, fontsize=20)
+        self.canvas.axes.set_ylabel(ylabel, fontsize=20)
+        self.canvas.axes.set_xlabel(xlabel, fontsize=20)
+        
+        #iterate through the lines mapping variables
+        for line in lines:
+            plot_line, = self.canvas.axes.plot(self.time, line["y"], color=line.get("color"))
+            #check if there is label attached to it
+            if "label" in line:
+                plot_line.set_label(line["label"])
+                
+                
+        # Only show legend if at least one label exists
+        if any("label" in line for line in lines):
+            self.canvas.axes.legend(loc='upper right', bbox_to_anchor=(1, 1), fontsize=15)
 
-    def draw_current_diagrams(self):
-
-        self.canvas.axes.cla()  # clear canvas
-        self.canvas.axes.set_title(r"Current sensors", fontsize=20)
-        self.canvas.axes.set_ylabel(r"Current / mA", fontsize=20)
-        self.canvas.axes.set_xlabel(r"Time / s", fontsize=20)
-        plot_1, = self.canvas.axes.plot(self.time, self.current_1, color='g')
-        plot_2, = self.canvas.axes.plot(self.time, self.current_2, color='#FFB6C1')
-        plot_3, = self.canvas.axes.plot(self.time, self.magnitude_current, color='r')
-        plot_1.set_label(r"Current 1 $I_1$")
-        plot_2.set_label(r"Current 2 $I_2$")
-        plot_3.set_label(r"Magnitude $\hat I$")
-        self.canvas.axes.legend(loc='upper right', bbox_to_anchor=(1, 1), fontsize=15)
         self.canvas.axes.grid(True, which='both', linestyle='--', linewidth=0.5)
         self.canvas.axes.minorticks_on()
         self.canvas.draw()
+                
+        
+        
+    def draw_current_diagrams(self):
+        title = r"Current Sensors"
+        ylabel = r"Current / mA"
+        lines = [
+            {"y": self.current_1, "label" : r"Current 1 $I_1$", "color": "g"},
+            {"y": self.current_2, "label" : r"Current_2 $I_2$", "color": "#FFB6C1"},
+            {"y": self.magnitude_current, "label":r"Magnitude $\hat I$", "color": "r"},
+        ]
+        
+        self.template_draw_diagram(title, ylabel, lines)
+        
 
     def draw_voltage_diagrams(self):
+        title = r"Voltage Sensors"
+        ylabel = r"Voltage / V"
+        lines = [
+            {"y": self.voltage_1, "label": r"Hall sensor 1 $U_1$", "color": "#890304"},
+            {"y": self.voltage_2, "label": r"Hall sensor 2 $U_2$", "color": "#00113a"},
+        ]
 
-        self.canvas.axes.cla()  # clear canvas
-        self.canvas.axes.set_title(r"Voltage sensors", fontsize=20)
-        self.canvas.axes.set_ylabel(r"Voltage /  V", fontsize=20)
-        self.canvas.axes.set_xlabel(r"Time / s", fontsize=20)
-        plot_1, = self.canvas.axes.plot(self.time, self.voltage_1, color='#890304')
-        plot_2, = self.canvas.axes.plot(self.time, self.voltage_2, color='#00113a')
-        plot_1.set_label(r"Hall sensors 1 $U_1$")
-        plot_2.set_label(r"Hall sensors 2 $U_2$")
-        self.canvas.axes.legend(loc='upper right', bbox_to_anchor=(1, 1))
-        self.canvas.axes.grid(True, which='both', linestyle='--', linewidth=0.5)
-        self.canvas.axes.minorticks_on()
-        self.canvas.draw()
+        self.template_draw_diagram(title, ylabel, lines)
 
     def draw_phase_diagram(self):
+        title = "Phase diagram"
+        ylabel = r"Angle $\phi$ / rad"
+        lines = [
+            {"y": self.angle_magnetic_field, "label": r"$\phi_B$", "color": "#890304"},
+            {"y": self.angle_magnet, "label": r"$\phi_m$", "color": "#00113a"},
+            {"y": self.phase_difference, "label": r"$\Delta\phi$", "color": "#7294D4"},
+        ]
 
-        self.canvas.axes.cla()  # clear canvas
-        self.canvas.axes.set_title("Phase diagramm")
-        self.canvas.axes.set_ylabel(r"Angle $\phi$ / rad")
-        self.canvas.axes.set_xlabel(r"Time / $s$")
-        plot_1, = self.canvas.axes.plot(self.time, self.angle_magnetic_field, color='#890304')
-        plot_2, = self.canvas.axes.plot(self.time, self.angle_magnet, color='#00113a')
-        plot_3, = self.canvas.axes.plot(self.time, self.phase_difference, color='#7294D4')
-        plot_1.set_label(r"Angle of magnetic field $\phi_B$")
-        plot_2.set_label(r"Angle of magnet $\phi_m$")
-        plot_3.set_label(r"Phase difference $\Delta\phi$")
-        self.canvas.axes.legend(loc='upper right', bbox_to_anchor=(1, 1))
-        self.canvas.axes.grid(True, which='both', linestyle='--', linewidth=0.5)
-        self.canvas.axes.minorticks_on()
-        self.canvas.draw()
+        self.template_draw_diagram(title, ylabel, lines)
 
     def draw_angular_velocity_diagram(self):
+        title = "Angular velocity diagram"
+        ylabel = r"Angular velocity $\omega$ / rad$s^{-1}$"
+        lines = [
+            {"y": self.angular_velocity, "color": "red"},
+        ]
 
-        self.canvas.axes.cla()  # clear canvas
-        self.canvas.axes.set_title("Angular velocity diagram")
-        self.canvas.axes.set_ylabel(r"Angular velocity $\omega$ / rad$s^{-1}$")
-        self.canvas.axes.set_xlabel(r"Time / $s$")
-        self.canvas.axes.plot(self.time, self.angular_velocity, color='red')
-        self.canvas.axes.grid(True, which='both', linestyle='--', linewidth=0.5)
-        self.canvas.axes.minorticks_on()
-        self.canvas.draw()
+        self.template_draw_diagram(title, ylabel, lines)
 
     def draw_torque_diagram(self):
+        title = "Torque diagram"
+        ylabel = r"Torque $T$ / Nm"
+        lines = [
+            {"y": self.total_torque, "color": "red"},
+        ]
 
-        self.canvas.axes.cla()  # clear canvas
-        self.canvas.axes.set_title("Torque diagram")
-        self.canvas.axes.set_ylabel(r"Torque T / Nm")
-        self.canvas.axes.set_xlabel(r"Time / $s$")
-        self.canvas.axes.plot(self.time, self.total_torque, color='red')
-        self.canvas.axes.grid(True, which='both', linestyle='--', linewidth=0.5)
-        self.canvas.axes.minorticks_on()
-        self.canvas.draw()
+        self.template_draw_diagram(title, ylabel, lines)
 
     def draw_shear_rate_diagram(self):
+        title = "Shear rate diagram"
+        ylabel = r"Shear rate $\dot\gamma$ / $s^{-1}$"
+        lines = [
+            {"y": self.shear_rate, "color": "red"},
+        ]
 
-        self.canvas.axes.cla()  # clear canvas
-        self.canvas.axes.set_title("Shear rate diagram")
-        self.canvas.axes.set_ylabel(r"Shear rate $\dot\gamma$ / $s^{-1}$")
-        self.canvas.axes.set_xlabel(r"Time / $s$")
-        self.canvas.axes.plot(self.time, self.shear_rate, color='red')
-        self.canvas.axes.grid(True, which='both', linestyle='--', linewidth=0.5)
-        self.canvas.axes.minorticks_on()
-        self.canvas.draw()
+        self.template_draw_diagram(title, ylabel, lines)
+
 
     def draw_shear_stress_diagram(self):
-        self.canvas.axes.cla()  # clear canvas
-        self.canvas.axes.set_title("Shear stress diagram")
-        self.canvas.axes.set_ylabel(r"Shear stress $\tau$ / Pa")
-        self.canvas.axes.set_xlabel(r"Time / $s$")
-        self.canvas.axes.plot(self.time, self.shear_stress, color='red')
-        self.canvas.axes.grid(True, which='both', linestyle='--', linewidth=0.5)
-        self.canvas.axes.minorticks_on()
-        self.canvas.draw()
+        title = "Shear stress diagram"
+        ylabel = r"Shear stress $\tau$ / Pa"
+        lines = [
+            {"y": self.shear_stress, "color": "red"},
+        ]
+
+        self.template_draw_diagram(title, ylabel, lines)
+
 
     def draw_viscosity_diagram(self):
-        self.canvas.axes.cla()  # clear canvas
-        self.canvas.axes.set_title("Viscosity diagram")
-        self.canvas.axes.set_ylabel(r"Viscosity $\eta$")
-        self.canvas.axes.set_xlabel(r"Time / $s$")
-        self.canvas.axes.plot(self.time, self.viscosity, color='red')
-        self.canvas.axes.grid(True, which='both', linestyle='--', linewidth=0.5)
-        self.canvas.axes.minorticks_on()
-        self.canvas.draw()
+        title = "Viscosity diagram"
+        ylabel = r"Viscosity $\eta$"
+        lines = [
+            {"y": self.viscosity, "color": "red"},
+        ]
+
+        self.template_draw_diagram(title, ylabel, lines)
 
     def closeEvent(self, event):
         event.accept()

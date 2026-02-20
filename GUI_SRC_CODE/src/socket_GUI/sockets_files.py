@@ -39,29 +39,9 @@ flag_for_downsampling = None
 
 p1 = None
 
-
-######################################################################################
-############## FOR DATA RECV PURPOSES ################################################
-DMA_ADC_BUFF_SIZE = 2
-
-NUM_ID_SEG = 5
-
-UINT16_BYTES = 2
-FLOAT32_BYTES = 4
-
-DATA_BYTES_NUM_PER_SAMPLE = (2 * UINT16_BYTES) + (3* FLOAT32_BYTES)
-
-BYTES_PER_SAMPLE = DATA_BYTES_NUM_PER_SAMPLE + NUM_ID_SEG
-
-TOT_FOR_ONE_CYCLE  = (BYTES_PER_SAMPLE * DMA_ADC_BUFF_SIZE)
-
-
-SAMPLE_PERIOD_TOTAL = 0.0001 * DMA_ADC_BUFF_SIZE
-TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = int(0.1 / SAMPLE_PERIOD_TOTAL)
-
 #for total count receiving from socket (depends if we want 0.5s, 1s or 2s)
-TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND =   int(0.1 / SAMPLE_PERIOD_TOTAL)
-######################################################################################
+tot_count_accumulate_recv = 250
+
 
 
 
@@ -181,13 +161,13 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
             Indicates whether the plotting process has been started.
         p1 (multiprocessing.Process):
             Process object for the live plotting subprocess.
-        TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC (int):
+        tot_count_accumulate_recv (int):
             Number of read iterations to accumulate into one buffer.
 
     Workflow:
         1. Initialize an empty buffer (`received_data`).
         2. Accumulate data from the serial port in fixed-size chunks (48 bytes)
-           until the count reaches `TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC`.
+           until the count reaches `tot_count_accumulate_recv`.
         3. Once a batch is ready:
             - If the plotting process has not been started yet, spawn it.
             - Forward the raw data to `q_to_process` for unpacking.
@@ -208,8 +188,7 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
 
     """
     
-    global flag_for_process, p1, TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC, flag_for_downsampling
-    global TOT_FOR_ONE_CYCLE
+    global flag_for_process, p1, tot_count_accumulate_recv, flag_for_downsampling
 
     worker_data_flag = packet_transmission.RunningTimeFlag()
     worker_process_flag = packet_transmission.ProcessUnpackingFlag()
@@ -219,18 +198,12 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
     count = 0
     while True:
         try:
-            received_data = b''  # initialise buffer
-
+            received_data = b'' #initilaised buffer
             try:
-                while count < TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC:
-                    count += 1
-
-                    chunk = b''
-                    while len(chunk) < TOT_FOR_ONE_CYCLE:
-                        chunk += ser1.read(TOT_FOR_ONE_CYCLE - len(chunk))
-
-                    received_data += chunk  # THIS WAS MISSING
-
+                while count < tot_count_accumulate_recv:
+                    count +=1 
+                    chunk =  ser1.read(48)
+                    received_data += chunk
                 count = 0
                 
                 ## run only once when the program starts
@@ -250,7 +223,6 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
                     if data_send:
                         save_to_csv(data_send, worker_kb_property, worker_specific_downsampling, worker_normalise_properties)
                         data_send = None
-                    print("Data written!")
             except Exception as e:
                 print(f"Here 1: {e}")
         except Exception as e:
@@ -263,10 +235,8 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
 ##########################################################################
 def send_thread(ser1):
     worker_combined_send = packet_transmission.TxData()
-    print("here")
     #combined everything
     combined_send = worker_combined_send.combine_data()
-    print("Byte send to firmware: ", combined_send)
     #reset the flag
     try:
         ser1.write(combined_send)
@@ -280,61 +250,55 @@ def plot_live(queue1, q_to_graph, q_to_csv): #q_to_graph to graph (main file)
 
 def start_process_live_graph(queue1, q_to_graph, q_to_csv):
     """
-    Process incoming data for live graphing and CSV logging.
+    Continuously process incoming data for live graphing and CSV logging.
 
-    Parses the stream based on identifier bytes and extracts the payloads.
-    Supports mixed uint16 and float32 payloads.
+    This function runs in an infinite loop, consuming raw byte streams 
+    from `queue1`. It parses the stream by looking for specific identifier 
+    bytes and extracting the following two bytes as a 16-bit unsigned integer. 
+    The decoded integer values are then forwarded to two queues:
+    - `q_to_graph` for live visualization
+    - `q_to_csv` for data logging
+
+    Args:
+        queue1 (multiprocessing.Queue):
+            Input queue containing raw byte streams to process.
+        q_to_graph (multiprocessing.Queue):
+            Output queue for passing decoded integer data to a graphing process.
+        q_to_csv (multiprocessing.Queue):
+            Output queue for passing decoded integer data to a CSV writer.
+
+    Processing logic:
+        - Identifiers are defined as {b'H', b'I', b'J', b'K'}.
+        - When an identifier is found in the stream:
+            - The next two bytes are extracted.
+            - Interpreted as a little-endian unsigned 16-bit integer (`<H`).
+            - Added to the list of decoded values (`tot_chunks`).
+        - After processing the full buffer, the collected integers are sent 
+          to both output queues.
+
     """
+    
 
-    ID_HALL_1     = 0xA1
-    ID_HALL_2     = 0xA2
-    ID_CURRENT_1  = 0xA3
-    ID_CURRENT_2  = 0xA4
-    ID_PHASE_DIFF = 0xA5
-
-    # ID → (payload_size, unpack_format)
-    ID_MAP = {
-        ID_HALL_1:     (4, '<f'),
-        ID_HALL_2:     (4, '<f'),
-        ID_CURRENT_1:  (2, '<H'),
-        ID_CURRENT_2:  (2, '<H'),
-        ID_PHASE_DIFF: (4, '<f'),
-    }
+    identifier_bits =  {b'H', b'I', b'J', b'K'}
 
     while True:
         recv_buffer = queue1.get()
-        if not recv_buffer:
-            continue
-
-        numeric_values = []
-        i = 0
-        buf_len = len(recv_buffer)
-
-        while i < buf_len:
-            identifier = recv_buffer[i]
-
-            if identifier in ID_MAP:
-                payload_size, fmt = ID_MAP[identifier]
-                end = i + 1 + payload_size
-
-                if end <= buf_len:
-                    payload = recv_buffer[i + 1 : end]
-                    value = struct.unpack(fmt, payload)[0]
-
-                    numeric_values.append(value)  # only numeric value, ID removed
-
-                    i = end  # skip ID + payload
+        if recv_buffer:
+            tot_chunks = []
+            i = 0 
+            while i < len(recv_buffer):
+                if bytes([recv_buffer[i]]) in identifier_bits:
+                    if i + 2 < len(recv_buffer):
+                        chunk = recv_buffer[i+1:i+3]    #take the second and third, list slicing works by setting the first and the last array(which it doesnt take)
+                        integer_value = struct.unpack('<H', chunk)[0]
+                        tot_chunks.append(integer_value)
+                    # Skip past the identifier and 2-byte chunk
+                    i+= 3
                 else:
-                    # incomplete packet at buffer end
-                    break
-            else:
-                # byte does not match any ID → resync
-                i += 1
-
-        # send only numeric values to queues
-        if numeric_values:
-            q_to_graph.put(numeric_values)
-            q_to_csv.put(numeric_values)
+                    i+=1
+            q_to_graph.put(tot_chunks)
+            q_to_csv.put(tot_chunks)
+            
             
 ##########################################################################
 #write to dummy csv 
@@ -459,8 +423,8 @@ def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling
     col1_converted = packet_transmission.calibrated_hall_sensors1(worker_kb_property.k_b_1, col1_converted, col3_converted/1000)  
     col2_converted = packet_transmission.calibrated_hall_sensors2(worker_kb_property.k_b_2, col2_converted, col4_converted/1000)
 
-    col1_converted = (col1_converted- worker_normalise_properties.zero_offset_voltage_1) / worker_normalise_properties.amplitude_voltage_1
-    col2_converted = (col2_converted - worker_normalise_properties.zero_offset_voltage_2) / worker_normalise_properties.amplitude_voltage_2
+    col1_converted = (col1_converted- worker_normalise_properties.zero_offset_voltage_1) / worker_normalise_properties.amp_voltage_1
+    col2_converted = (col2_converted - worker_normalise_properties.zero_offset_voltage_2) / worker_normalise_properties.amp_voltage_2
 
     #Average values to reduce amount of data saved
     ####FOR CONSTANT SHEAR RATE 
