@@ -632,21 +632,21 @@ class PIDOutput(QMainWindow, Ui_Title):
         Forces the magnet into rotation mode (3Hz) with specific coil currents.
         """
         try:
-            shear_stress = float(self.textbox_shear_stress.text() or 0)
+            delta_phi = float(self.textbox_phase_difference.text() or 0)
 
             # --------------------- Map UI logic ------------------------
             direction = 2 if self.comboBox_direction.currentText() == "Clockwise" else 1
             filter_val = 0 if self.filter_checkbox.isChecked() else 2
 
             #--------------------- Update the Data Worker ---------------------
-            self.worker_data_block.data_1 = 65534
+            self.worker_data_block.data_1 = 0.5 # Placeholder
             self.worker_data_block.data_2 = 3  # Forced 3Hz Frequency
             self.worker_data_block.data_current = (200, 0, 200, 0)  # Coil currents
 
             self.worker_data_block.data_7 = direction
             self.worker_data_block.data_8 = filter_val
             self.worker_data_block.data_10 = 2  # Rotation Mode (CRITICAL)
-            self.worker_data_block.data_11 = shear_stress
+            self.worker_data_block.data_11 = delta_phi
 
             # ---------------------  Physical Transmission ---------------------
             # Setting the flag triggers the actual transmission thread
@@ -667,6 +667,9 @@ class PIDOutput(QMainWindow, Ui_Title):
         else:
             self.status_label.setStyleSheet("color: #a83232;")  # Red
             self.status_label.setText(message)
+            
+    def save_normalise_data(self):
+        
         
         
         
