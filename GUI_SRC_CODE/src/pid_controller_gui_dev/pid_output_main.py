@@ -668,10 +668,6 @@ class PIDOutput(QMainWindow, Ui_Title):
             self.status_label.setStyleSheet("color: #a83232;")  # Red
             self.status_label.setText(message)
             
-    def save_normalise_data(self):
-        
-        
-        
         
     def set_hardware_reset_event(self):
         
