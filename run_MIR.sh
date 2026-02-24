@@ -77,6 +77,7 @@ if [[ ! -d "$VENV_DIR" ]]; then
 else
 	#ACTIVATE THE VIRTUAL ENVIRONMENT 
 	echo $'\e[32mVirtual environment found.........\e[0m'
+  echo "DEBUG: Checking for venv in: '$VENV_DIR'"
     case "$(uname)" in
       CYGWIN*|MINGW*)
         source "$VENV_DIR/Scripts/activate"
