@@ -108,7 +108,7 @@ fi
 if [[ ! -f "$ENV_PYTHON" ]]; then
   echo -e "\e[32mCreating Python 3.12 environment from conda...\e[0m"
 
-  "$MAMBA_EXE" create -y -p "$ENV_DIR" -c conda-forge python=3.12 pip matplotlib numpy pandas pyqt
+  "$MAMBA_EXE" create -y -p "$ENV_DIR" -c conda-forge python=3.12 pip matplotlib numpy pandas 
 
   # 2. Use pip ONLY for the remaining items in your requirements file
     echo -e "\e[32mInstalling remaining dependencies...\e[0m"
