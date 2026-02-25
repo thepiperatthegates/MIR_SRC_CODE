@@ -42,8 +42,14 @@ ARCH_NAME="$(uname -m)"
 # --------------- WINDOWS (Cygwin or MSYS/Git Bash) ---------------------
 if [[ "$OS_NAME" == *"cygwin"* || "$OS_NAME" == *"mingw"* || "$OS_NAME" == *"msys"* ]]; then
     ENV_PYTHON="${ENV_DIR}/python.exe"
+	
+	# If that doesn't exist, fallback:
+	if [[ ! -f "$ENV_PYTHON" ]]; then
+		ENV_PYTHON="${ENV_DIR}/Scripts/python.exe"
+	fi
+
     PLATFORM="win-64"
-    MAMBA_EXE="${MAMBA_EXE}.exe" # Windows requires .exe extension
+    MAMBA_EXE="$SCRIPT_DIR/Library/bin/micromamba.exe" # Windows requires .exe extension
 
 # --------------- MACOS (Darwin) ---------------------
 elif [[ "$OS_NAME" == "darwin" ]]; then
@@ -91,10 +97,16 @@ if [[ ! -f "$MAMBA_EXE" ]]; then
 		
 
     #Download link using curl
-    curl -L https://micro.mamba.pm/api/micromamba/${PLATFORM}/latest | tar -xvj bin/micromamba
-
-    #make it executable (only on linux and macos)
-    chmod +x "$MAMBA_EXE"
+	if [[ "$OS_NAME" == *"cygwin"* || "$OS_NAME" == *"mingw"* || "$OS_NAME" == *"msys"* ]]; then
+		curl -L -o micromamba.tar.bz2 https://micro.mamba.pm/api/micromamba/${PLATFORM}/latest
+		tar -xvjf micromamba.tar.bz2 -C "$SCRIPT_DIR"
+		rm micromamba.tar.bz2
+	else
+		curl -L https://micro.mamba.pm/api/micromamba/${PLATFORM}/latest | tar -xvj bin/micromamba
+		#make it executable (only on linux and macos)
+		chmod +x "$MAMBA_EXE"
+		
+	fi
 		
 else
 	#Miniconda is available 
@@ -108,8 +120,33 @@ fi
 if [[ ! -f "$ENV_PYTHON" ]]; then
   echo -e "\e[32mCreating Python 3.12 environment from conda...\e[0m"
 
-  "$MAMBA_EXE" create -y -p "$ENV_DIR" -c conda-forge python=3.12 pip matplotlib numpy pandas 
+if [[ "$PLATFORM" == "win-64" ]]; then
 
+    # Convert paths to Windows format for PowerShell
+    WIN_MAMBA_EXE=$(cygpath -w "$MAMBA_EXE")   # C:\Users\...
+    WIN_ENV_DIR=$(cygpath -w "$ENV_DIR")       # C:\Users\...
+
+    echo "MAMBA_EXE (Windows) = $WIN_MAMBA_EXE"
+    echo "ENV_DIR (Windows) = $WIN_ENV_DIR"
+
+    # Verify micromamba binary works
+    "$MAMBA_EXE" --version
+    file "$MAMBA_EXE"
+
+    # Create environment using PowerShell
+    MSYS_NO_PATHCONV=1 "$WIN_MAMBA_EXE" create -y -p "$WIN_ENV_DIR" -c conda-forge python=3.12 pip matplotlib numpy pandas
+
+    # Set ENV_PYTHON
+    ENV_PYTHON="$ENV_DIR/python.exe"
+    if [[ ! -f "$ENV_PYTHON" ]]; then
+        ENV_PYTHON="$ENV_DIR/Scripts/python.exe"
+    fi
+else
+    "$MAMBA_EXE" create -y -p "$ENV_DIR" -c conda-forge \
+        python=3.12 pip matplotlib numpy pandas
+fi
+	
+	
   # 2. Use pip ONLY for the remaining items in your requirements file
     echo -e "\e[32mInstalling remaining dependencies...\e[0m"
     "$ENV_PYTHON" -m pip install -r "$REQ_FILES"
