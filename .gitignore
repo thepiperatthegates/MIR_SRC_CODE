@@ -28,3 +28,14 @@ GUI_SRC_CODE/src/__pycache__/main_window_gui.cpython-312.pyc
 /GUI_SRC_CODE/src/pid_controller_gui_dev/__pycache__
 /GUI_SRC_CODE/src/creep_test/__pycache__
 /GUI_SRC_CODE/src/creep_test/__pycache__
+GUI_SRC_CODE/src/pid_controller_gui_dev/__pycache__/pid_output.cpython-312.pyc
+GUI_SRC_CODE/src/pid_controller_gui_dev/__pycache__/pid_output_main.cpython-312.pyc
+GUI_SRC_CODE/src/pid_controller_gui_dev/__pycache__/change_coeff.cpython-312.pyc
+GUI_SRC_CODE/src/pid_controller_gui_dev/__pycache__/change_coeff_tab.cpython-312.pyc
+GUI_SRC_CODE/src/creep_test/__pycache__/creep_test_window_main.cpython-312.pyc
+GUI_SRC_CODE/src/creep_test/__pycache__/creep_test_gui.cpython-312.pyc
+GUI_SRC_CODE/src/creep_test/__pycache__/analyse_Window.cpython-312.pyc
+GUI_SRC_CODE/src/creep_test/__pycache__/analyse_window_creep_test.cpython-312.pyc
+GUI_SRC_CODE/src/creep_test/__pycache__/__init__.cpython-312.pyc
+GUI_SRC_CODE/src/__pycache__/packet_transmission.cpython-312.pyc
+GUI_SRC_CODE/src/__pycache__/main_window_gui.cpython-312.pyc
