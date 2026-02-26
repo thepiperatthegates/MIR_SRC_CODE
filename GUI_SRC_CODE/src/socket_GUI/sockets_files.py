@@ -65,14 +65,18 @@ def port_name_setter(this_port_name):
 def socket_start_connect():
     global port_name
 
-    if sys.platform == 'darwin':        #hijazi's laptop
-        port_num = '/dev/tty.usbmodem355A357631331'   #for mac1
-        # port_name = '/dev/tty.usbmodem355A357631331'       
-    elif sys.platform == 'win32':       #simon's laptop
-        port_num = port_name
-    elif sys.platform == 'linux':
-        port_num = '/dev/ttyACM0'
-
+    port_num = None 
+    
+    # Detect platform and set port
+    if sys.platform == 'darwin':        # macOS
+        port_num = '/dev/tty.usbmodem3776345D32331'
+    elif sys.platform == 'win32':       # Windows
+        port_num = port_name  # must be defined elsewhere
+    elif sys.platform == 'linux':       # Linux
+        for options in ['/dev/ttyACM1', '/dev/ttyACM2', '/dev/ttyACM3']:
+            if os.path.exists(options):
+                port_num = options
+                break
     try:
         ser = serial.Serial(port=port_num, baudrate=baud_rate,timeout=None)
         print(ser)
@@ -219,7 +223,6 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
                     if data_send:
                         save_to_csv(data_send, worker_kb_property, worker_specific_downsampling, worker_normalise_properties)
                         data_send = None
-                    print("Data written!")
             except Exception as e:
                 print(f"Here 1: {e}")
         except Exception as e:
@@ -232,10 +235,8 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
 ##########################################################################
 def send_thread(ser1):
     worker_combined_send = packet_transmission.TxData()
-    print("here")
     #combined everything
     combined_send = worker_combined_send.combine_data()
-    print("Byte send to firmware: ", combined_send)
     #reset the flag
     try:
         ser1.write(combined_send)
@@ -422,8 +423,8 @@ def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling
     col1_converted = packet_transmission.calibrated_hall_sensors1(worker_kb_property.k_b_1, col1_converted, col3_converted/1000)  
     col2_converted = packet_transmission.calibrated_hall_sensors2(worker_kb_property.k_b_2, col2_converted, col4_converted/1000)
 
-    col1_converted = (col1_converted- worker_normalise_properties.zero_offset_voltage_1) / worker_normalise_properties.amplitude_voltage_1
-    col2_converted = (col2_converted - worker_normalise_properties.zero_offset_voltage_2) / worker_normalise_properties.amplitude_voltage_2
+    col1_converted = (col1_converted- worker_normalise_properties.zero_offset_voltage_1) / worker_normalise_properties.amp_voltage_1
+    col2_converted = (col2_converted - worker_normalise_properties.zero_offset_voltage_2) / worker_normalise_properties.amp_voltage_2
 
     #Average values to reduce amount of data saved
     ####FOR CONSTANT SHEAR RATE 

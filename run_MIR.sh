@@ -14,9 +14,24 @@ case "$(uname)" in
 		PROJECT_ROOT="./GUI_SRC_CODE"
 		;;
 	Linux*)
-		echo "to be worked on"
+		PROJECT_ROOT="./GUI_SRC_CODE"
 		;;
 esac 
+
+
+# ---------------------------------------
+# Select Python executable per OS
+# ---------------------------------------
+
+case "$(uname)" in
+  Linux*)
+    PYTHON_CMD="python3"
+    ;;
+  Darwin*|CYGWIN*|MINGW*)
+    PYTHON_CMD="python"
+    ;;
+esac
+
 		
 	
 
@@ -37,7 +52,7 @@ if [[ ! -d "$VENV_DIR" ]]; then
 		echo $'\e[32mVirtual environment is not found for python script................\e[0m'
 		echo $'\e[32mCreating virtual environment for this system.............\e[0m'
 		
-		python -m venv "$VENV_DIR"
+		$PYTHON_CMD -m venv "$VENV_DIR"
 		
 		#ACTIVATE THE VIRTUAL ENVIRONMENT 
 
@@ -50,12 +65,12 @@ if [[ ! -d "$VENV_DIR" ]]; then
         ;;
     esac 
 		
-    python -m pip install --upgrade pip
+    $PYTHON_CMD -m pip install --upgrade pip
 
 		#INSTALL REQUIRED PACKAGES
 		pip install -r "$REQ_FILES"
 
-    echo "*" > .venv/.gitignore
+    echo "*" > "$VENV_DIR/.gitignore"
 		
 else
 	#ACTIVATE THE VIRTUAL ENVIRONMENT 
@@ -119,7 +134,7 @@ echo "[INFO] Running MiR-GUI..................................."
 echo $'\e[1;31mDO NOT CLOSE THIS WINDOW!\e[0m'
 
 
-python -u $MAIN_SCRIPT_PATH | while IFS= read -r line; do
+$PYTHON_CMD -u $MAIN_SCRIPT_PATH | while IFS= read -r line; do
     echo -e "\e[33m$line\e[0m"
 done
 
