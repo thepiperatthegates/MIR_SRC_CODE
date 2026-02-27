@@ -5,16 +5,12 @@
 
 Developed by Hijazi Hakkim for his Praxisprojekt and Bachelor-Thesis at Forschungszentrum Jülich in 2024/2025.
 
-Contact info:
+Contact info :
+
+
 i) ``hijaziaziz@gmail.com``
 
 ii) ``h.bin.mohd.aziz@fz-juelich.de``
-
-Source code list
-------------------------
-i)   GUI_SRC_CODE -> for Python GUI. 
-ii)  STM_SRC_CODE -> for STM32H7575XI source code in C. 
-
 
 =====================================================
 Running the script 
