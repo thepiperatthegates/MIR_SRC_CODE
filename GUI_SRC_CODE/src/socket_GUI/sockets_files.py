@@ -10,7 +10,6 @@ import time
 import multiprocessing
 import serial
 import struct
-import queue
 
 
 baud_rate = 128000
@@ -21,13 +20,6 @@ q_to_process = multiprocessing.Queue()
 q_to_graph = multiprocessing.Queue()
 q_to_csv = multiprocessing.Queue()
 
-<<<<<<< HEAD
-q_get_mir_mode = queue.Queue()
-time_increment = None
-tot_average = None
-
-=======
->>>>>>> dev
 
 offset_1 = 0
 offset_2 = 0
@@ -66,13 +58,6 @@ def port_name_setter(this_port_name):
     
     port_name = this_port_name
 
-<<<<<<< HEAD
-
-
-
-# q = multiprocessing.Queue()
-=======
->>>>>>> dev
 
 ##########################################################################
 #start socket connection for USB 
@@ -406,7 +391,6 @@ def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling
     count_time = count_time +1
     
     print("How many times has this function been called? :", count_time)
-
 
     data = np.array(cleaned_buffer)
     print(len(data))

@@ -83,7 +83,6 @@ class Ui_Title(object):
         self.gridLayout_5.addWidget(self.k_b_label, 2, 0, 1, 3)
         self.gridLayout_4.addLayout(self.gridLayout_5, 0, 1, 7, 1)
         self.verticalLayout = QtWidgets.QVBoxLayout()
->>>>>>> dev
         self.verticalLayout.setObjectName("verticalLayout")
         self.label_time = QtWidgets.QLabel(self.centralwidget)
         font = QtGui.QFont()
@@ -236,34 +235,16 @@ class Ui_Title(object):
         self.comboBox_direction.addItem("")
         self.comboBox_direction.addItem("")
         self.verticalLayout.addWidget(self.comboBox_direction)
-<<<<<<< HEAD
-        self.k_b_label = QtWidgets.QLabel(self.centralwidget)
-        self.k_b_label.setGeometry(QtCore.QRect(260, 940, 391, 41))
-        self.k_b_label.setObjectName("k_b_label")
-=======
-        self.gridLayout.addWidget(self.normalise_button, 1, 0, 1, 1)
-        self.textbox_sample_frequency = QtWidgets.QLineEdit(self.centralwidget)
-        self.textbox_sample_frequency.setGeometry(QtCore.QRect(10, 850, 111, 21))
-        self.textbox_sample_frequency.setToolTip("")
-        self.textbox_sample_frequency.setObjectName("textbox_sample_frequency")
-        self.label_sample_frequency = QtWidgets.QLabel(self.centralwidget)
-        self.label_sample_frequency.setGeometry(QtCore.QRect(10, 830, 131, 16))
-=======
         self.label_sample_frequency = QtWidgets.QLabel(self.centralwidget)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(3)
         sizePolicy.setVerticalStretch(2)
         sizePolicy.setHeightForWidth(self.label_sample_frequency.sizePolicy().hasHeightForWidth())
         self.label_sample_frequency.setSizePolicy(sizePolicy)
->>>>>>> dev
         font = QtGui.QFont()
         font.setFamily("Linux Libertine")
         font.setPointSize(12)
         self.label_sample_frequency.setFont(font)
-<<<<<<< HEAD
-        self.label_sample_frequency.setObjectName("label_sample_frequency")
->>>>>>> Stashed changes
-=======
         self.label_sample_frequency.setLayoutDirection(QtCore.Qt.LeftToRight)
         self.label_sample_frequency.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.label_sample_frequency.setFrameShadow(QtWidgets.QFrame.Plain)
@@ -508,7 +489,6 @@ class Ui_Title(object):
         self.gridLayout_4.setColumnStretch(1, 5)
         self.gridLayout_4.setRowStretch(3, 2)
         self.verticalLayout_2.addLayout(self.gridLayout_4)
->>>>>>> dev
         Title.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(Title)
         self.menubar.setGeometry(QtCore.QRect(0, 0, 1307, 21))
@@ -548,27 +528,6 @@ class Ui_Title(object):
         self.label_direction.setText(_translate("Title", "Direction of rotation"))
         self.comboBox_direction.setItemText(0, _translate("Title", "Clockwise"))
         self.comboBox_direction.setItemText(1, _translate("Title", "Anti-clockwise"))
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-        self.k_b_label.setText(_translate("Title", "k_b_1  =                     k_b_2= "))
-=======
-        self.button_send.setText(_translate("Title", "Send data"))
-        self.button_start.setText(_translate("Title", "Start acquisiton"))
-        self.button_stop.setText(_translate("Title", "STOP!"))
-        self.analyse_button.setText(_translate("Title", "Analyse data "))
-        self.button_cal_constant.setText(_translate("Title", "Calibrate Hall "))
-        self.button_fr_constant.setText(_translate("Title", "f_R rechnen"))
-        self.button_auto_range.setText(_translate("Title", "Auto-range"))
-        self.timeInterval_comboBox.setItemText(0, _translate("Title", "500ms"))
-        self.timeInterval_comboBox.setItemText(1, _translate("Title", "1000ms"))
-        self.timeInterval_comboBox.setItemText(2, _translate("Title", "2000ms"))
-        self.label_time_2.setText(_translate("Title", "Time Interval (s)"))
-        self.graph_stop_button.setText(_translate("Title", "Pause live-graph"))
-        self.status_label.setText(_translate("Title", "Status : Ready"))
-        self.normalise_button.setText(_translate("Title", "Normalise Voltage"))
-        self.label_sample_frequency.setText(_translate("Title", "Sample frequency Hz"))
->>>>>>> Stashed changes
-=======
         self.label_sample_frequency.setText(_translate("Title", "Sample frequency / Hz"))
         self.button_rotate.setText(_translate("Title", "Rotate"))
         self.button_send.setText(_translate("Title", "Send data"))
@@ -584,7 +543,6 @@ class Ui_Title(object):
         self.timeInterval_comboBox.setItemText(2, _translate("Title", "1000ms"))
         self.button_fr_constant.setText(_translate("Title", "f_R rechnen"))
         self.button_cal_constant.setText(_translate("Title", "Calibrate Hall "))
->>>>>>> dev
         self.menuRestart.setTitle(_translate("Title", "Restart"))
         self.actionHardware_reset.setText(_translate("Title", "Hardware reset"))
         self.actionSoftware_restart.setText(_translate("Title", "Software restart"))

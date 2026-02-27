@@ -732,11 +732,6 @@ def get_electronics_flag():
 
 def calibration_input_coil_1(input):
     
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-    output = CURRENT_COEFF_FIRST_SENSOR_A + CURRENT_COEFF_FIRST_SENSOR_B * input + CURRENT_COEFF_FIRST_SENSOR_C * pow(input, 2) + CURRENT_COEFF_FIRST_SENSOR_D * pow(input, 3)
-=======
-=======
     global ELECTRONICS_FLAG
     
     
@@ -749,16 +744,9 @@ def calibration_input_coil_1(input):
 
 
 def calibration_input_coil_2(input):
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-  
-    output = CURRENT_COEFF_SECOND_SENSOR_A + CURRENT_COEFF_SECOND_SENSOR_B * input + CURRENT_COEFF_SECOND_SENSOR_C * pow(input, 2) + CURRENT_COEFF_SECOND_SENSOR_D * pow(input, 3)
-=======
-=======
     global ELECTRONICS_FLAG
     
     
->>>>>>> dev
     if ELECTRONICS_FLAG == 1:
         output = CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 + CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 * input + CURRENT_COEFF_SECOND_SENSOR_C_VERSION1 * pow(input, 2) + CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 * pow(input, 3)
     elif ELECTRONICS_FLAG == 2:

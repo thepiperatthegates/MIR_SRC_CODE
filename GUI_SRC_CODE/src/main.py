@@ -62,13 +62,6 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
         
         super().__init__()
         self.setupUi(self)
-<<<<<<< HEAD
-<<<<<<< Updated upstream
-=======
-        # disable experiment combobox initially
-        self.choose_experiment_comboBox.setEnabled(False)
-
-=======
         
         ################for banner purposes
         # get absolute path of project root (folder containing 'src' and 'pics')
@@ -86,16 +79,11 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
         # disable experiment combobox initially
         self.choose_experiment_comboBox.setEnabled(False)
         self.choose_electronic_comboBox.setEnabled(False)
->>>>>>> dev
 
         # connect electronic combobox signal at init
         self.choose_electronic_comboBox.currentIndexChanged.connect(self.enable_choose_experiment)
 
         # connect experiment combobox signal at init
-<<<<<<< HEAD
->>>>>>> Stashed changes
-=======
->>>>>>> dev
         self.choose_experiment_comboBox.activated.connect(self.choose_window)
         
         self.choose_com_comboBox.activated.connect(self.choose_com_port)
@@ -181,7 +169,6 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
             
             
         self.close()
->>>>>>> dev
 
 
 
