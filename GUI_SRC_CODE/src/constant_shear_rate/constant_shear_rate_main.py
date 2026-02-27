@@ -691,7 +691,13 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         # ----- Assign values to the worker data block --------
         self.worker_data_block.data_1 = 65534
-        self.worker_data_block.data_2 = self.textbox_frequency.text()
+        self.worker_data_block.data_2 = float(self.textbox_frequency.text())
+        
+        # ----- Case for ZERO frequency values (NOT ACCEPTED BY MCU) --------
+        
+        if self.worker_data_block.data_2 == 0.0:
+            #set the frequency to be as small as possible 
+            self.worker_data_block.data_2_for_MCU = 0.00429 #Hz
         
         # ------ Pack currents/offsets directly into a tuple. --------
         self.worker_data_block.data_current = (
