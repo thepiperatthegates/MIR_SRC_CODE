@@ -1,6 +1,7 @@
 #3rd party lazy modules
 
-from math import sin, cos, pi
+from math import  pi
+import os
 import struct
 import numpy as np
 
@@ -476,7 +477,15 @@ class fRCoefficients:
             raise ValueError(f"Invalid ELECTRONICS_FLAG = {ELECTRONICS_FLAG}")
 
         cls._initialized = True
-
+        
+    
+    # ----- Reload ---------
+    @classmethod
+    def reload(cls):
+        cls._initialized = False
+        cls._initialize()
+        
+        
     # ---------- Properties ----------
     @property
     def fr1(self):
@@ -512,26 +521,45 @@ class fRCoefficients:
 class kbCoefficient:
     _initialized = False
 
-    _k_b_1 = None
-    _k_b_2 = None
+    _k_b_1 = 0.0
+    _k_b_2 = 0.0
 
     @classmethod
     def _initialize(cls):
         """Run once based on the global ELECTRONICS_FLAG."""
         global ELECTRONICS_FLAG
+        
         if cls._initialized:
             return
-
-        if ELECTRONICS_FLAG in (0, 1):
-            cls._k_b_1 = 0.083597946
-            cls._k_b_2 = 0.084535931
-        elif ELECTRONICS_FLAG == 2:
-            cls._k_b_1 = 0.16423985101661842
-            cls._k_b_2 = 0.1666737395533449
-        else:
-            raise ValueError(f"Invalid ELECTRONICS_FLAG = {ELECTRONICS_FLAG}")
+        
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        
+        filepath = os.path.join(project_root, "files", "k_b_coefficient.csv")
+        
+        user_input = ELECTRONICS_FLAG
+        
+        #Load CSV data along with headers
+        data = np.genfromtxt(filepath, delimiter=";", names=True)
+        
+        #Boolean comparison in the first column
+        index = data["ELECTRONICS_FLAG"] == user_input 
+        if not np.any(index):
+            raise ValueError(f"No matching ELECTRONICS_FLAG = {user_input} in CSV")
+        
+        row = data[index][0]
+        
+        #get the data
+        cls._k_b_1 = float(row["k_b_1"])
+        cls._k_b_2 = float(row["k_b_2"])
 
         cls._initialized = True
+        
+        
+    # ---- reload ----
+    @classmethod
+    def reload(cls):
+        cls._initialized = False
+        cls._initialize()
 
     # ---- k_b_1 ----
     @property
@@ -554,48 +582,92 @@ class kbCoefficient:
     def k_b_2(self, val):
         type(self)._initialize()
         type(self)._k_b_2 = float(val)
-
-
-class VoltageNormaliseCoefficient():
-
-    _amplitude_voltage_1 = 0.0
+        
+        
+class VoltageNormaliseCoefficient:
+    _initialized = False
+    
+    _amp_voltage_1 = 0.0
     _zero_offset_voltage_1 = 0.0
-
-    _amplitude_voltage_2 = 0.0
+    _amp_voltage_2 = 0.0
     _zero_offset_voltage_2 = 0.0
+    
+    
+    @classmethod 
+    def _initialize(cls):
+        
+        if cls._initialized:
+            return
 
+        project_root = os.path.dirname(os.path.abspath(__file__))
+        filepath = os.path.join(project_root, "files", "normalise_voltage_constant.csv")
+
+        # If file exists → load values
+        if os.path.exists(filepath):
+            data = np.genfromtxt(filepath, delimiter=';', names=True)
+
+            cls._amp_voltage_1 = float(data["voltage_amp_1_V"])
+            cls._zero_offset_voltage_1 = float(data["voltage_zero_offset_1_V"])
+            cls._amp_voltage_2 = float(data["voltage_amp_2_V"])
+            cls._zero_offset_voltage_2 = float(data["voltage_zero_offset_2_V"])
+        
+        
+        cls._initialized = True
+        
+        
+    # ---- reload ----
+    @classmethod
+    def reload(cls):
+        cls._initialized = False
+        cls._initialize()
+
+        
+    # ---- voltage 1 ----
+        
     @property
-    def amplitude_voltage_1(self):
-        return self.__class__._amplitude_voltage_1
-
-    @amplitude_voltage_1.setter
-    def amplitude_voltage_1(self, val):
-        self.__class__._amplitude_voltage_1 = val
-
+    def amp_voltage_1(self):
+        type(self)._initialize()    
+        return type(self)._amp_voltage_1
+    
+    @amp_voltage_1.setter
+    def amp_voltage_1(self, val):
+        type(self)._initialize()
+        type(self)._amp_voltage_1 = float(val)
+        
+    
     @property
     def zero_offset_voltage_1(self):
-        return self.__class__._zero_offset_voltage_1
-
+        type(self)._initialize()    
+        return type(self)._zero_offset_voltage_1
+    
     @zero_offset_voltage_1.setter
     def zero_offset_voltage_1(self, val):
-        self.__class__._zero_offset_voltage_1 = val
-
+        type(self)._initialize()
+        type(self)._zero_offset_voltage_1 = float(val)
+        
+    # ---- voltage 2----
+        
     @property
-    def amplitude_voltage_2(self):
-        return self.__class__._amplitude_voltage_2
-
-    @amplitude_voltage_2.setter
-    def amplitude_voltage_2(self, val):
-        self.__class__._amplitude_voltage_2 = val
-
+    def amp_voltage_2(self):
+        type(self)._initialize()    
+        return type(self)._amp_voltage_2
+    
+    @amp_voltage_2.setter
+    def amp_voltage_2(self, val):
+        type(self)._initialize()
+        type(self)._amp_voltage_2 = float(val)
+        
+    
     @property
     def zero_offset_voltage_2(self):
-        return self.__class__._zero_offset_voltage_2
-
+        type(self)._initialize()    
+        return type(self)._zero_offset_voltage_2
+    
     @zero_offset_voltage_2.setter
     def zero_offset_voltage_2(self, val):
-        self.__class__._zero_offset_voltage_2 = val
-
+        type(self)._initialize()
+        type(self)._zero_offset_voltage_2 = float(val)
+    
 
 
 

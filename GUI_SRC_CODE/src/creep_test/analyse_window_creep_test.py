@@ -161,6 +161,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.canvas.hide()
         self.horizontalLayout.addWidget(self.mpl_toolbar)
         self.csv_Button.clicked.connect(self.find_filename_button_pressed)
+        self.save_Button.clicked.connect(self.save_button_event)
         self.data_show_comboBox.setDisabled(True)
         self.save_Button.setDisabled(True)
         
@@ -260,7 +261,6 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             # remove last two columns
             self.final_data_to_show = self.final_data_to_save[:, :-4]
             
-            self.save_Button.clicked.connect(self.save_button_event)
             self.save_Button.setDisabled(False)
             
         elif self.num_column == 17:
@@ -493,12 +493,15 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
     def save_button_event(self):
         
-       
-        filename, _ = QFileDialog.getSaveFileName(parent=self, caption="Save File", directory="", filter="CSV Files (*.csv)")
+        self.save_Button.setEnabled(False)
+        filename, _ = QFileDialog.getSaveFileName(parent=self, caption="Save File", directory="",
+                                                  filter="CSV Files (*.csv)")
         if filename:
             # Save with pandas
             df = pandas.DataFrame(self.final_data_to_save)
             df.to_csv(filename, sep=";", index=False, header=None)
+        self.save_Button.setEnabled(True)
+
                 
     def calculate_angle(self):
         """

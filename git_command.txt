@@ -1,0 +1,28 @@
+1) To check git commit hash 
+
+-> For short list; git log --oneline
+-> For full commit log; git log
+
+
+2) To switch to a specific commit
+
+-> git checkout <commit-hash>
+
+
+3) To switch different branches
+
+-> git branch
+-> git switch <branches>
+
+4) To stash the change (non-permanent)
+
+-> git stash
+-> git stash list (to see the amount of stash)
+-> git stash show (to see the diff)
+
+
+5) To commit 
+
+-> git add . (dot indicates everything)
+-> git commit -m "Messages Here"
+
