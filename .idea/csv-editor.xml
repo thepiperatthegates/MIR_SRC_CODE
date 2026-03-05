@@ -10,6 +10,13 @@
             </Attribute>
           </value>
         </entry>
+        <entry key="/GUI_SRC_CODE/src/files/normalise_voltage_constant.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value=";" />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="/GUI_SRC_CODE/src/files/results_fr.csv">
           <value>
             <Attribute>

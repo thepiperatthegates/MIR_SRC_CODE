@@ -161,7 +161,6 @@ class DataUpdate(QThread):
                 self.i1_slice = reshaped_data[:, 2]
                 self.i2_slice = reshaped_data[:, 3]
                 self.phase_diff_slice = reshaped_data[:, 4]
-                print(self.v1_slice)
 
                 data_mutex.lock()
 
@@ -347,13 +346,14 @@ class PIDOutput(QMainWindow, Ui_Title):
         #----------------------- Variable Initialization -----------------------
         self._init_plot_variables()
         self._init_data_placeholders()
-        self._init_packet_workers()
+        self._init_workers()
         self._init_physics_constants()
         
         #----------------------- UI and Hardware Setup -----------------------
         self._setup_initial_ui_state()
         self._start_backend_threads()
         self._connect_signals()
+        self._setup_ui_elements()
 
     def _configure_display(self):
         """Handle High DPI scaling settings."""
@@ -407,7 +407,7 @@ class PIDOutput(QMainWindow, Ui_Title):
         self.standard_phase = np.zeros(20)
         self.calculate_final_fR = 0
 
-    def _init_packet_workers(self):
+    def _init_workers(self):
         """Initialize all setter/getter flags from packet_transmission."""
         self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
         self.worker_data_block = packet_transmission.TxData()
@@ -460,7 +460,15 @@ class PIDOutput(QMainWindow, Ui_Title):
         
         # ----------------------- Initial graph trigger -----------------------
         self.change_graph()
-        
+
+    def _setup_ui_elements(self):
+
+        self.k_b_label.setText(
+            f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
+            f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
+            f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
+            f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
+        )
 
     def change_graph(self):
         """Sets up the plotting environment based on UI selection."""
@@ -535,9 +543,6 @@ class PIDOutput(QMainWindow, Ui_Title):
         else:
             self.worker_DataUpdate.flag_normalise_event(False)
 
-        print(self.worker_DataUpdate.flag_normalise)
-                
-
     def graph_update_sensors(self):
     # ----------------------- Access the slices once to minimize race condition window -----------------------
         v1 = self.worker_getter_graph.v1_slice
@@ -598,9 +603,6 @@ class PIDOutput(QMainWindow, Ui_Title):
             shear_rate = float(self.textbox_shear_rate.text() or 0)
             delta_phi = float(self.textbox_phase_difference.text() or 0)
             torque_ref = float(self.textbox_input_torque.text() or 0)
-            print(torque_ref)
-            print(type(torque_ref))
-
             # --------------------- Map UI States to Hardware Codes ---------------------
             # Direction: Anti-clockwise = 1, Clockwise = 2
             direction_code = 2 if self.comboBox_direction.currentText() == "Clockwise" else 1

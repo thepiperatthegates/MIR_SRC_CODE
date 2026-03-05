@@ -434,12 +434,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.button_stop.setDisabled(True)
         self.textbox_time.setPlaceholderText("Enter time in second")
         self.textbox_sample_frequency.setText("10000")
-        
+
         self.k_b_label.setText(
             f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
             f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
             f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
-            f"f<sub>R</sub> equation = {np.poly1d(self.calculate_final_fR)}"
+            f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
         )
         
         self.plot_object = PlotWindow()
@@ -906,12 +906,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                     header="ELECTRONICS_FLAG;k_b_1;k_b_2",
                     comments=""
                 )
-                
+
                 self.k_b_label.setText(
-                    f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1 }&nbsp;&nbsp;&nbsp;"
+                    f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
                     f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
                     f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
-                    f"f<sub>R</sub> equation = {np.poly1d(self.calculate_final_fR)}"
+                    f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
                 )
                 
                 #---- reload the file ----

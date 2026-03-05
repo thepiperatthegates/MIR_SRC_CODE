@@ -232,7 +232,7 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
 
                 ##----------------------  run only once when the program starts ----------------------
                 if not worker_process_flag.flag_process and received_data:
-                    p1 = multiprocessing.Process(target=plot_live, args=(q_to_process, q_to_graph, q_to_csv))
+                    p1 = multiprocessing.Process(target=start_process_live_graph, args=(q_to_process, q_to_graph, q_to_csv))
                     p1.start()
 
                     worker_process_flag.flag_process = True
@@ -264,12 +264,7 @@ def send_thread(ser1):
     except Exception as e:
         print("Cannot send data!", e)
 
-def plot_live(queue1, q_to_graph, q_to_csv): #q_to_graph to graph (main file)
-    start_process_live_graph(queue1, q_to_graph, q_to_csv)
-
-    
-
-def start_process_live_graph(queue1, q_to_graph, q_to_csv):
+def start_process_live_graph(q_to_process, q_to_graph, q_to_csv):
     """
     Process incoming data for live graphing and CSV logging.
 
@@ -283,6 +278,8 @@ def start_process_live_graph(queue1, q_to_graph, q_to_csv):
     ID_CURRENT_2  = 0xA4
     ID_PHASE_DIFF = 0xA5
 
+    ID_HALL_NORM =0xA6
+
     # ----------------- ID bit for specific variables (f -> float / H -> uint16_t) --------------------
     ID_MAP = {
         ID_HALL_1:     (4, '<f'),
@@ -290,10 +287,11 @@ def start_process_live_graph(queue1, q_to_graph, q_to_csv):
         ID_CURRENT_1:  (2, '<H'),
         ID_CURRENT_2:  (2, '<H'),
         ID_PHASE_DIFF: (4, '<f'),
+        ID_HALL_NORM: (16, '<ffff'),
     }
 
     while True:
-        recv_buffer = queue1.get()
+        recv_buffer = q_to_process.get()
         if not recv_buffer:
             continue
 
@@ -312,14 +310,24 @@ def start_process_live_graph(queue1, q_to_graph, q_to_csv):
                     payload = recv_buffer[i + 1 : end]
                     value = struct.unpack(fmt, payload)[0]
 
-                    numeric_values.append(value)  # only numeric value, ID removed
+                    if identifier == ID_HALL_NORM:
+                        #------ Send the tuple (max1, min1, max2, min2) to UI queue -------------
+                        print(value)
 
-                    i = end  # skip ID + payload
+                    else:
+                        #------ Standard sensor stream -----------------------------------
+                        numeric_values.append(value)  # only numeric value, ID removed
+
+                    #---------  skip ID + payload --------------
+                    i = end
+
                 else:
-                    # incomplete packet at buffer end
+                    #-----------  incomplete packet at buffer end ----------------
+                    print(f"Error in data syncing, don't know how to handle {identifier}")
                     break
             else:
                 #---------------- byte does not match any ID → resync ----------------
+                print(f"Unknown ID encountered: 0x{identifier:02X} at index {i}. Resyncing...")
                 i += 1
 
         # ---------------- send only numeric values to queues ----------------
@@ -336,7 +344,8 @@ def file_name_change_set(prefix, extension=".csv"):
     file_name = f"{prefix}{extension}"
     
 
-def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling, worker_normalise_properties, num_columns=4):
+def save_to_csv(cleaned_buffer, worker_kb_property,
+                worker_specific_downsampling, worker_normalise_properties, num_columns=4):
     """
     Process, calibrate, downsample, timestamp, and save measurement data to a CSV file.
 
