@@ -156,16 +156,16 @@ class DataUpdate(QThread):
 
                 reshaped_data = self.bytes_to_process.reshape(-1, num_columns)
 
-                self.v1_slice = reshaped_data[:, 0]
-                self.v2_slice = reshaped_data[:, 1]
-                self.i1_slice = reshaped_data[:, 2]
-                self.i2_slice = reshaped_data[:, 3]
-                self.phase_diff_slice = reshaped_data[:, 4]
+                self.v1_slice = reshaped_data[:, 0]     # normalised hall 1 [no unit]
+                self.v2_slice = reshaped_data[:, 1]     #normalised hall 2 [no unit]
+                self.i1_slice = reshaped_data[:, 2]     #i1 [digital]
+                self.i2_slice = reshaped_data[:, 3]     # i2 [digital]
+                self.phase_diff_slice = reshaped_data[:, 4]         # phase diff [rad]
 
                 data_mutex.lock()
 
                 # Hall Sensors
-                #TODO: NEW FIRMWARE ITERACTIONS MUST NOT BE NEGATIVE FOR I1!!!!!!!!!
+                
                 self.v1_slice = -packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
                 self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
 
@@ -173,7 +173,7 @@ class DataUpdate(QThread):
                 self.i1_slice = -packet_transmission.change_current_adc(self.i1_slice)  # convert col3 (in mA)
                 self.i2_slice = packet_transmission.change_current_adc(self.i2_slice)  # convert col4 (in mA)
 
-                # calibration for current sensor
+                # Calibration for current sensor
                 self.i1_slice = packet_transmission.calibration_input_coil_1(self.i1_slice)
                 self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
 
@@ -183,12 +183,7 @@ class DataUpdate(QThread):
                                                                              self.v1_slice, self.i1_slice / 1000)
                 self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
                                                                              self.v2_slice, self.i2_slice / 1000)
-
-                # this is normalising step (still do not know whether I want to do it immidiately or not)
-                # if self.flag_normalise:
-                #     self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amplitude_voltage_1
-                #     self.v2_slice = ( self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amplitude_voltage_2
-
+                
                 # Calibrate process starts
                 # measurement fR process starts
                 # measurement to determine the normalising parameters (for first time rotation)
@@ -443,7 +438,7 @@ class PIDOutput(QMainWindow, Ui_Title):
 
     def _connect_signals(self):
         """Link UI interactions to their respective methods."""
-        # ----------------------- Buttons -----------------------
+        # ----------------------- Buttons ----------    print(len(data))-------------
         self.button_send.clicked.connect(self.send_parameter_event)
         self.button_send.clicked.connect(lambda: self.popout_window(1))
         self.button_auto_range.clicked.connect(self.auto_range_event)
@@ -753,7 +748,7 @@ class TabWindowPID(QMainWindow):
         #stop all the background processes
 
             
-        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, sockets_files.q_to_csv):
+        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, sockets_files.q_to_csv, sockets_files.q_to_norm):
             q.close()
             q.join_thread()
 

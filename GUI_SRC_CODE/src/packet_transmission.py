@@ -324,27 +324,37 @@ class RemainingTimeForCreepTest():
     
 
 class ProcessUnpackingFlag():
-    _flag_process = False
+    
+    _flag_rx_process = False
     
     @property
-    def flag_process(self):
-        return self.__class__._flag_process
+    def flag_rx_process(self):
+        return self.__class__._flag_rx_process
     
-    @flag_process.setter
-    def flag_process(self, val):
-        self.__class__._flag_process = bool(val)
+    @flag_rx_process.setter
+    def flag_rx_process(self, val):
+        self.__class__._flag_rx_process = bool(val)
 
 class RunningTimeFlag:
-    _flag_running_time = False
+    _flag_csv_save = False
     
+    _flag_norm_save = False
     
     @property
-    def flag_running_time(self):
-        return self.__class__._flag_running_time 
+    def flag_csv_save(self):
+        return self.__class__._flag_csv_save 
     
-    @flag_running_time.setter
-    def flag_running_time(self, value):
-        self.__class__._flag_running_time = bool(value)
+    @flag_csv_save.setter
+    def flag_csv_save(self, value):
+        self.__class__._flag_csv_save = bool(value)
+        
+    @property
+    def flag_norm_save(self):
+        return self.__class__._flag_norm_save
+    
+    @flag_norm_save.setter
+    def flag_norm_save(self, value):
+        self.__class__._flag_norm_save = bool(value)
         
         
 class DownSampleSpecificFlag():

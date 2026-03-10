@@ -312,7 +312,7 @@ class SleepTimer(QObject):
             self.update_time_signal.emit(round(self.remaining, 1))
         else:
             self.timer.stop()
-            self.worker_flag_run_time.flag_running_time = False
+            self.worker_flag_run_time.flag_csv_save = False
 
 class SocketThread(QThread):
     
@@ -749,7 +749,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_downsample_property.time_increment = 1.0 / fs
         self.worker_downsample_property.tot_average = tot_avg
         self.worker_downsample_property.current_time = 0.0
-        self.worker_flag_run_time.flag_running_time = True
+        self.worker_flag_run_time.flag_csv_save = True
         
         sockets_files.file_name_change_set("dummy")
 
@@ -1407,7 +1407,7 @@ class TabWindowConstSR(QMainWindow):
         #stop all the background processes
 
             
-        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, sockets_files.q_to_csv):
+        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, sockets_files.q_to_csv, sockets_files.q_to_norm):
             q.close()
             q.join_thread()
 

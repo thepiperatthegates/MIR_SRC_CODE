@@ -16,14 +16,17 @@ baud_rate = 128000
 
 append_payload =0 
 
+offset_1 = 0
+offset_2 = 0
+
+
+#--------------------------- queue init ---------------------------
 q_to_process = multiprocessing.Queue()
 q_to_graph = multiprocessing.Queue()
 q_to_csv = multiprocessing.Queue()
 
-
-offset_1 = 0
-offset_2 = 0
-
+q_to_norm = multiprocessing.Queue()
+#-------------------------------------------------------------------
 
 #---------------------- setter for port_name ----------------------
 port_name = None 
@@ -38,7 +41,7 @@ flag_for_process = None
 flag_for_downsampling = None
 
 p1 = None
-
+#----------------------------------------------------------------------
 
 # ---------------------- FOR DATA RECV PURPOSES --------------------------------------------
 DMA_ADC_BUFF_SIZE = 2
@@ -103,7 +106,7 @@ def socket_start_connect():
         print("Cannot connect with USB serial port!:", e)
         print(port_name)
         socket_start_connect()  #RECURSIVE TO TRY AGAIN
-        
+        worker_data_flag
         status_connection = False
         
     return ser
@@ -168,7 +171,7 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
         worker_specific_downsampling:
             Worker instances to specifiy the steps of downsampling (kunstlich)
         worker_kb_property:
-            Worker instance for kb coefficients/to be send to the save_to_csv functions backend
+            Worker instance for kb coefficients/to be send to the save_sensors_data_to_csv functions backend
         ser1 (serial.Serial):
             An open serial connection object used for reading data.
 
@@ -231,22 +234,42 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
                 count = 0
 
                 ##----------------------  run only once when the program starts ----------------------
-                if not worker_process_flag.flag_process and received_data:
-                    p1 = multiprocessing.Process(target=start_process_live_graph, args=(q_to_process, q_to_graph, q_to_csv))
+                if not worker_process_flag._flag_rx_process and received_data:
+                    p1 = multiprocessing.Process(target=start_process_live_graph, args=(q_to_process, q_to_graph, q_to_csv, q_to_norm))
                     p1.start()
 
-                    worker_process_flag.flag_process = True
-
+                    worker_process_flag._flag_rx_process = True
+                    
                 # ---------------------- send to subprocess to be unpacked ----------------------
-                q_to_process.put(obj=received_data)
-                data_send = q_to_csv.get()
+                q_to_process.put(received_data)
+                
+                #------- unpacked data for ``sensors_values`` is send through here ---------------------------
+                sensor_data_recv = q_to_csv.get()
 
-                if worker_data_flag.flag_running_time:
-                    if data_send:
-                        save_to_csv(data_send, worker_kb_property, worker_specific_downsampling,
+                
+                #---------- event for saving in csv files ------------------------------
+                if worker_data_flag.flag_csv_save:
+                    if sensor_data_recv:
+                        
+                        #------ save sensors data to csv --------------
+                        save_sensors_data_to_csv(sensor_data_recv, worker_kb_property, worker_specific_downsampling,
                                     worker_normalise_properties)
-                        data_send = None
+                        
+                        #----- reset the data -----
+                        sensor_data_recv = None
                     print("Data written!")
+                    
+                    
+                #---------- event for saving norm data (max, min of hall) in csv ---------------------
+                if worker_data_flag.flag_norm_save:
+                    #----------- unpacked data for ``norm_values`` is send through here -----------------------
+                    norm_values_recv = q_to_norm.get() 
+                    
+                    #----------- save norm data to csv  ----------------------
+                    save_norm_data_to_csv(norm_values_recv)
+                    
+                    
+                    
             except Exception as e:
                 print(f"Here 1: {e}")
         except Exception as e:
@@ -254,17 +277,17 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
             time.sleep(0.01)
 
 # ---------------------- thread for TCP Tx ----------------------
-def send_thread(ser1):
+def send_thread(serial_data):
     worker_combined_send = packet_transmission.TxData()
     #combined everything
     combined_send = worker_combined_send.combine_data()
     #reset the flag
     try:
-        ser1.write(combined_send)
+        serial_data.write(combined_send)
     except Exception as e:
         print("Cannot send data!", e)
 
-def start_process_live_graph(q_to_process, q_to_graph, q_to_csv):
+def start_process_live_graph(q_to_process, q_to_graph, q_to_csv, q_to_norm):
     """
     Process incoming data for live graphing and CSV logging.
 
@@ -287,6 +310,8 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv):
         ID_CURRENT_1:  (2, '<H'),
         ID_CURRENT_2:  (2, '<H'),
         ID_PHASE_DIFF: (4, '<f'),
+        
+        # ID for normalising data (32 bytes)
         ID_HALL_NORM: (16, '<ffff'),
     }
 
@@ -294,8 +319,13 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv):
         recv_buffer = q_to_process.get()
         if not recv_buffer:
             continue
-
-        numeric_values = []
+        
+        
+        #----- RESERT the tuples values -------
+        sensors_values = []
+        norm_values = []
+        
+        
         i = 0
         buf_len = len(recv_buffer)
 
@@ -312,11 +342,19 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv):
 
                     if identifier == ID_HALL_NORM:
                         #------ Send the tuple (max1, min1, max2, min2) to UI queue -------------
-                        print(value)
+                        norm_values.append(value)
+                        
+                        #---- RESET the sensors_values so it does not put anything to the necessary queue ----
+                        sensors_values = []
+                        
 
                     else:
                         #------ Standard sensor stream -----------------------------------
-                        numeric_values.append(value)  # only numeric value, ID removed
+                        sensors_values.append(value)  # only numeric value, ID removed
+                        
+                        #---- RESET the norm_values so it does not put anything to the necessary queue ----
+                        norm_values = []
+                        
 
                     #---------  skip ID + payload --------------
                     i = end
@@ -331,9 +369,15 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv):
                 i += 1
 
         # ---------------- send only numeric values to queues ----------------
-        if numeric_values:
-            q_to_graph.put(numeric_values)
-            q_to_csv.put(numeric_values)
+        if sensors_values and not norm_values:
+            q_to_graph.put(sensors_values)
+            q_to_csv.put(sensors_values)
+            
+            
+        # ---------------- send only normalising values to queues ----------------    
+        if norm_values and not sensors_values:
+            q_to_norm.put(norm_values)
+            
 
 # ---------------------- write to dummy csv  ----------------------
 def file_name_change_set(prefix, extension=".csv"):
@@ -344,7 +388,7 @@ def file_name_change_set(prefix, extension=".csv"):
     file_name = f"{prefix}{extension}"
     
 
-def save_to_csv(cleaned_buffer, worker_kb_property,
+def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
                 worker_specific_downsampling, worker_normalise_properties, num_columns=4):
     """
     Process, calibrate, downsample, timestamp, and save measurement data to a CSV file.
@@ -373,7 +417,7 @@ def save_to_csv(cleaned_buffer, worker_kb_property,
             - ``time_increment_specified`` : user-specified sample time step (s)
             - ``current_time`` : running timestamp updated after each call
     worker_normalise_properties : object
-        Object containing:
+        Object containing:q_to_norm
             - ``zero_offset_voltage_1`` : normalisation offset for Hall sensor 1
             - ``zero_offset_voltage_2`` : normalisation offset for Hall sensor 2
             - ``amplitude_voltage_1`` : normalisation amplitude for Hall sensor 1
@@ -421,43 +465,42 @@ def save_to_csv(cleaned_buffer, worker_kb_property,
 
     global file_name, count_time
     
-    count_time = count_time +1
+    count_time = count_time + 1
     
     print("How many times has this function been called? :", count_time)
 
+    
+    #------- turn the tuples into numpy arrays -------
     data = np.array(cleaned_buffer)
-    print(len(data))
+    
     # Reshape the data to have 'num_columns' columns per row
     reshaped_data = np.array(data).reshape(-1, num_columns)
     
-    
-    reshaped_data = reshaped_data.astype(float)
-    
-    col1 = reshaped_data[:, 0].astype(int)             #take first column (U1)
-    col2 = reshaped_data[:, 1].astype(int)                  #take second column (U2)
-    col3 = reshaped_data[:, 2].astype(int)                  #take third column (I1)
-    col4 = reshaped_data[:, 3].astype(int)                  #take fourth column (I2)
 
+    col1 = reshaped_data[:, 0].astype(float)             # normalised hall 1 [no unit]
+    col2 = reshaped_data[:, 1].astype(float)              #normalised hall 2 [no unit]
+    col3 = reshaped_data[:, 2].astype(int)               #i1 [digital]
+    col4 = reshaped_data[:, 3].astype(int)                # i2 [digital]
+    col5 = reshaped_data[:, 4].astype(float)              # phase diff [rad]
     
     
-    #Hall Sensors
-    col1_converted = -packet_transmission.change_adc_hall(col1)               #convert col1
-    col2_converted = packet_transmission.change_adc_hall(col2)               #convert col2
-    
+    #Hall Sensors (it's already normalised)
+    col1 = -col1
+    col2 = col2
     
     #Current
-    col3_converted = -packet_transmission.change_current_adc(col3)               #convert col1
-    col4_converted = packet_transmission.change_current_adc(col4)               #convert col2
+    col3 = -packet_transmission.change_current_adc(col3)               #convert col1
+    col4 = packet_transmission.change_current_adc(col4)               #convert col2
 
-    col3_converted = packet_transmission.calibration_input_coil_1(col3_converted)
-    col4_converted = packet_transmission.calibration_input_coil_2(col4_converted)
+    col3 = packet_transmission.calibration_input_coil_1(col3)
+    col4 = packet_transmission.calibration_input_coil_2(col4)
 
     #Justified hall sensors
-    col1_converted = packet_transmission.calibrated_hall_sensors1(worker_kb_property.k_b_1, col1_converted, col3_converted/1000)  
-    col2_converted = packet_transmission.calibrated_hall_sensors2(worker_kb_property.k_b_2, col2_converted, col4_converted/1000)
+    col1 = packet_transmission.calibrated_hall_sensors1(worker_kb_property.k_b_1, col1, col3/1000)  
+    col2 = packet_transmission.calibrated_hall_sensors2(worker_kb_property.k_b_2, col2, col4/1000)
 
-    col1_converted = (col1_converted- worker_normalise_properties.zero_offset_voltage_1) / worker_normalise_properties.amp_voltage_1
-    col2_converted = (col2_converted - worker_normalise_properties.zero_offset_voltage_2) / worker_normalise_properties.amp_voltage_2
+    col1 = (col1- worker_normalise_properties.zero_offset_voltage_1) / worker_normalise_properties.amp_voltage_1
+    col2 = (col2 - worker_normalise_properties.zero_offset_voltage_2) / worker_normalise_properties.amp_voltage_2
 
     #Average values to reduce amount of data saved
     ####FOR CONSTANT SHEAR RATE 
@@ -486,22 +529,22 @@ def save_to_csv(cleaned_buffer, worker_kb_property,
     
     #check if the need for specific downsample is needed
     if worker_specific_downsampling.flag_specific_downsample:
-            col1_converted = average_values(col1_converted, worker_specific_downsampling.tot_average_specified).ravel()
-            col2_converted = average_values(col2_converted, worker_specific_downsampling.tot_average_specified).ravel()
-            col3_converted = average_values(col3_converted, worker_specific_downsampling.tot_average_specified).ravel()
-            col4_converted = average_values(col4_converted, worker_specific_downsampling.tot_average_specified).ravel()
+            col1 = average_values(col1, worker_specific_downsampling.tot_average_specified).ravel()
+            col2 = average_values(col2, worker_specific_downsampling.tot_average_specified).ravel()
+            col3 = average_values(col3, worker_specific_downsampling.tot_average_specified).ravel()
+            col4 = average_values(col4, worker_specific_downsampling.tot_average_specified).ravel()
     
     elif worker_specific_downsampling.flag_specific_downsample is False:
-            col1_converted = average_values(col1_converted, worker_specific_downsampling.tot_average).ravel()
-            col2_converted = average_values(col2_converted, worker_specific_downsampling.tot_average).ravel()
-            col3_converted = average_values(col3_converted, worker_specific_downsampling.tot_average).ravel()
-            col4_converted = average_values(col4_converted, worker_specific_downsampling.tot_average).ravel()
+            col1 = average_values(col1, worker_specific_downsampling.tot_average).ravel()
+            col2 = average_values(col2, worker_specific_downsampling.tot_average).ravel()
+            col3 = average_values(col3, worker_specific_downsampling.tot_average).ravel()
+            col4 = average_values(col4, worker_specific_downsampling.tot_average).ravel()
 
-    averaged_data = np.zeros((len(col1_converted), 4))  # shape (100,4)
-    averaged_data[:, 0] = col1_converted
-    averaged_data[:, 1] = col2_converted
-    averaged_data[:, 2] = col3_converted
-    averaged_data[:, 3] = col4_converted
+    averaged_data = np.zeros((len(col1), 4))  # shape (100,4)
+    averaged_data[:, 0] = col1
+    averaged_data[:, 1] = col2
+    averaged_data[:, 2] = col3
+    averaged_data[:, 3] = col4
     
     num_rows = averaged_data.shape[0] 
         
@@ -580,7 +623,9 @@ def average_values (col, N):
     return average_val
 
 
-
+def save_norm_data_to_csv(packed_norm_data):
+    
+    
 
     
 if __name__ == "__main__":
