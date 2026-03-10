@@ -182,8 +182,10 @@ class DataUpdate(QThread):
                                                                              self.v1_slice, self.i1_slice / 1000)
                 self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
                                                                              self.v2_slice, self.i2_slice / 1000)
-
+                print(self.v1_slice)
                 # this is normalising step (still do not know whether I want to do it immidiately or not)
+                
+                
                 if self.flag_normalise:
                     self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amp_voltage_1
                     self.v2_slice = (self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amp_voltage_2
@@ -1238,7 +1240,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         # change to frequency for MCU
         self.worker_data_block.data_2_for_MCU = 1 #Hz
 
-        self.worker_data_block.data_current = 200, 0, 200, 0
+        self.worker_data_block.data_current = 400, 0, 400, 0
 
         # from combobox direction
         self.worker_data_block.data_7 = 1
@@ -1292,11 +1294,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.worker_DataUpdate.flag_special_event(False, False, False)
 
 
-            self.worker_normalise_properties.amp_voltage_1 = (np.max(self.accumulate_hall_1[10:]) - np.min(self.accumulate_hall_1[10:])) / 2
-            self.worker_normalise_properties.zero_offset_voltage_1 = (np.max(self.accumulate_hall_1[10:]) + np.min(self.accumulate_hall_1[10:])) / 2
+            self.worker_normalise_properties.amp_voltage_1 = (np.max(self.accumulate_hall_1[1000:]) - np.min(self.accumulate_hall_1[1000:])) / 2
+            self.worker_normalise_properties.zero_offset_voltage_1 = (np.max(self.accumulate_hall_1[1000:]) + np.min(self.accumulate_hall_1[1000:])) / 2
 
-            self.worker_normalise_properties.amp_voltage_2 = (np.max(self.accumulate_hall_2[10:]) - np.min(self.accumulate_hall_2[10:])) /  2
-            self.worker_normalise_properties.zero_offset_voltage_2 = (np.max(self.accumulate_hall_2[10:]) + np.min(self.accumulate_hall_2[10:])) / 2
+            self.worker_normalise_properties.amp_voltage_2 = (np.max(self.accumulate_hall_2[1000:]) - np.min(self.accumulate_hall_2[1000:])) /  2
+            self.worker_normalise_properties.zero_offset_voltage_2 = (np.max(self.accumulate_hall_2[1000:]) + np.min(self.accumulate_hall_2[1000:])) / 2
 
             #File path for saving
             header_text = "voltage_amp_1_V;voltage_zero_offset_1_V;voltage_amp_2_V;voltage_zero_offset_2_V"

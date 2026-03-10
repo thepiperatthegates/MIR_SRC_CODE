@@ -584,6 +584,7 @@ class kbCoefficient:
         type(self)._k_b_2 = float(val)
         
         
+        
 class VoltageNormaliseCoefficient:
     _initialized = False
     
@@ -607,9 +608,13 @@ class VoltageNormaliseCoefficient:
             data = np.genfromtxt(filepath, delimiter=';', names=True)
 
             cls._amp_voltage_1 = float(data["voltage_amp_1_V"])
+            # print("amp_voltage_1", cls._amp_voltage_1)
             cls._zero_offset_voltage_1 = float(data["voltage_zero_offset_1_V"])
+            # print("amp_voltage_zero_offset_1_v", cls._zero_offset_voltage_1 )
             cls._amp_voltage_2 = float(data["voltage_amp_2_V"])
+            # print("amp_voltage_2", cls._amp_voltage_2)
             cls._zero_offset_voltage_2 = float(data["voltage_zero_offset_2_V"])
+            # print("amp_voltage_zero_offset_2_v", cls._zero_offset_voltage_2 )
         
         
         cls._initialized = True
@@ -620,6 +625,7 @@ class VoltageNormaliseCoefficient:
     def reload(cls):
         cls._initialized = False
         cls._initialize()
+        
 
         
     # ---- voltage 1 ----
