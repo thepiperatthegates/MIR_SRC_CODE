@@ -783,6 +783,9 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.save_button.setDisabled(is_active)
 
     def start_calibration_event(self, input_current = -400, count_recursion = 1 ):
+        
+        self.worker_DataUpdate.flag_normalise_event(False)
+        
         print("Recursion in main func:", count_recursion)
         
         self.worker_k_b_property.k_b_1 = 0.0
@@ -968,6 +971,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.worker_fr_property.fr1 = 0.0
             self.calculate_final_fR = 0
             
+        self.worker_DataUpdate.flag_normalise_event(False)
+            
         ############################# send data to setter getter ############################################################################
         self.worker_data_block.data_1 = str(5) #mA
         self.worker_data_block.data_2_for_MCU  = str(running_frequency) # Hz
@@ -1005,6 +1010,9 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_data_block.data_1 = float(10)
         self.worker_data_block.data_2_for_MCU  = str(running_frequency) # Hz
         
+        if float(self.textbox_offset1.text()) == 0 or float(self.textbox_offset2.text()) == 0:
+            
+            
         self.worker_data_block.data_current = input_current, self.textbox_offset1.text(), input_current, self.textbox_offset2.text()
         self.worker_data_block.data_7 = rotation_direction
             
