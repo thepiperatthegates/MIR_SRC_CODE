@@ -1009,10 +1009,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         ############################# send data to setter getter ######################################
         self.worker_data_block.data_1 = float(10)
         self.worker_data_block.data_2_for_MCU  = str(running_frequency) # Hz
-        
-        if float(self.textbox_offset1.text()) == 0 or float(self.textbox_offset2.text()) == 0:
-            
-            
+
         self.worker_data_block.data_current = input_current, self.textbox_offset1.text(), input_current, self.textbox_offset2.text()
         self.worker_data_block.data_7 = rotation_direction
             
