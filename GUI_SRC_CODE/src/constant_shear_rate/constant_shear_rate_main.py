@@ -76,44 +76,50 @@ class DataUpdate(QThread):
     def __init__(self, main_window_ref=None):
         super().__init__()
         self.main_window_ref = main_window_ref
+        
+        # ---------------- Operational State ---------------
         self.running = True
         self.flag_calibrate = False
-
+        self.flag_normalise = False
+        self.flag_normalise_measurement = False
         self.flag_fR_measurement = False
+
+        # ----------- Accumulators & Totals (Hall/Current) ----------
         self.accumulate_hall_1 = 0.0
         self.accumulate_hall_2 = 0.0
         self.accumulate_current_1 = 0.0
         self.accumulate_current_2 = 0.0
-
-        # for normalise properties purposes
-        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
-        self.amplitude_voltage_1 = 0.0
-        self.zero_offset_voltage_1 = 0.0
-        self.amplitude_voltage_2 = 0.0
-        self.zero_offset_voltage_2 = 0.0
-
-        self.flag_normalise = False
-        self.flag_normalise_measurement = False
 
         self.total_hall_1 = None
         self.total_hall_2 = None
         self.total_current_1 = None
         self.total_current_2 = None
 
+        # ---------- Normalization Parameters -----------
+        self.amplitude_voltage_1 = 0.0
+        self.zero_offset_voltage_1 = 0.0
+        self.amplitude_voltage_2 = 0.0
+        self.zero_offset_voltage_2 = 0.0
+
+        # ------- Data Buffers (NumPy Arrays) --------
+        # Raw Data Slices
         self.v1_slice = np.array([], dtype=np.uint16)
         self.v2_slice = np.array([], dtype=np.uint16)
         self.i1_slice = np.array([], dtype=np.uint16)
         self.i2_slice = np.array([], dtype=np.uint16)
+        self.bytes_to_process = np.array([], dtype=np.uint16)
 
-        self.bytes_to_process = np.array([], dtype=np.uint16)  # Empty NumPy array for incoming data
-
+        #------------ Calculated Values ------------------------
         self.angle_permanent_magnet_val = np.array([], dtype=np.float32)
         self.angle_magnetic_field_val = np.array([], dtype=np.float32)
         self.phase_difference_val = np.array([], dtype=np.float32)
 
+        # ------ Helper Workers --------------------------------
+        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
         self.worker_array_setter = packet_transmission.StoreArrayGraph()
         self.worker_kb_property = packet_transmission.kbCoefficient()
-
+        
+        
     def run(self):
 
         """
@@ -182,12 +188,10 @@ class DataUpdate(QThread):
                                                                              self.v1_slice, self.i1_slice / 1000)
                 self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
                                                                              self.v2_slice, self.i2_slice / 1000)
-
-                # this is normalising step (still do not know whether I want to do it immidiately or not)
                 if self.flag_normalise:
                     self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amp_voltage_1
                     self.v2_slice = (self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amp_voltage_2
-
+                
                 # Calibrate process starts
                 # measurement fR process starts
                 # measurement to determine the normalising parameters (for first time rotation)
@@ -439,7 +443,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
             f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
             f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
-            f"f<sub>R</sub> equation = {np.poly1d(self.calculate_final_fR)}"
+            f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
         )
         
         self.plot_object = PlotWindow()
@@ -492,12 +496,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         normalise_filepath = os.path.join(project_root, "files", "normalise_voltage_constant.csv")
 
-        # If file exists → load values
+        # If file exists, then load values from csv
         if os.path.exists(normalise_filepath):
             self.worker_DataUpdate.flag_normalise_event(True)
         else:
             self.worker_DataUpdate.flag_normalise_event(False)
-        
+            
         self.worker_DataUpdate.start()
         
         self.change_graph()
@@ -779,6 +783,9 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.save_button.setDisabled(is_active)
 
     def start_calibration_event(self, input_current = -400, count_recursion = 1 ):
+        
+        self.worker_DataUpdate.flag_normalise_event(False)
+        
         print("Recursion in main func:", count_recursion)
         
         self.worker_k_b_property.k_b_1 = 0.0
@@ -914,10 +921,10 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 )
                 
                 self.k_b_label.setText(
-                    f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1 }&nbsp;&nbsp;&nbsp;"
+                    f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
                     f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
                     f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
-                    f"f<sub>R</sub> equation = {np.poly1d(self.calculate_final_fR)}"
+                    f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
                 )
                 
                 #---- reload the file ----
@@ -930,7 +937,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 self.button_stop.setDisabled(False)
                 
                 
-    def set_constant(self, get_accumulate_hall_1, get_accumulate_hall_2, get_accumulate_current_1, get_accumulate_current2):
+    def set_constant(self, get_accumulate_hall_1, get_accumulate_hall_2, get_accumulate_current_1, get_accumulate_current_2):
         """
         Set accumulated measurement values for Hall sensors and current sensors.
 
@@ -951,7 +958,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.accumulate_hall_1 = get_accumulate_hall_1
         self.accumulate_hall_2 = get_accumulate_hall_2
         self.accumulate_current_1 = get_accumulate_current_1
-        self.accumulate_current_2 = get_accumulate_current2
+        self.accumulate_current_2 = get_accumulate_current_2
     
     
     #initiation!!!!!
@@ -963,6 +970,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.worker_fr_property.fr0 = 0.0
             self.worker_fr_property.fr1 = 0.0
             self.calculate_final_fR = 0
+            
+        self.worker_DataUpdate.flag_normalise_event(False)
             
         ############################# send data to setter getter ############################################################################
         self.worker_data_block.data_1 = str(5) #mA
@@ -1000,7 +1009,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         ############################# send data to setter getter ######################################
         self.worker_data_block.data_1 = float(10)
         self.worker_data_block.data_2_for_MCU  = str(running_frequency) # Hz
-        
+
         self.worker_data_block.data_current = input_current, self.textbox_offset1.text(), input_current, self.textbox_offset2.text()
         self.worker_data_block.data_7 = rotation_direction
             
@@ -1159,7 +1168,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                     f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
                     f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
                     f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
-                    f"f<sub>R</sub> equation = {np.poly1d(self.calculate_final_fR)}"
+                    f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
                 )
                 
                 #refresh the graph
@@ -1228,17 +1237,17 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
 
     def button_rotate_event(self):
-        
         #Reset the normalise event state 
         self.worker_DataUpdate.flag_normalise_event(False)
+        
 
         ############################# send data to setter getter ######################################
         self.worker_data_block.data_1 =5.0 #second
         # make the running frequency 200 Hz, does not matter since we will produce DC current anyway
         # change to frequency for MCU
-        self.worker_data_block.data_2_for_MCU = 1 #Hz
+        self.worker_data_block.data_2_for_MCU = 2 #Hz
 
-        self.worker_data_block.data_current = 200, 0, 200, 0
+        self.worker_data_block.data_current = 400, 0, 400, 0
 
         # from combobox direction
         self.worker_data_block.data_7 = 1
@@ -1297,6 +1306,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
             self.worker_normalise_properties.amp_voltage_2 = (np.max(self.accumulate_hall_2[10:]) - np.min(self.accumulate_hall_2[10:])) /  2
             self.worker_normalise_properties.zero_offset_voltage_2 = (np.max(self.accumulate_hall_2[10:]) + np.min(self.accumulate_hall_2[10:])) / 2
+            
+            print("self.worker_normalise_properties.amp_voltage_1", self.worker_normalise_properties.amp_voltage_1)
+            print("self.worker_normalise_properties.zero_offset_voltage_1", self.worker_normalise_properties.zero_offset_voltage_1)
+            print("self.worker_normalise_properties.amp_voltage_2 ", self.worker_normalise_properties.amp_voltage_2 )
+            print("self.worker_normalise_properties.zero_offset_voltage_2 ", self.worker_normalise_properties.zero_offset_voltage_2 )
 
             #File path for saving
             header_text = "voltage_amp_1_V;voltage_zero_offset_1_V;voltage_amp_2_V;voltage_zero_offset_2_V"
