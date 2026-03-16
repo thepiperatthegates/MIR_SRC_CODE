@@ -72,7 +72,7 @@ if ($PythonExe -and (Test-Path $ReqFile)) {
 }
 
 # --------------------------------------------
-# Run MiR-GUI
+# Run MIR-GUI
 # --------------------------------------------
 if ($PythonExe) {
     Write-Host "[INFO] Environment ready. Python: $PythonExe" -ForegroundColor Green
