@@ -5,6 +5,15 @@
 # OTHERWISE, USE AT YOUR OWN RISK!
 # ============================================
 
+
+
+
+
+
+# ===================== Set the execution policy for PowerShell ============================ 
+
+Set-ExecutionPolicy Bypass -Scope Process -Force
+
 # --------------------------------------------
 # Define paths
 # --------------------------------------------
