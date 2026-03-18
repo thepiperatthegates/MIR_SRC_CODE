@@ -44,13 +44,20 @@ For example;
 
 Step 3: Executing the Script
 --------------------------------------
+Firstly, you must ensure ``Get-ExecutionPolicy`` is not set to ``Restricted`` in Powershell. 
 
-To run the script immediately without changing global system security  
+If it does, to run the script immediately without changing global system security  
 permanently, use the ``-ExecutionPolicy Bypass`` flag.
 
 .. code-block:: powershell
 
    Set-ExecutionPolicy Bypass -Scope Process -Force
+
+or 
+
+.. code-block:: powershell
+
+   Set-ExecutionPolicy AllSigned
 
 This does not indicate any malicious intent on your system, do not be alarmed!
 
