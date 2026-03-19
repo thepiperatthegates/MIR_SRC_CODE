@@ -97,7 +97,6 @@ def socket_start_connect():
                 break
     try:
         ser = serial.Serial(port=port_num, baudrate=baud_rate,timeout=None)
-        print(ser)
         print("Connecting to the board")
         print("Successful connection")
         
@@ -106,7 +105,6 @@ def socket_start_connect():
         print("Cannot connect with USB serial port!:", e)
         print(port_name)
         socket_start_connect()  #RECURSIVE TO TRY AGAIN
-        worker_data_flag
         status_connection = False
         
     return ser
@@ -467,9 +465,6 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
     
     count_time = count_time + 1
     
-    print("How many times has this function been called? :", count_time)
-
-    
     #------- turn the tuples into numpy arrays -------
     data = np.array(cleaned_buffer)
     
@@ -623,10 +618,23 @@ def average_values (col, N):
     return average_val
 
 
-def save_norm_data_to_csv(packed_norm_data):
+def save_norm_data_to_csv(packed_norm_data, filename="normalise_voltage_constant.csv"):
     
+    #-------------- turn tuple into numpy array -------------
+    data = np.array(packed_norm_data)
     
-
+    #-------------- reshaped into 4 columns ----------------
+    data = data.reshape(-1, 4)
+    
+    headers_name = "max_hall_1_V;zero_offset_hall_1_V;max_hall_2_V;zero_offset_hall_2_V"
+    
+    project_root =  os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    file_name_full = os.path.join(project_root, "files", filename)
+    
+    #-------------- save normalisation variables in csv ----------------
+    np.savetxt(file_name_full, data, delimiter=";",fmt='%.18e', header=headers_name, comments="")
+    
+    print("Norm vars stored in csv")
     
 if __name__ == "__main__":
     socket_start_connect()

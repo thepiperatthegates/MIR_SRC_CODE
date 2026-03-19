@@ -166,8 +166,8 @@ class DataUpdate(QThread):
 
                 # Hall Sensors
                 
-                self.v1_slice = -packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
-                self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
+                # self.v1_slice = packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
+                # self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
 
                 # Current
                 self.i1_slice = -packet_transmission.change_current_adc(self.i1_slice)  # convert col3 (in mA)
