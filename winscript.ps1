@@ -1,18 +1,7 @@
 # ============================================
-# DISCLAIMER !!!!!!!!!!:
-# THIS POWERSHELL SCRIPT IS AI MADE. BECAUSE I HAVE NO ABSOLUTE IDEA 
-# ABOUT THE SYNTAX OF POWERSHELL. MIGHT LEARN IN THE NEAR FUTURE. 
-# OTHERWISE, USE AT YOUR OWN RISK!
+# USE AT YOUR OWN RISK!
 # ============================================
 
-
-
-
-
-
-# ===================== Set the execution policy for PowerShell ============================ 
-
-Set-ExecutionPolicy Bypass -Scope Process -Force
 
 # --------------------------------------------
 # Define paths
@@ -79,6 +68,45 @@ if ($PythonExe -and (Test-Path $ReqFile)) {
     Write-Host "[INFO] Syncing dependencies from requirements.txt ..." -ForegroundColor Cyan
     & $PythonExe -m pip install -r $ReqFile
 }
+
+
+
+# ==================== Update Check Logic =======================================
+Write-Host "[INFO] Checking GitHub for new commits..." -ForegroundColor Cyan
+
+# ======================= Fetch the latest metadata from GitHub without downloading files yet ====================
+git fetch origin main -q 2>$null
+
+
+# Check the last exit code with $LASTEXITCODE
+if ($LASTEXITCODE -eq 0) {
+    # ============== Compare the local HEAD to the remote tracking branch ==================
+    $LocalHash  = git rev-parse HEAD
+    $RemoteHash = git rev-parse origin/main
+
+if ($LocalHash -ne $RemoteHash) {
+        Write-Host "=========================================" -ForegroundColor Yellow
+        Write-Host "[UPDATE] New update detected on GitHub!" -ForegroundColor Yellow
+        
+        # --- NEW: User Input Logic ---
+        $Confirmation = Read-Host "Would you like to update now? (y/n)" -ForegroundColor DarkYellow
+        
+        if ($Confirmation -eq 'y') {
+            Write-Host "[INFO] Updating files... please wait and do not exit." -ForegroundColor Cyan
+            git pull origin main
+            Write-Host "[SUCCESS] Update complete!" -ForegroundColor Green
+        } else {
+            Write-Host "[SKIP] Update declined. Running current version..." -ForegroundColor Gray
+        }
+        # -----------------------------
+        Write-Host "========================================="
+    } else {
+        Write-Host "[INFO] You are up to date." -ForegroundColor Green
+    }
+} else {
+    Write-Host "[WARN] Could not reach GitHub or folder is not a Git repo." -ForegroundColor Gray
+}
+
 
 # --------------------------------------------
 # Run MIR-GUI
