@@ -626,8 +626,6 @@ class VoltageNormaliseCoefficient:
         cls._initialized = False
         cls._initialize()
         
-
-        
     # ---- voltage 1 ----
         
     @property
