@@ -124,8 +124,9 @@ def thread_start():
     ser1 = socket_start_connect()
     worker_kb_property = packet_transmission.kbCoefficient()
     worker_specific_downsampling = packet_transmission.DownSampleSpecificFlag()
+    worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
     #Event for run time receiving data from Serial Porte
-    thread_recv = threading.Thread(target=recv_thread, args=(ser1,worker_kb_property, worker_specific_downsampling))
+    thread_recv = threading.Thread(target=recv_thread, args=(ser1,worker_kb_property, worker_specific_downsampling, worker_normalise_properties))
     thread_recv.start()
     
     worker_flag_send = packet_transmission.TxFlag()
@@ -141,7 +142,7 @@ def thread_start():
 
             
 
-def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
+def recv_thread(ser1, worker_kb_property, worker_specific_downsampling, worker_normalise_properties):
     """
     Continuously read incoming data from a serial connection and 
     forward it for live plotting and CSV logging.
@@ -192,7 +193,7 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
 
     worker_data_flag = packet_transmission.RunningTimeFlag()
     worker_process_flag = packet_transmission.ProcessUnpackingFlag()
-    worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
+    # worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
     
     #start count with zero
     count = 0
@@ -219,6 +220,8 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
                 
                 # worker_data_flag = packet_transmission.running_time_flag_getter()
                 if worker_data_flag.flag_running_time:
+                    
+                    #Reload the newest normalise properties
                     
                     if data_send:
                         save_to_csv(data_send, worker_kb_property, worker_specific_downsampling, worker_normalise_properties)
