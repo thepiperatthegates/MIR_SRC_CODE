@@ -493,8 +493,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         self.worker_DataUpdate = DataUpdate(self)
         
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        normalise_filepath = os.path.join(project_root, "files", "normalise_voltage_constant.csv")
+        normalise_filepath = os.path.join(self.project_root, "files", "normalise_voltage_constant.csv")
 
         # If file exists, then load values from csv
         if os.path.exists(normalise_filepath):
@@ -915,7 +914,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                     path_to_save_kb,
                     data,
                     delimiter=";",
-                    fmt=["%d", "%.18f", "%.18f"],
+                    fmt=["%d", "%.17g", "%.17g"],
                     header="ELECTRONICS_FLAG;k_b_1;k_b_2",
                     comments=""
                 )
@@ -1156,7 +1155,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 
                 dir_fr_results = os.path.join(self.project_root, "files", "results_fr.csv")
                 # Save to CSV      
-                np.savetxt(dir_fr_results, data_to_save, delimiter=";", comments="", fmt="%.18f", header=header_text)
+                np.savetxt(dir_fr_results, data_to_save, delimiter=";", comments="", fmt="%.17g", header=header_text)
                 #calculate final fR
                 self.calculate_final_fR =  np.polyfit(self.calculated_angular_velocity, self.calculated_torque, 1)
                 self.popout_window(4, self.calculate_final_fR, self.worker_k_b_property.k_b_1, self.worker_k_b_property.k_b_2)
@@ -1318,9 +1317,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             
             data_to_save = np.column_stack((self.worker_normalise_properties.amp_voltage_1, self.worker_normalise_properties.zero_offset_voltage_1,
                                             self.worker_normalise_properties.amp_voltage_2, self.worker_normalise_properties.zero_offset_voltage_2))
+            
+            print(self.worker_normalise_properties.amp_voltage_1)
 
             # Save to CSV      
-            np.savetxt(dir_save_normalisation, data_to_save, delimiter=";", comments="", fmt="%.18f", header=header_text)
+            np.savetxt(dir_save_normalisation, data_to_save, delimiter=";", comments="", fmt="%.17g",  header=header_text)
             
             packet_transmission.VoltageNormaliseCoefficient.reload()
 

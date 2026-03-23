@@ -1,5 +1,5 @@
 @echo off
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0winscript.ps1"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0/winscript.ps1"
 
 
 pause

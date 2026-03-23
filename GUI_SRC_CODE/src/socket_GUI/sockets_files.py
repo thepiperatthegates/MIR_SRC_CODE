@@ -396,17 +396,17 @@ def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling
     print("How many times has this function been called? :", count_time)
 
     data = np.array(cleaned_buffer)
-    print(len(data))
+
     # Reshape the data to have 'num_columns' columns per row
     reshaped_data = np.array(data).reshape(-1, num_columns)
     
     
     reshaped_data = reshaped_data.astype(float)
     
-    col1 = reshaped_data[:, 0].astype(int)             #take first column (U1)
-    col2 = reshaped_data[:, 1].astype(int)                  #take second column (U2)
-    col3 = reshaped_data[:, 2].astype(int)                  #take third column (I1)
-    col4 = reshaped_data[:, 3].astype(int)                  #take fourth column (I2)
+    col1 = reshaped_data[:, 0]             #take first column (U1)
+    col2 = reshaped_data[:, 1]           #take second column (U2)
+    col3 = reshaped_data[:, 2]                #take third column (I1)
+    col4 = reshaped_data[:, 3]               #take fourth column (I2)
 
     
     
@@ -497,10 +497,10 @@ def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling
     
     try:
         if not os.path.exists(file_name_full):
-            np.savetxt(file_name_full, final_data, header="",  delimiter=";",  comments="", fmt='%.18e')
+            np.savetxt(file_name_full, final_data, header="",  delimiter=";",  comments="", fmt='%.17g')
         else:
             with open(file_name_full, "a") as f:
-                np.savetxt(f, final_data, delimiter=";",fmt='%.18e')
+                np.savetxt(f, final_data, delimiter=";", fmt="%.17g", )
     except Exception as e:
         print(f"The fuck?: {e}")
 
