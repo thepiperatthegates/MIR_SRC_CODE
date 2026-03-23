@@ -616,7 +616,8 @@ class VoltageNormaliseCoefficient:
             cls._zero_offset_voltage_2 = float(data["voltage_zero_offset_2_V"])
             # print("amp_voltage_zero_offset_2_v", cls._zero_offset_voltage_2 )
         
-        
+        print("From files amp 1: ", cls._amp_voltage_1)
+        print("From _zero_offset_voltage_1: ", cls._zero_offset_voltage_1)
         cls._initialized = True
         
         

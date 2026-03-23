@@ -505,8 +505,11 @@ class Ui_Title(object):
         self.actionHardware_reset.setObjectName("actionHardware_reset")
         self.actionSoftware_restart = QtWidgets.QAction(Title)
         self.actionSoftware_restart.setObjectName("actionSoftware_restart")
+        self.actionFlash_STM32 = QtWidgets.QAction(Title)
+        self.actionFlash_STM32.setObjectName("actionFlash_STM32")
         self.menuRestart.addAction(self.actionHardware_reset)
         self.menuRestart.addAction(self.actionSoftware_restart)
+        self.flash_menu.addAction(self.actionFlash_STM32)
         self.menubar.addAction(self.menuRestart.menuAction())
         self.menubar.addAction(self.flash_menu.menuAction())
 
@@ -550,4 +553,5 @@ class Ui_Title(object):
         self.flash_menu.setTitle(_translate("Title", "FLASH"))
         self.actionHardware_reset.setText(_translate("Title", "Hardware reset"))
         self.actionSoftware_restart.setText(_translate("Title", "Software restart"))
+        self.actionFlash_STM32.setText(_translate("Title", "Flash STM32"))
 from pyqtgraph import GraphicsLayoutWidget

@@ -925,6 +925,7 @@ background-color: rgb(255, 170, 127);</string>
     <property name="title">
      <string>FLASH</string>
     </property>
+    <addaction name="actionFlash_STM32"/>
    </widget>
    <addaction name="menuRestart"/>
    <addaction name="flash_menu"/>
@@ -938,6 +939,11 @@ background-color: rgb(255, 170, 127);</string>
   <action name="actionSoftware_restart">
    <property name="text">
     <string>Software restart</string>
+   </property>
+  </action>
+  <action name="actionFlash_STM32">
+   <property name="text">
+    <string>Flash STM32</string>
    </property>
   </action>
  </widget>
