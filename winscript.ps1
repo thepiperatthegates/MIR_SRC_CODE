@@ -57,7 +57,7 @@ if (-not $PythonExe) {
         & $MambaExe create -y -p "$EnvDir" -c conda-forge python=3.12
     }
 
-    # Re-scan for the executable
+    # Re-scan for the executable.
     $PythonExe = Get-ChildItem -Path $EnvDir -Filter "python.exe" -Recurse | Select-Object -First 1 -ExpandProperty FullName
 }
 
@@ -114,7 +114,13 @@ if ($LocalHash -ne $RemoteHash) {
 if ($PythonExe) {
     Write-Host "[INFO] Environment ready. Python: $PythonExe" -ForegroundColor Green
     Write-Host "[INFO] Running MiR-GUI... DO NOT CLOSE THIS WINDOW!" -ForegroundColor Yellow
-    & $PythonExe -u $MainScriptPath
+	 
+    $confirmation = & $PythonExe -u $MainScriptPath
+
+	if ($LASTEXITCODE -ne 0 -or -!$?){
+	Write-Host "[INFO] Running global Python because of ADMIN rights" -ForegroundColor Yellow
+		Python	-u $MainScriptPath
+	}
 } else {
     Write-Host "[ERROR] Python environment could not be initialized." -ForegroundColor Red
 }
