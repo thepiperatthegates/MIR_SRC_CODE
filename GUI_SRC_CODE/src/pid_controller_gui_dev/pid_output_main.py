@@ -178,11 +178,11 @@ class DataUpdate(QThread):
                 self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
 
 
-                # calibration for  hall sensors
-                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
-                                                                             self.v1_slice, self.i1_slice / 1000)
-                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
-                                                                             self.v2_slice, self.i2_slice / 1000)
+                # # calibration for  hall sensors
+                # self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
+                #                                                              self.v1_slice, self.i1_slice / 1000)
+                # self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
+                #                                                              self.v2_slice, self.i2_slice / 1000)
                 
                 # Calibrate process starts
                 # measurement fR process starts
@@ -378,6 +378,7 @@ class PIDOutput(QMainWindow, Ui_Title):
         self._plot_ref1 = self._plot_ref2 = self.before1 = self.before2 = None
         self.curve_v1 = self.curve_v2 = self.curve_i1 = self.curve_i2 = None
         self.curve_sigma_b = self.curve_sigma_m = None
+        self.curve_phase_difference = None
         
         self.time_axis = [i * 0.0001 for i in range(1000)]
         self.flag_fR = self.flag_K = False
@@ -583,7 +584,7 @@ class PIDOutput(QMainWindow, Ui_Title):
         global data_mutex
         data_mutex.lock()
         
-        self.curve_phase_difference.setData(self.time_axis, self.worker_getter_graph.phase_difference_val)
+        self.curve_phase_diff.setData(self.time_axis, self.worker_getter_graph.phase_difference_val)
         
         data_mutex.unlock()
 

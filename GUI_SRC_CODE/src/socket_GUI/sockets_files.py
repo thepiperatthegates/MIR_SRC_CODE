@@ -299,10 +299,11 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv, q_to_norm):
     ID_CURRENT_2  = 0xA4
     ID_PHASE_DIFF = 0xA5
 
-    ID_HALL_NORM =0xA6
+    ID_HALL_NORM =  0xA6
 
     # ----------------- ID bit for specific variables (f -> float / H -> uint16_t) --------------------
     ID_MAP = {
+        # (int -> Byte, str -> Type)
         ID_HALL_1:     (4, '<f'),
         ID_HALL_2:     (4, '<f'),
         ID_CURRENT_1:  (2, '<H'),
@@ -310,16 +311,21 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv, q_to_norm):
         ID_PHASE_DIFF: (4, '<f'),
         
         # ID for normalising data (32 bytes)
-        ID_HALL_NORM: (16, '<ffff'),
+        ID_HALL_NORM: (8, '<HHHH'),
     }
+    leftover = b''
+   
 
     while True:
-        recv_buffer = q_to_process.get()
-        if not recv_buffer:
+        recv_chunk = q_to_process.get()
+        if not recv_chunk:
             continue
         
+        # 1. Stitch leftovers from the previous chunk
+        recv_buffer = leftover + recv_chunk
+        leftover = b'' 
         
-        #----- RESERT the tuples values -------
+        # Reset these for EVERY new buffer chunk
         sensors_values = []
         norm_values = []
         
@@ -329,53 +335,47 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv, q_to_norm):
 
         while i < buf_len:
             identifier = recv_buffer[i]
+            
+            # print(f"Checking Byte at index {i}: 0x{identifier:02X}")
 
             if identifier in ID_MAP:
                 payload_size, fmt = ID_MAP[identifier]
                 end = i + 1 + payload_size
 
+                # 2. Check if the full payload exists in the current buffer
                 if end <= buf_len:
                     payload = recv_buffer[i + 1 : end]
-                    value = struct.unpack(fmt, payload)[0]
-
+                
+                    
                     if identifier == ID_HALL_NORM:
-                        #------ Send the tuple (max1, min1, max2, min2) to UI queue -------------
-                        norm_values.append(value)
-                        
-                        #---- RESET the sensors_values so it does not put anything to the necessary queue ----
-                        sensors_values = []
-                        
-
+                        # --- ATOMIC ONE-SHOT HANDLING ---
+                        # Unpack all 4 floats at once
+                        norm_data = struct.unpack(fmt, payload) 
+                        # Send directly to the normalization queue immediately
+                        q_to_norm.put(norm_data)
+                        print(f"Normalization Data Received: {norm_data}")
+                    
                     else:
-                        #------ Standard sensor stream -----------------------------------
-                        sensors_values.append(value)  # only numeric value, ID removed
-                        
-                        #---- RESET the norm_values so it does not put anything to the necessary queue ----
-                        norm_values = []
-                        
+                        # --- CONTINUOUS SENSOR STREAM ---
+                        # Unpack single sensor value
+                        value = struct.unpack(fmt, payload)[0]
+                        sensors_values.append(value)
 
-                    #---------  skip ID + payload --------------
-                    i = end
-
+                    i = end # Move to the next potential ID
                 else:
-                    #-----------  incomplete packet at buffer end ----------------
-                    print(f"Error in data syncing, don't know how to handle {identifier}")
-                    break
+                    # 3. FRAGMENTATION: ID found, but payload is missing bytes
+                    # Save the remaining bytes for the next 'get' from the queue
+                    leftover = recv_buffer[i:]
+                    break 
             else:
-                #---------------- byte does not match any ID → resync ----------------
-                print(f"Unknown ID encountered: 0x{identifier:02X} at index {i}. Resyncing...")
+                # 4. RESYNC: Not a valid ID, skip one byte and look again
                 i += 1
-
-        # ---------------- send only numeric values to queues ----------------
-        if sensors_values and not norm_values:
+                
+        # Handle the sensor stream (only if we actually collected values)
+        if sensors_values:
+            print(sensors_values)
             q_to_graph.put(sensors_values)
             q_to_csv.put(sensors_values)
-            
-            
-        # ---------------- send only normalising values to queues ----------------    
-        if norm_values and not sensors_values:
-            q_to_norm.put(norm_values)
-            
 
 # ---------------------- write to dummy csv  ----------------------
 def file_name_change_set(prefix, extension=".csv"):
