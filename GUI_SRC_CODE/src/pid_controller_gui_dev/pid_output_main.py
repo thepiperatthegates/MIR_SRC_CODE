@@ -161,6 +161,9 @@ class DataUpdate(QThread):
                 self.i1_slice = reshaped_data[:, 2]     #i1 [digital]
                 self.i2_slice = reshaped_data[:, 3]     # i2 [digital]
                 self.phase_diff_slice = reshaped_data[:, 4]         # phase diff [rad]
+                
+                print(self.v1_slice)
+
 
                 data_mutex.lock()
 
