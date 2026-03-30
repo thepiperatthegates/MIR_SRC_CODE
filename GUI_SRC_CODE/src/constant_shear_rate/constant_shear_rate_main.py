@@ -1386,7 +1386,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             dir_dummy_csv = os.path.join(self.project_root, "files", "dummy.csv")
 
             data_read = np.loadtxt(dir_dummy_csv, delimiter=';')
-            np.savetxt(filename_saving, data_read, delimiter=';')
+            np.savetxt(filename_saving, data_read, delimiter=';', fmt='%.17g')
 
         
     def popout_window(self, arg, calculate_final_fR = 0.0, k_b_1 = 0.0, k_b_2 = 0.0):
