@@ -161,8 +161,6 @@ class DataUpdate(QThread):
                 self.i1_slice = reshaped_data[:, 2]     #i1 [digital]
                 self.i2_slice = reshaped_data[:, 3]     # i2 [digital]
                 self.phase_diff_slice = reshaped_data[:, 4]         # phase diff [rad]
-                
-                print(self.v1_slice)
 
 
                 data_mutex.lock()
@@ -444,10 +442,14 @@ class PIDOutput(QMainWindow, Ui_Title):
         """Link UI interactions to their respective methods."""
         # ----------------------- Buttons ----------    print(len(data))-------------
         self.button_send.clicked.connect(self.send_parameter_event)
-        self.button_send.clicked.connect(lambda: self.popout_window(1))
         self.button_auto_range.clicked.connect(self.auto_range_event)
         self.save_button.clicked.connect(self.save_button_event)
         self.button_rotate.clicked.connect(self.rotate_magnet_event)
+        # self.button_start.clicked.connect(sef.)
+        
+        
+        for popout in [self.button_send, self.button_rotate]:
+            popout.clicked.connect(lambda: self.popout_window(1))
 
         # ----------------------- Actions -----------------------
         self.actionHardware_reset.triggered.connect(self.set_hardware_reset_event)
@@ -598,7 +600,6 @@ class PIDOutput(QMainWindow, Ui_Title):
         """
         try:
             # --------------------- Parse and Validate Inputs ---------------------
-            # Using float() or int() conversion here prevents sending garbage data to the MCU
             shear_rate = float(self.textbox_shear_rate.text() or 0)
             delta_phi = float(self.textbox_phase_difference.text() or 0)
             torque_ref = float(self.textbox_input_torque.text() or 0)
@@ -610,8 +611,8 @@ class PIDOutput(QMainWindow, Ui_Title):
             filter_code = 0 if self.filter_checkbox.isChecked() else 2
 
             # --------------------- Update the Data Worker ---------------------
-            self.worker_data_block.data_1 = torque_ref  #
-            self.worker_data_block.data_2 = shear_rate
+            self.worker_data_block.data_1 = shear_rate
+            self.worker_data_block.data_2 = torque_ref
             self.worker_data_block.data_7 = direction_code
             self.worker_data_block.data_8 = filter_code
             self.worker_data_block.data_10 = 1  # Command/Mode selector (PID CONTROLLER ON)
@@ -621,7 +622,7 @@ class PIDOutput(QMainWindow, Ui_Title):
             # Setting the flag triggers the actual transmission thread
             self.worker_flag_send.flag_tx = True
 
-            # 5. UI Feedback
+            # UI Feedback
             self._update_transmission_ui(success=True)
 
         except ValueError:
@@ -656,7 +657,7 @@ class PIDOutput(QMainWindow, Ui_Title):
 
         except ValueError:
             # --------------------- If the user entered invalid text in the textboxes ---------------------
-            self._update_transmission_ui(False, "Input Error: Check Stress value!")
+            self._update_transmission_ui(False, "Input Error: Check input values!")
 
 
     def _update_transmission_ui(self, success, message="Data sent!"):
@@ -718,7 +719,7 @@ class PIDOutput(QMainWindow, Ui_Title):
     def popout_window(self, arg, calculate_final_fR = 0.0, k_b_1 = 0.0, k_b_2 = 0.0):
 
         msg = QMessageBox()
-
+        
         text = packet_transmission.set_popout_text(arg, calculate_final_fR, k_b_1, k_b_2)
         msg.setText(text)
 
@@ -751,15 +752,44 @@ class TabWindowPID(QMainWindow):
     def closeEvent(self, event):
         #stop all the background processes
 
+        print("Initiating Shutdown...")
+
+        # 1. SEND SIGNAL: Tell the process to stop
+        # Do NOT call q.close() here yet!
+        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, 
+                sockets_files.q_to_csv, sockets_files.q_to_norm):
+            try:
+                # Clear the queue if it's full so the 'None' can get in
+                while not q.empty():
+                    q.get_nowait()
+                q.put(None)
+            except:
+                pass
+
+        # 2. WAIT: Give the background process time to see the 'None' and exit
+        p1 = getattr(sockets_files, 'p1', None)
+        if p1 is not None and p1.is_alive():
+            # join() blocks the GUI for up to 2 seconds waiting for p1 to finish
+            p1.join(timeout=4.0) 
             
-        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, sockets_files.q_to_csv, sockets_files.q_to_norm):
-            q.close()
-            q.join_thread()
+            if p1.is_alive():
+                print("Process stubborn, terminating...")
+                p1.terminate()
+                p1.join()
 
-
-        #terminate the other subprocess
-        sockets_files.p1.terminate()
-        sockets_files.p1.join()
+        # 3. CLEANUP: Now that the process is DEAD, it's safe to close queues
+        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, 
+                sockets_files.q_to_csv, sockets_files.q_to_norm):
+            try:
+                # Setting cancel_join_thread prevents the GUI from hanging 
+                # if there's still unread data in the buffer
+                q.cancel_join_thread() 
+                q.close()
+                q.terminate()
+                
+                
+            except:
+                pass
 
         #stop all the threads
         

@@ -45,16 +45,16 @@
      </widget>
     </item>
     <item row="1" column="0">
-     <widget class="QLineEdit" name="input_Ki"/>
+     <widget class="QLineEdit" name="input_Kp"/>
     </item>
     <item row="1" column="1">
-     <widget class="QLineEdit" name="input_Kp"/>
+     <widget class="QLineEdit" name="input_Ki"/>
     </item>
     <item row="1" column="2">
      <widget class="QLineEdit" name="input_Kd"/>
     </item>
     <item row="2" column="1">
-     <widget class="QPushButton" name="button_send">
+     <widget class="QPushButton" name="button_coeff_send">
       <property name="text">
        <string>Change coeff</string>
       </property>

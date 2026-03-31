@@ -43,30 +43,46 @@ flag_test = None
 
 p1 = None
 
+worker_data_flag = packet_transmission.RunningTimeFlag()
+
 
 restart_event = multiprocessing.Event()
-#----------------------------------------------------------------------
 
-# ---------------------- FOR DATA RECV PURPOSES --------------------------------------------
-DMA_ADC_BUFF_SIZE = 2
+# -------------- Data transmission CONSTANTS -------------------------
 
-NUM_ID_SEG = 5
+# --- Data Type Sizes (in Byte) ---
+UINT8_SIZE   = 1
+UINT16_SIZE  = 2
+FLOAT32_SIZE = 4
 
-UINT16_BYTES = 2
-FLOAT32_BYTES = 4
+# --- Frame Configuration ---
+# Frame structure: [Header (2 bytes)] + [Payload]
+DMA_BUFFER_SIZE      = 2
+HEADER_SIZE          = 2 * UINT8_SIZE
+PAYLOAD_DATA_SIZE    = (2 * UINT16_SIZE) + (3 * FLOAT32_SIZE)
+BYTES_PER_SAMPLE     = HEADER_SIZE + PAYLOAD_DATA_SIZE
+TOTAL_ONE_CYCLE_BYTES    = BYTES_PER_SAMPLE * DMA_BUFFER_SIZE
 
-DATA_BYTES_NUM_PER_SAMPLE = (2 * UINT16_BYTES) + (3* FLOAT32_BYTES)
 
-BYTES_PER_SAMPLE = DATA_BYTES_NUM_PER_SAMPLE + NUM_ID_SEG
+# --- Timing & Frequency ---
+# Calculations for 10kHz base frequency (0.0001s)
+SAMPLE_PERIOD        = 0.0001 * DMA_BUFFER_SIZE
+TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC   = int(0.1 / SAMPLE_PERIOD)
 
-TOT_FOR_ONE_CYCLE  = (BYTES_PER_SAMPLE * DMA_ADC_BUFF_SIZE)
+# --- Protocol Headers & Formatting ---
+# Format: < (Little Endian), f (float), H (unsigned short)
+FRAME_SIZE  = BYTES_PER_SAMPLE      # 2 header + 4+4+2+2+4 payload
+NORM_SIZE   =  HEADER_SIZE + (4 * (UINT16_SIZE))      # 2 header + 2+2+2+2 payload
+FRAME_FMT   = '<ffHHf'  # H1, H2, C1, C2, PD
+NORM_FMT    = '<HHHH'   # max_h1, min_h1, max_h2, min_h2
 
-
-SAMPLE_PERIOD_TOTAL = 0.0001 * DMA_ADC_BUFF_SIZE
-TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = int(0.1 / SAMPLE_PERIOD_TOTAL)
+SENSOR_H1 = 0xAA
+SENSOR_H2 = 0xAB
+NORM_H1   = 0xBA
+NORM_H2   = 0xBB
 
 # ---------------------- for total count receiving from socket (depends if we want 0.5s, 1s or 2s) ----------------------
-TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND =   int(0.1 / SAMPLE_PERIOD_TOTAL)
+TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND =   int(0.1 / SAMPLE_PERIOD)
 
 
 
@@ -159,10 +175,8 @@ def thread_start():
 
 
 def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
-    global flag_for_process, p1, TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC, flag_for_downsampling
-    global TOT_FOR_ONE_CYCLE
-
-    worker_data_flag = packet_transmission.RunningTimeFlag()
+    
+    #----- pasing worker objects ------------
     worker_process_flag = packet_transmission.ProcessUnpackingFlag()
     worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
 
@@ -177,13 +191,13 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
                 while count < TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC:
                     count += 1
                     chunk = b''
-                    while len(chunk) < TOT_FOR_ONE_CYCLE:
-                        chunk += ser1.read(TOT_FOR_ONE_CYCLE - len(chunk))
+                    while len(chunk) < TOTAL_ONE_CYCLE_BYTES:
+                        chunk += ser1.read(TOTAL_ONE_CYCLE_BYTES - len(chunk))
                     received_data += chunk
 
                 count = 0
 
-                # ── Start process for the first time ──
+                # -----  Start live graph process for the first time --------
                 if not worker_process_flag._flag_rx_process and received_data:
                     p1 = multiprocessing.Process(target=start_process_live_graph,
                                                   args=(q_to_process, q_to_graph, q_to_csv, q_to_norm, restart_event))
@@ -192,45 +206,61 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
 
                 q_to_process.put(received_data)
 
-                # ── Non-blocking get with timeout to avoid freeze ──
+                # ---- Non-blocking get with timeout to avoid freeze ----
                 sensor_data_recv = None
                 try:
-                    sensor_data_recv = q_to_csv.get(timeout=5.0)  # ← won't block forever
+                    # Non blocking queue get (since it might takes a while for firmware to react)
+                    sensor_data_recv = q_to_csv.get(timeout=1.0)  
                 except Exception:
-                    pass  # timeout hit — process likely exited for norm restart
+                    pass  # timeout hit, restart the process
 
-                # ── Restart process if norm triggered exit ──
+                # ------ Restart process if norm triggered exit --------- 
                 if not p1.is_alive() and worker_process_flag._flag_rx_process:
                     print("[RESTART] Restarting start_process_live_graph...")
                     restart_event.clear()
-                        # ── Drain all queues before restarting ──
+                    #-----  Drain all queues before restarting so no data conflict -----
                     drain_queue(q_to_process)
                     drain_queue(q_to_graph)
                     drain_queue(q_to_csv)
                     drain_queue(q_to_norm)
                     
-    
                     p1 = multiprocessing.Process(target=start_process_live_graph,
                                                   args=(q_to_process, q_to_graph, q_to_csv, q_to_norm, restart_event))
                     p1.start()
 
+                
+                # ---- Saving data function -------
                 if worker_data_flag.flag_csv_save:
                     if sensor_data_recv:
                         save_sensors_data_to_csv(sensor_data_recv, worker_kb_property, worker_specific_downsampling,
                                                   worker_normalise_properties)
                         sensor_data_recv = None
-                    print("Data written!")
 
                 if worker_data_flag.flag_norm_save:
                     norm_values_recv = q_to_norm.get()
-                    save_norm_data_to_csv(norm_values_recv)
+                    print("Here?")
+                    if norm_values_recv:
+                        save_norm_data_to_csv(norm_values_recv)
+                        
+                        # ---- Reset the state -----
+                        worker_data_flag.flag_norm_save = False
+                        norm_values_recv = None
+                    
 
             except Exception as e:
                 print(f"Here 1: {e}")
+                break
         except Exception as e:
             print(f"Here 2: {e}")
             time.sleep(0.01)
-
+            
+            
+    # --- Grace Exit to delete the children ---
+    print("Cleaning up recv_thread...")
+    if p1 and p1.is_alive():
+        p1.terminate()
+        p1.join()
+    ser1.close() 
 
 def send_thread(serial_data):
     worker_combined_send = packet_transmission.TxData()
@@ -239,6 +269,7 @@ def send_thread(serial_data):
         serial_data.write(combined_send)
     except Exception as e:
         print("Cannot send data!", e)
+        
         
 def drain_queue(q):
     """Remove all items from a queue without blocking."""
@@ -249,45 +280,9 @@ def drain_queue(q):
             break
 
 
-def find_frame_start(buf):
-    """
-    Reliably find frame start by matching the pattern:
-    [ID_HALL_1][4 bytes][ID_HALL_2]
-    A single ID byte match is not enough — payload bytes can collide.
-    """
-    ID_HALL_1 = 0xA1
-    ID_HALL_2 = 0xA2
-    HALL1_PAYLOAD = 4
-
-    i = 0
-    while i < len(buf) - (1 + HALL1_PAYLOAD + 1):
-        if buf[i] == ID_HALL_1 and buf[i + 1 + HALL1_PAYLOAD] == ID_HALL_2:
-            return i  # confident frame start
-        i += 1
-    return -1  # not found
-
-
 def start_process_live_graph(q_to_process, q_to_graph, q_to_csv, q_to_norm, restart_event):
-    ID_HALL_1     = 0xA1
-    ID_HALL_2     = 0xA2
-    ID_CURRENT_1  = 0xB3
-    ID_CURRENT_2  = 0xB4
-    ID_PHASE_DIFF = 0xC5
-    ID_HALL_NORM  = 0xD6
-
-    ID_MAP = {
-        ID_HALL_1:     (4, '<f'),
-        ID_HALL_2:     (4, '<f'),
-        ID_CURRENT_1:  (2, '<H'),
-        ID_CURRENT_2:  (2, '<H'),
-        ID_PHASE_DIFF: (4, '<f'),
-        ID_HALL_NORM:  (8, '<HHHH'),
-    }
-    EXPECTED_SEQUENCE = [ID_HALL_1, ID_HALL_2, ID_CURRENT_1, ID_CURRENT_2, ID_PHASE_DIFF]
-
-    leftover  = b''
-    seq_index = 0
-    synced    = False  # ← must find a confirmed frame start before trusting any data
+    
+    leftover = b''
 
     while True:
         recv_chunk = q_to_process.get()
@@ -295,82 +290,53 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv, q_to_norm, rest
             continue
 
         recv_buffer = leftover + recv_chunk
-        leftover    = b''
-        sensors_values = []
-        batch_frames   = []
+        leftover     = b''
+        batch_frames = []
 
-        # ── If not synced, search for a confirmed frame start ──
-        if not synced:
-            frame_start = find_frame_start(recv_buffer)
-            if frame_start == -1:
-                print("[SYNC] No frame start found, waiting for more data...")
-                leftover = recv_buffer  # keep entire buffer, try again next chunk
-                continue
-            print(f"[SYNC] Frame start found at byte {frame_start}")
-            recv_buffer = recv_buffer[frame_start:]  # discard everything before
-            seq_index   = 0
-            synced      = True
-
-        i       = 0
+        index      = 0
         buf_len = len(recv_buffer)
 
-        while i < buf_len:
-            identifier = recv_buffer[i]
+        while index < buf_len - 1:
 
-            # ── NORM: flush, exit, let recv_thread restart ──
-            if identifier == ID_HALL_NORM:
-                payload_size, fmt = ID_MAP[ID_HALL_NORM]
-                end = i + 1 + payload_size
+            # ----- NORM frame ------
+            if recv_buffer[index] == NORM_H1 and recv_buffer[index+1] == NORM_H2:
+                end = index + NORM_SIZE
                 if end > buf_len:
-                    leftover = recv_buffer[i:]
+                    leftover = recv_buffer[index]
                     break
-                norm_data = struct.unpack(fmt, recv_buffer[i + 1 : end])
+                norm_data = struct.unpack(NORM_FMT, recv_buffer[index+2 : end])
                 q_to_norm.put(norm_data)
+                
                 print(f"[NORM] Received: {norm_data}")
+                
+                save_norm_data_to_csv(norm_data)
+                
                 if batch_frames:
                     q_to_graph.put(batch_frames)
                     q_to_csv.put(batch_frames)
                 restart_event.set()
                 return
 
-            # ── Sequence check ──
-            expected_id = EXPECTED_SEQUENCE[seq_index]
-            if identifier != expected_id:
-                print(f"[FRAME ERROR] Expected 0x{expected_id:02X}, got 0x{identifier:02X} — resyncing")
-                sensors_values = []
-                seq_index      = 0
-                synced         = False  # ← lost sync, must re-confirm frame start
-
-                # Search for next confirmed frame start from here
-                frame_start = find_frame_start(recv_buffer[i:])
-                if frame_start == -1:
-                    leftover = recv_buffer[i:]  # keep rest, try next chunk
+            # ----- Sensor frame -----
+            if recv_buffer[index] == SENSOR_H1 and recv_buffer[index+1] == SENSOR_H2:
+                end = index + FRAME_SIZE
+                if end > buf_len:
+                    leftover = recv_buffer[index:]
                     break
-                i       = i + frame_start
-                synced  = True
+                h1, h2, c1, c2, pd = struct.unpack(FRAME_FMT, recv_buffer[index+2 : end])
+                batch_frames.extend([h1, h2, c1, c2, pd])
+                index = end
+                
                 continue
 
-            # ── Valid in-sequence byte ──
-            payload_size, fmt = ID_MAP[identifier]
-            end = i + 1 + payload_size
-            if end > buf_len:
-                leftover = recv_buffer[i:]
-                break
-
-            value = struct.unpack(fmt, recv_buffer[i + 1 : end])[0]
-            sensors_values.append(value)
-            seq_index += 1
-            i = end
-
-            # ── Complete frame ──
-            if seq_index == len(EXPECTED_SEQUENCE):
-                batch_frames.extend(sensors_values)
-                sensors_values = []
-                seq_index      = 0
+            # ── No header match: skip one byte ──
+            index += 1
 
         if batch_frames:
             q_to_graph.put(batch_frames)
             q_to_csv.put(batch_frames)
+            
+            
 # ---------------------- write to dummy csv  ----------------------
 def file_name_change_set(prefix, extension=".csv"):
     
@@ -559,10 +525,10 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
     
     try:
         if not os.path.exists(file_name_full):
-            np.savetxt(file_name_full, final_data, header="",  delimiter=";",  comments="", fmt='%.18e')
+            np.savetxt(file_name_full, final_data, header="",  delimiter=";",  comments="", fmt='%.17g')
         else:
             with open(file_name_full, "a") as f:
-                np.savetxt(f, final_data, delimiter=";",fmt='%.18e')
+                np.savetxt(f, final_data, delimiter=";",   fmt='%.17g')
     except Exception as e:
         print(f"The fuck?: {e}")
 
@@ -626,7 +592,7 @@ def save_norm_data_to_csv(packed_norm_data, filename="normalise_voltage_constant
     file_name_full = os.path.join(project_root, "files", filename)
     
     #-------------- save normalisation variables in csv ----------------
-    np.savetxt(file_name_full, data, delimiter=";",fmt='%.18e', header=headers_name, comments="")
+    np.savetxt(file_name_full, data, delimiter=";",fmt='%i', header=headers_name, comments="")
     
     print("Norm vars stored in csv")
     

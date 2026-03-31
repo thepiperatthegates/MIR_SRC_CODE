@@ -850,7 +850,8 @@ def set_popout_text(arg,calculate_final_fR = 0.0, k_b_1 = 0.0, k_b_2 = 0.0):
         text = "Invalid sample frequency! Please do not use any value starting with 3, 7 or 9!"
     elif arg == 6:
         text = "Normalise parameters completed!"
-        
+    elif arg == 7:
+        text = "Parameters sent to microcontroller!"
     return text
 
 class DownsampleEvent():

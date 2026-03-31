@@ -8,7 +8,6 @@ from PyQt5.QtCore import QThread, pyqtSignal, QMutex, QRegularExpression, QObjec
 from PyQt5.QtWidgets import *
 from PyQt5.QtGui import QRegularExpressionValidator, QDoubleValidator
 
-
 # #fix cache problem with MATHPLOTLIB
 os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
 import multiprocessing
@@ -27,34 +26,54 @@ class SendPIDCoeff(QMainWindow, Ui_Form):
         super().__init__()
         self.setupUi(self)
         
-                #for tx data
+        self._init_worker()
+        self._connect_signals()
+    
+    def _init_worker(self):
+        """Initialize all setter/getter flags from backend."""
+        #for tx data
         self.worker_data_block = backend.TxData()
         #for transmitting thread
         self.worker_flag_send = backend.TxFlag()
-    
-    
+        
+    def _connect_signals(self):
+        self.button_coeff_send.clicked.connect(self.send_data_event)
+        self.button_coeff_send.clicked.connect(lambda: self.popout_window(7))
+        
     def send_data_event(self):
         
+        Kp = float(self.input_Kp.text())
+        Ki = float(self.input_Ki.text())
+        Kd = float(self.input_Kd.text())
         
-        ############################# THIS IS ALL A PLACEHOLDER ######################################
-        self.worker_data_block.data_1 = 65534
+        print('Kp:', Kp)
+        print('Ki:', Ki)
+        print('Kd', Kd)
+        
+        
+        # --------------------- Update the Data Worker ---------------------
+        self.worker_data_block.data_1 = Kp
     
-        self.worker_data_block.data_2  = 10
-
-        self.worker_data_block.data_8 = 0 
+        self.worker_data_block.data_2  = Ki
+        self.worker_data_block.data_3 = Kd
+        self.worker_data_block.data_8 = 3
         
         #for data 10
-        self.worker_data_block.data_10 = 1 
-        
-        
-        ######################################################################################
+        self.worker_data_block.data_10 = 3 
 
+    # ------- Popout window
+    def popout_window(self, arg, calculate_final_fR = 0.0, k_b_1 = 0.0, k_b_2 = 0.0):
+
+        msg = QMessageBox()
         
-        ##send all data to microcontroller
-        #activate flag
-        self.worker_flag_send.flag_tx = True
+        text = backend.set_popout_text(arg, calculate_final_fR, k_b_1, k_b_2)
+        msg.setText(text)
+
+        msg.setIcon(QMessageBox.Question)
+
+        msg.exec()
         
-        
+            
         
 
 

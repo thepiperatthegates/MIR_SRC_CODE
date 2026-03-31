@@ -465,7 +465,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.button_start.clicked.connect(self.start_data_event)
         self.button_stop.clicked.connect(self.stop_button_push_event)
         
-        #--------- Add popouts ---------
+        #--------- Popouts ---------
         for btn in [self.button_send, self.button_start, self.button_stop, self.button_cal_constant]:
             btn.clicked.connect(lambda: self.popout_window(1))
 
