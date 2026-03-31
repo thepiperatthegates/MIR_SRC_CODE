@@ -83,7 +83,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
         self.worker_get_offset = packet_transmission.TxData()
 
-        self.offset_1, self.offset_2 = self.worker_get_offset.data_offsets_creep
+        self.offset_1 = float(self.worker_get_offset.data_4)
+        self.offset_2 = float(self.worker_get_offset.data_6)
 
         # placeholder for the offsets input
         self.textbox_offset1.setText(str(self.offset_1))
@@ -301,7 +302,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.voltage_1 = self.data[:, 1]
         self.voltage_2 = self.data[:, 2]
         
-
+        print("self.offset_1, self.offset_2",  self.offset_1)
+        print(self.offset_2)
         self.data[:, 3] -= self.offset_1
         self.data[:, 4] -= self.offset_2
 
@@ -564,14 +566,16 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         # take from the main tab
         if self.take_Button.isChecked():
-            self.offset_1, self.offset_2 = self.worker_get_offset.data_offsets_creep
+            
+            self.offset_1 = float(self.worker_get_offset.data_4)
+            self.offset_2 = float(self.worker_get_offset.data_6)
             self.textbox_offset1.setDisabled(True)
             self.textbox_offset2.setDisabled(True)
         else:
             # take from the textbox fields
             try:
-                self.offset_1 = int(self.textbox_offset1.text())
-                self.offset_2 = int(self.textbox_offset2.text())
+                self.offset_1 = float(self.textbox_offset1.text())
+                self.offset_2 = float(self.textbox_offset2.text())
                 self.textbox_offset1.setDisabled(False)
                 self.textbox_offset2.setDisabled(False)
             except ValueError:
