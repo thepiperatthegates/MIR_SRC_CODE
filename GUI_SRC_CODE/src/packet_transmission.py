@@ -191,13 +191,9 @@ class TxData():
         
         
     @property 
-    def data_offsets_creep(self):
-        return self.__class__._data_offset_creep_1, self.__class__._data_offset_creep_2
-    
+    def data_offsets(self):
+        return self.__class__._data_4, self.__class__._data_6
 
-    @data_offsets_creep.setter
-    def data_offsets_creep(self, val):
-        self.__class__._data_offset_creep_1, self.__class__._data_offset_creep_2 =  val
     
         
     
