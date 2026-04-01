@@ -104,6 +104,11 @@
            </item>
            <item>
             <property name="text">
+             <string>Phase difference diagram</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
              <string>Angular velocity diagram</string>
             </property>
            </item>
@@ -259,17 +264,17 @@
           </column>
           <column>
            <property name="text">
-            <string>Angle of permanent magnet Φ_B / rad</string>
+            <string>Angle of permanent magnet Φ_B / °</string>
            </property>
           </column>
           <column>
            <property name="text">
-            <string>Angle of permanent magnet  Φ_m / rad</string>
+            <string>Angle of permanent magnet  Φ_m / °</string>
            </property>
           </column>
           <column>
            <property name="text">
-            <string>Phase difference / rad</string>
+            <string>Phase difference /  °</string>
            </property>
           </column>
           <column>
@@ -311,7 +316,7 @@
      <x>0</x>
      <y>0</y>
      <width>1524</width>
-     <height>21</height>
+     <height>22</height>
     </rect>
    </property>
   </widget>
