@@ -795,16 +795,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         print("Input current for calibration:", input_current)
     
-        #from combobox direction
-        if self.comboBox_direction.currentText() == "Clockwise":
-            data_7 = 2
-        elif self.comboBox_direction.currentText() == "Anti-clockwise":
-            data_7 = 1
-            
-        data_8 = 3          #mode 3 to the board (for dc generator)
-        data_9= 0
-        data_10 = 1
-        
         ############################# send data to setter getter ############################################################################
         self.worker_data_block.data_1 = float(1.0) #seconds
         self.worker_data_block.data_2_for_MCU  = str(3) # Hz
@@ -814,10 +804,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #from combobox direction
         if self.comboBox_direction.currentText() == "Clockwise":
             self.worker_data_block.data_7 = 2
-            data_7 = self.worker_data_block.data_7
         elif self.comboBox_direction.currentText() == "Anti-clockwise":
             self.worker_data_block.data_7 = 1
-            data_7 = self.worker_data_block.data_7
             
 
         self.worker_data_block.data_8 = 3
@@ -1210,10 +1198,10 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #from combobox direction
         if self.comboBox_direction.currentText() == "Clockwise":
             self.worker_data_block.data_7 = 2
-            data_7 = self.worker_data_block.data_7
+            self.worker_data_block.data_7 = self.worker_data_block.data_7
         elif self.comboBox_direction.currentText() == "Anti-clockwise":
             self.worker_data_block.data_7 = 1
-            data_7 = self.worker_data_block.data_7
+            self.worker_data_block.data_7 = self.worker_data_block.data_7
             
         if self.filter_checkbox.isChecked():
             self.worker_data_block.data_8 = 0
