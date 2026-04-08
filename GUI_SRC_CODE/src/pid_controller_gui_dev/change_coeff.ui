@@ -62,6 +62,81 @@
     </item>
    </layout>
   </widget>
+  <widget class="QLabel" name="label_4">
+   <property name="geometry">
+    <rect>
+     <x>200</x>
+     <y>30</y>
+     <width>142</width>
+     <height>34</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Current Control</string>
+   </property>
+  </widget>
+  <widget class="QLabel" name="label_5">
+   <property name="geometry">
+    <rect>
+     <x>190</x>
+     <y>220</y>
+     <width>142</width>
+     <height>34</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>Torque </string>
+   </property>
+  </widget>
+  <widget class="QWidget" name="layoutWidget_2">
+   <property name="geometry">
+    <rect>
+     <x>30</x>
+     <y>260</y>
+     <width>441</width>
+     <height>91</height>
+    </rect>
+   </property>
+   <layout class="QGridLayout" name="gridLayout_2">
+    <item row="0" column="0">
+     <widget class="QLabel" name="label_6">
+      <property name="text">
+       <string>Kp</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="1">
+     <widget class="QLabel" name="label_7">
+      <property name="text">
+       <string>Ki</string>
+      </property>
+     </widget>
+    </item>
+    <item row="0" column="2">
+     <widget class="QLabel" name="label_8">
+      <property name="text">
+       <string>Kd</string>
+      </property>
+     </widget>
+    </item>
+    <item row="1" column="0">
+     <widget class="QLineEdit" name="input_Kp_2"/>
+    </item>
+    <item row="1" column="1">
+     <widget class="QLineEdit" name="input_Ki_2"/>
+    </item>
+    <item row="1" column="2">
+     <widget class="QLineEdit" name="input_Kd_2"/>
+    </item>
+    <item row="2" column="1">
+     <widget class="QPushButton" name="button_coeff_send_2">
+      <property name="text">
+       <string>Change coeff</string>
+      </property>
+     </widget>
+    </item>
+   </layout>
+  </widget>
  </widget>
  <resources/>
  <connections/>

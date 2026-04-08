@@ -41,21 +41,6 @@
     </item>
     <item>
      <property name="text">
-      <string>Creep experiment</string>
-     </property>
-    </item>
-    <item>
-     <property name="text">
-      <string>Steady shear stress</string>
-     </property>
-    </item>
-    <item>
-     <property name="text">
-      <string>Dynamic</string>
-     </property>
-    </item>
-    <item>
-     <property name="text">
       <string>Pid-Controller (dev)</string>
      </property>
     </item>
@@ -234,7 +219,7 @@
      <x>0</x>
      <y>0</y>
      <width>611</width>
-     <height>21</height>
+     <height>22</height>
     </rect>
    </property>
   </widget>

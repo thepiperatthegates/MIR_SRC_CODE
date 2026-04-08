@@ -1,99 +1,55 @@
 #3rd party lazy modules
-from math import sin, cos, pi
+
+from math import  pi
+import os
 import struct
 import numpy as np
-import os
-#---------------------- for button event flag ----------------------
+
+
+
+#for button event flag 
 flag_send = 0
 running_time_flag = 0
 
-#---------------------- for run time flag ----------------------
+#for run time flag
 run_time_gui = 0 
 
-#---------------------- for file name flag ----------------------
+#for file name flag
 file_name_flag = 0
 
-#---------------------- for clean up raw data flag ----------------------
+#for clean up raw data flag
 clean_up_flag = 0
 
 
-#---------------------- stop button flag ----------------------
+#stop button flag
 stop_button_flag = 1
 
-#---------------------- for start event----------------------
+#for start event
 start_flag_rx = 0
 start_flag_send = 0
 
 
-#---------------------- b ----------------------
+#b
 RESB_16 = 65535
 RESB_12 = 4095
 
-#---------------------- for impedance matching adc current ----------------------
-MAX_V_BEFORE_CURRENT = 5.0
-MIN_V_BEFORE_CURRENT = -5.0   #or y-intercept
-
-MAX_V_AFTER_CURRENT = 3.3
-MIN_V_AFTER_CURRENT = 0.0
-
-#---------------------- for impedance matching hall voltage ----------------------
-MAX_V_BEFORE_HALL = -2.5
-MIN_V_BEFORE_HALL = 2.5   #or y-intercept
-
-MAX_V_AFTER_HALL = 3.3
 MIN_V_AFTER_HALL = 0.0
-
-
-
-
 
 #default coefficients
 
 COIL_CONSTANT = 3.097e-3		# in T / A
 DIPOLE_MOMENT = 8.594e-3		# in A m^2
 
-CALIBRATION_FACTOR = 0
 
 
-
-#---------------------- flag for electronics type ----------------------
+#flag for electronics type
 ELECTRONICS_FLAG = 0
-
-
-########################################################### FIRST COIL ###########################################################
-#first sensor coefficient version 1
-CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 = -4.61934
-CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 = 0.99182
-CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 =  -4.24388e-6
-CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 =  -5.40711e-8
-
-#second sensor coefficient version 1
-CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 = 3.86547
-CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 = 0.98655
-CURRENT_COEFF_SECOND_SENSOR_C_VERSION1= 3.02401e-6
-CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 = -3.98871e-8
-######################################################################################################################
-
-
-
-
-########################################################### SECOND COIL ###########################################################
-# #second sensor coefficient version 2 (<403 mA)
-CURRENT_COEFF_FIRST_SENSOR_A_VERSION2 = 1.2231
-CURRENT_COEFF_FIRST_SENSOR_B_VERSION2 = 0.97724
-
-#second sensor coefficient version 2 (>403 mA)
-CURRENT_COEFF_SECOND_SENSOR_A_VERSION2 = -3.5721
-CURRENT_COEFF_SECOND_SENSOR_B_VERSION2  = 0.97735
-
-######################################################################################################################
-
-
 
 
 class TxData():
 
     _data_1 = _data_2 = _data_3 = _data_4 = _data_5 = _data_6 = _data_7 = _data_8 = _data_9 = _data_10 = _data_11 = _data_offset_creep_1 = _data_offset_creep_2 = 0
+    _time_acquisition = 0
     
     @property
     def send_data(self):
@@ -104,6 +60,14 @@ class TxData():
     def send_data(self, values):
         (self.__class__._data_1, self.__class__._data_2, self.__class__._data_3, self.__class__._data_4, 
         self.__class__._data_5, self.__class__._data_6, self.__class__._data_7, self.__class__._data_8, self.__class__._data_9, self.__class__._data_10) = values
+        
+    @property
+    def time_acquisition(self):
+        return self.__class__._time_acquisition
+    
+    @time_acquisition.setter
+    def time_acquisition(self, val):
+        self.__class__._time_acquisition = float(val)
         
     @property 
     def data_1(self):
@@ -121,7 +85,6 @@ class TxData():
     def data_2(self, val):
         C_SR = 37.099
         running_frequency = float(val)/(2*pi*C_SR)
-        
         # ---------------------- we will be taking the desired shear rate here directly ----------------------
         self.__class__._data_2 = val
         
@@ -141,6 +104,7 @@ class TxData():
     def data_current(self, val):
         self.__class__._data_3, self.__class__._data_4 , self.__class__._data_5 , self.__class__._data_6 = val 
         
+        
     @property 
     def data_3(self):
         return self.__class__._data_3
@@ -148,6 +112,7 @@ class TxData():
     @data_3.setter
     def data_3(self, val):
         self.__class__._data_3 = val
+        
         
     @property 
     def data_4(self):
@@ -164,6 +129,7 @@ class TxData():
     @data_5.setter
     def data_5(self, val):
         self.__class__._data_5 = val
+        
         
     @property 
     def data_6(self):
@@ -205,7 +171,6 @@ class TxData():
     def data_10(self, val):
         self.__class__._data_10 = val
         
-        
     @property
     def data_11(self):
         return self.__class__._data_11 
@@ -216,13 +181,9 @@ class TxData():
         
         
     @property 
-    def data_offsets_creep(self):
-        return self.__class__._data_offset_creep_1, self.__class__._data_offset_creep_2
-    
+    def data_offsets(self):
+        return self.__class__._data_4, self.__class__._data_6
 
-    @data_offsets_creep.setter
-    def data_offsets_creep(self, val):
-        self.__class__._data_offset_creep_1, self.__class__._data_offset_creep_2 =  val
     
         
     
@@ -232,9 +193,8 @@ class TxData():
         
         ## TODO: CHANGE BYTE_SEND TO FLOAT 
         print("Frequency of DAC", self.__class__._data_2)
-
         
-        byte_send1 = struct.pack('<f', float(self.__class__._data_1))               #for torque reference
+        byte_send1 = struct.pack('<f', float(self.__class__._data_1))       
         byte_send2 = struct.pack('<f', float(self.__class__._data_2))             #running frequency of MCU 
         byte_send3 = struct.pack('<f', float(self.__class__._data_3))              #amplitude1
         byte_send4 = struct.pack('<f', float(self.__class__._data_4))              #offset1
@@ -249,10 +209,9 @@ class TxData():
         combined_send = b''.join([byte_send1, byte_send2, byte_send3, 
                                 byte_send4, byte_send5, byte_send6, byte_send7, byte_send8, byte_send9, byte_send10, byte_send11])
         
+        combined_send = b''.join([byte_send1, byte_send2, byte_send3, byte_send4, byte_send5, byte_send6, byte_send7, byte_send8, byte_send9, byte_send10])
+        
         return combined_send
-
-    
-
 class TxFlag():
     _flag_tx = False
     
@@ -267,7 +226,7 @@ class TxFlag():
 class RemainingTimeForCreepTest():
     _total_time_for_file_save  = 0.0 
     _input_sampling_time = 0.0
-    _time_for_resetting_time = 0.0
+    _ime_for_resetting_time = 0.0
     
     
     _start_vector_time = 0.0
@@ -297,7 +256,7 @@ class RemainingTimeForCreepTest():
         self.__class__._time_for_resetting_time = self.__class__._total_time_for_file_save - self.__class__._input_sampling_time
         return self.__class__._time_for_resetting_time
     
-    @time_for_resetting_time.setter
+    @input_sampling_time.setter
     def time_for_resetting_time(self, val):
         self.__class__._time_for_resetting_time = val
     
@@ -324,29 +283,28 @@ class RemainingTimeForCreepTest():
     
 
 class ProcessUnpackingFlag():
-    
-    _flag_rx_process = False
+    _flag_process = False
     
     @property
-    def flag_rx_process(self):
-        return self.__class__._flag_rx_process
+    def flag_process(self):
+        return self.__class__._flag_process
     
-    @flag_rx_process.setter
-    def flag_rx_process(self, val):
-        self.__class__._flag_rx_process = bool(val)
+    @flag_process.setter
+    def flag_process(self, val):
+        self.__class__._flag_process = bool(val)
 
 class RunningTimeFlag:
-    _flag_csv_save = False
-    
+    _flag_running_time = False
     _flag_norm_save = False
     
-    @property
-    def flag_csv_save(self):
-        return self.__class__._flag_csv_save 
     
-    @flag_csv_save.setter
-    def flag_csv_save(self, value):
-        self.__class__._flag_csv_save = bool(value)
+    @property
+    def flag_running_time(self):
+        return self.__class__._flag_running_time 
+    
+    @flag_running_time.setter
+    def flag_running_time(self, value):
+        self.__class__._flag_running_time = bool(value)
         
     @property
     def flag_norm_save(self):
@@ -515,7 +473,15 @@ class fRCoefficients:
             raise ValueError(f"Invalid ELECTRONICS_FLAG = {ELECTRONICS_FLAG}")
 
         cls._initialized = True
-
+        
+    
+    # ----- Reload ---------
+    @classmethod
+    def reload(cls):
+        cls._initialized = False
+        cls._initialize()
+        
+        
     # ---------- Properties ----------
     @property
     def fr1(self):
@@ -558,32 +524,33 @@ class kbCoefficient:
     def _initialize(cls):
         """Run once based on the global ELECTRONICS_FLAG."""
         global ELECTRONICS_FLAG
-
+        
         if cls._initialized:
             return
-
+        
         project_root = os.path.dirname(os.path.abspath(__file__))
-
+        
         filepath = os.path.join(project_root, "files", "k_b_coefficient.csv")
-
+        
         user_input = ELECTRONICS_FLAG
-
-        # Load CSV data along with headers
+        
+        #Load CSV data along with headers
         data = np.genfromtxt(filepath, delimiter=";", names=True)
-
-        # Boolean comparison in the first column
-        index = data["ELECTRONICS_FLAG"] == user_input
+        
+        #Boolean comparison in the first column
+        index = data["ELECTRONICS_FLAG"] == user_input 
         if not np.any(index):
             raise ValueError(f"No matching ELECTRONICS_FLAG = {user_input} in CSV")
-
+        
         row = data[index][0]
-
-        # get the data
+        
+        #get the data
         cls._k_b_1 = float(row["k_b_1"])
         cls._k_b_2 = float(row["k_b_2"])
 
         cls._initialized = True
-
+        
+        
     # ---- reload ----
     @classmethod
     def reload(cls):
@@ -611,19 +578,21 @@ class kbCoefficient:
     def k_b_2(self, val):
         type(self)._initialize()
         type(self)._k_b_2 = float(val)
-
-
+        
+        
+        
 class VoltageNormaliseCoefficient:
     _initialized = False
-
+    
     _amp_voltage_1 = 0.0
     _zero_offset_voltage_1 = 0.0
     _amp_voltage_2 = 0.0
     _zero_offset_voltage_2 = 0.0
-
-    @classmethod
+    
+    
+    @classmethod 
     def _initialize(cls):
-
+        
         if cls._initialized:
             return
 
@@ -635,61 +604,72 @@ class VoltageNormaliseCoefficient:
             data = np.genfromtxt(filepath, delimiter=';', names=True)
 
             cls._amp_voltage_1 = float(data["voltage_amp_1_V"])
+            # print("amp_voltage_1", cls._amp_voltage_1)
             cls._zero_offset_voltage_1 = float(data["voltage_zero_offset_1_V"])
+            # print("amp_voltage_zero_offset_1_v", cls._zero_offset_voltage_1 )
             cls._amp_voltage_2 = float(data["voltage_amp_2_V"])
+            # print("amp_voltage_2", cls._amp_voltage_2)
             cls._zero_offset_voltage_2 = float(data["voltage_zero_offset_2_V"])
-
+            # print("amp_voltage_zero_offset_2_v", cls._zero_offset_voltage_2 )
+        
+        print("From files amp 1: ", cls._amp_voltage_1)
+        print("From _zero_offset_voltage_1: ", cls._zero_offset_voltage_1)
         cls._initialized = True
-
+        
+        
     # ---- reload ----
     @classmethod
     def reload(cls):
         cls._initialized = False
         cls._initialize()
-
+        
     # ---- voltage 1 ----
-
+        
     @property
     def amp_voltage_1(self):
-        type(self)._initialize()
+        type(self)._initialize()    
         return type(self)._amp_voltage_1
-
+    
     @amp_voltage_1.setter
     def amp_voltage_1(self, val):
         type(self)._initialize()
         type(self)._amp_voltage_1 = float(val)
-
+        
+    
     @property
     def zero_offset_voltage_1(self):
-        type(self)._initialize()
+        type(self)._initialize()    
         return type(self)._zero_offset_voltage_1
-
+    
     @zero_offset_voltage_1.setter
     def zero_offset_voltage_1(self, val):
         type(self)._initialize()
         type(self)._zero_offset_voltage_1 = float(val)
-
+        
     # ---- voltage 2----
-
+        
     @property
     def amp_voltage_2(self):
-        type(self)._initialize()
+        type(self)._initialize()    
         return type(self)._amp_voltage_2
-
+    
     @amp_voltage_2.setter
     def amp_voltage_2(self, val):
         type(self)._initialize()
         type(self)._amp_voltage_2 = float(val)
-
+        
+    
     @property
     def zero_offset_voltage_2(self):
-        type(self)._initialize()
+        type(self)._initialize()    
         return type(self)._zero_offset_voltage_2
-
+    
     @zero_offset_voltage_2.setter
     def zero_offset_voltage_2(self, val):
         type(self)._initialize()
         type(self)._zero_offset_voltage_2 = float(val)
+    
+
 
 
 def stop_button_event(this_stop_button_flag):
@@ -699,32 +679,24 @@ def stop_button_event(this_stop_button_flag):
     
 def stop_button_getter():
     return stop_button_flag
-    
+
+
+
+_HALL_SCALE  = -5.0    / RESB_16   # [V / LSB]
+_HALL_OFFSET =  2.5                # [V]
+
+_CURRENT_SCALE  = -1000.0 / RESB_16  # [mA / LSB]
+_CURRENT_OFFSET =  500.0             # [mA]
 
 
 def change_adc_hall(digital_hall_voltage):
+    """Accepts scalar or numpy array. Returns Hall voltage [V]."""
+    return np.multiply(_HALL_SCALE, digital_hall_voltage) + _HALL_OFFSET
 
-    analogue_hall_voltage = (3.3/RESB_16 * digital_hall_voltage) 
-    gradient_analogue  = gradient_calculate(2.5, -2.5, 3.3)
-    analogue_hall_voltage_after_impedance_matching = (analogue_hall_voltage*gradient_analogue) + 2.5
-     
-    return analogue_hall_voltage_after_impedance_matching
-    
 def change_current_adc(digital_current_values):
-    
-    analogue_before_adjustment = 3.3/RESB_16*digital_current_values
-    gradient_analogue = gradient_calculate(5.0, -5.0 , 3.3)
-    
-    
-    analogue_voltage_after_impedance_matching = analogue_before_adjustment*gradient_analogue + 5.0
-    analogue_current_after_impedance_matching = 500/5.0 * analogue_voltage_after_impedance_matching
-    return analogue_current_after_impedance_matching
+    """Accepts scalar or numpy array. Returns coil current [mA]."""
+    return np.multiply(_CURRENT_SCALE, digital_current_values) + _CURRENT_OFFSET
 
-
-def gradient_calculate(y_intercept, y_axis, x_axis):
-     
-    gradient =  (y_axis - y_intercept)/x_axis
-    return gradient
 
 def calibrated_hall_sensors1(k_b_1, hall_voltage, actual_current):
     
@@ -751,11 +723,37 @@ def get_electronics_flag():
     
     return ELECTRONICS_FLAG
 
+# ---------- FIRST ELECTRONIC ----------
+#first sensor coefficient version 1
+CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 = -4.61934
+CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 = 0.99182
+CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 =  -4.24388e-6
+CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 =  -5.40711e-8
+
+#second sensor coefficient version 1
+CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 = 3.86547
+CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 = 0.98655
+CURRENT_COEFF_SECOND_SENSOR_C_VERSION1= 3.02401e-6
+CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 = -3.98871e-8
+#----------------------------------------
+
+# ---------- SECOND ELECTRONIC ----------
+# #second sensor coefficient version 2 (<403 mA)
+CURRENT_COEFF_FIRST_SENSOR_A_VERSION2 = 1.2231
+CURRENT_COEFF_FIRST_SENSOR_B_VERSION2 = 0.97724
+
+#second sensor coefficient version 2 (>403 mA)
+CURRENT_COEFF_SECOND_SENSOR_A_VERSION2 = -3.5721
+CURRENT_COEFF_SECOND_SENSOR_B_VERSION2  = 0.97735
+#----------------------------------------
+
+
+
 def calibration_input_coil_1(input):
     
     global ELECTRONICS_FLAG
     
-    output = 0 
+    
     if ELECTRONICS_FLAG == 1:
         output = CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 + CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 * input + CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 * pow(input, 2) +  CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 * pow(input, 3)
     elif ELECTRONICS_FLAG == 2:
@@ -766,8 +764,6 @@ def calibration_input_coil_1(input):
 
 def calibration_input_coil_2(input):
     global ELECTRONICS_FLAG
-    
-    output = 0 
     
     if ELECTRONICS_FLAG == 1:
         output = CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 + CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 * input + CURRENT_COEFF_SECOND_SENSOR_C_VERSION1 * pow(input, 2) + CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 * pow(input, 3)
@@ -850,8 +846,7 @@ def set_popout_text(arg,calculate_final_fR = 0.0, k_b_1 = 0.0, k_b_2 = 0.0):
         text = "Invalid sample frequency! Please do not use any value starting with 3, 7 or 9!"
     elif arg == 6:
         text = "Normalise parameters completed!"
-    elif arg == 7:
-        text = "Parameters sent to microcontroller!"
+        
     return text
 
 class DownsampleEvent():

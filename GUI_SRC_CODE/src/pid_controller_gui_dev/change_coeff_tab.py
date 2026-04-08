@@ -39,6 +39,7 @@ class SendPIDCoeff(QMainWindow, Ui_Form):
     def _connect_signals(self):
         self.button_coeff_send.clicked.connect(self.send_data_event)
         self.button_coeff_send.clicked.connect(lambda: self.popout_window(7))
+        self.button_coeff_send_2.clicked.connect(self.send_data_event_torque)
         
     def send_data_event(self):
         
@@ -46,9 +47,11 @@ class SendPIDCoeff(QMainWindow, Ui_Form):
         Ki = float(self.input_Ki.text())
         Kd = float(self.input_Kd.text())
         
-        print('Kp:', Kp)
-        print('Ki:', Ki)
-        print('Kd', Kd)
+                
+        Kp_2 = float(self.input_Kp_2.text())
+        Ki_2 = float(self.input_Ki_2.text())
+        Kd_2 = float(self.input_Kd_2.text())
+        
         
         
         # --------------------- Update the Data Worker ---------------------
@@ -56,10 +59,45 @@ class SendPIDCoeff(QMainWindow, Ui_Form):
     
         self.worker_data_block.data_2  = Ki
         self.worker_data_block.data_3 = Kd
+        
+        self.worker_data_block.data_4 = Kp_2
+    
+        self.worker_data_block.data_5  = Ki_2
+        self.worker_data_block.data_6 = Kd_2
         self.worker_data_block.data_8 = 3
         
         #for data 10
         self.worker_data_block.data_10 = 3 
+        
+        self.worker_flag_send.flag_tx = True
+        
+    def send_data_event_torque(self):
+        
+        Kp = float(self.input_Kp.text())
+        Ki = float(self.input_Ki.text())
+        Kd = float(self.input_Kd.text())
+        
+        
+        Kp_2 = float(self.input_Kp_2.text())
+        Ki_2 = float(self.input_Ki_2.text())
+        Kd_2 = float(self.input_Kd_2.text())
+        
+        
+        # --------------------- Update the Data Worker ---------------------
+        self.worker_data_block.data_1 = Kp
+    
+        self.worker_data_block.data_2  = Ki
+        self.worker_data_block.data_3 = Kd
+        self.worker_data_block.data_4 = Kp_2
+    
+        self.worker_data_block.data_5  = Ki_2
+        self.worker_data_block.data_6 = Kd_2
+        self.worker_data_block.data_8 = 3
+        
+        #for data 10
+        self.worker_data_block.data_10 = 3 
+        
+        self.worker_flag_send.flag_tx = True
 
     # ------- Popout window
     def popout_window(self, arg, calculate_final_fR = 0.0, k_b_1 = 0.0, k_b_2 = 0.0):

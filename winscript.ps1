@@ -57,7 +57,7 @@ if (-not $PythonExe) {
         & $MambaExe create -y -p "$EnvDir" -c conda-forge python=3.12
     }
 
-    # Re-scan for the executable
+    # Re-scan for the executable.
     $PythonExe = Get-ChildItem -Path $EnvDir -Filter "python.exe" -Recurse | Select-Object -First 1 -ExpandProperty FullName
 }
 
@@ -80,17 +80,35 @@ git fetch origin main -q 2>$null
 
 # Check the last exit code with $LASTEXITCODE
 if ($LASTEXITCODE -eq 0) {
-    # ============== Compare the local HEAD to the remote tracking branch ==================
-    $LocalHash  = git rev-parse HEAD
-    $RemoteHash = git rev-parse origin/main
 
-if ($LocalHash -ne $RemoteHash) {
+    # Get list of changed files between local and remote
+    $ChangedFiles = git diff --name-only HEAD origin/main
+
+    # Define files to ignore
+    $IgnoreList = @(
+        "dummy.csv",
+        "k_b_coefficient.csv",
+        "normalise_voltage_constant.csv",
+		"results_fr.csv",
+		"coefficients_correction.txt"
+    )
+
+    # Filter out ignored files
+    $RelevantChanges = $ChangedFiles | Where-Object {
+        $IgnoreList -notcontains $_
+    }
+
+    if ($RelevantChanges) {
         Write-Host "=========================================" -ForegroundColor Yellow
-        Write-Host "[UPDATE] New update detected on GitHub!" -ForegroundColor Yellow
-        
-        # --- NEW: User Input Logic ---
-        $Confirmation = Read-Host "Would you like to update now? (y/n)" -ForegroundColor DarkYellow
-        
+        Write-Host "[UPDATE] Relevant updates detected on GitHub!" -ForegroundColor Yellow
+
+        # Show which files triggered the update
+        Write-Host "[INFO] Changed files:" -ForegroundColor Cyan
+        $RelevantChanges | ForEach-Object { Write-Host " - $_" }
+
+        # Ask user
+        $Confirmation = Read-Host "Would you like to update now? (y/n)"
+
         if ($Confirmation -eq 'y') {
             Write-Host "[INFO] Updating files... please wait and do not exit." -ForegroundColor Cyan
             git pull origin main
@@ -98,12 +116,14 @@ if ($LocalHash -ne $RemoteHash) {
         } else {
             Write-Host "[SKIP] Update declined. Running current version..." -ForegroundColor Gray
         }
-        # -----------------------------
+
         Write-Host "========================================="
-    } else {
-        Write-Host "[INFO] You are up to date." -ForegroundColor Green
     }
-} else {
+    else {
+        Write-Host "[INFO] No relevant updates (only ignored files changed)." -ForegroundColor Green
+    }
+}
+else {
     Write-Host "[WARN] Could not reach GitHub or folder is not a Git repo." -ForegroundColor Gray
 }
 
@@ -114,7 +134,13 @@ if ($LocalHash -ne $RemoteHash) {
 if ($PythonExe) {
     Write-Host "[INFO] Environment ready. Python: $PythonExe" -ForegroundColor Green
     Write-Host "[INFO] Running MiR-GUI... DO NOT CLOSE THIS WINDOW!" -ForegroundColor Yellow
-    & $PythonExe -u $MainScriptPath
+	 
+    $confirmation = & $PythonExe -u $MainScriptPath
+
+	if ($LASTEXITCODE -ne 0 -or -!$?){
+	Write-Host "[INFO] Running global Python because of ADMIN rights" -ForegroundColor Yellow
+		Python	-u $MainScriptPath
+	}
 } else {
     Write-Host "[ERROR] Python environment could not be initialized." -ForegroundColor Red
 }

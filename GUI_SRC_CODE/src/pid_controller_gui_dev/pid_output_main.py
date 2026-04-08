@@ -20,6 +20,7 @@ import socket_GUI.sockets_files as sockets_files
 from socket_GUI.sockets_files import q_to_graph
 
 import packet_transmission as packet_transmission
+from .analyse_window_pid import AnalyseWindow
 
 
 
@@ -289,7 +290,7 @@ class SleepTimer(QObject):
     def __init__(self):
         super().__init__()
         self.worker_remaining = packet_transmission.TxData()
-        self.remaining = float(self.worker_remaining.data_1) # get local_data_1 from global
+        self.remaining = float(self.worker_remaining.time_acquisition) # get local_data_1 from global
         self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
         self.worker_reset_current_time = packet_transmission.DownSampleSpecificFlag()
         self.timer = QTimer(self)
@@ -311,7 +312,6 @@ class SleepTimer(QObject):
             self.timer.stop()
             self.worker_flag_run_time.flag_running_time = False
 
-            # packet_transmission.running_time_flag_setter(0)
 
 class SocketThread(QThread):
     
@@ -429,7 +429,6 @@ class PIDOutput(QMainWindow, Ui_Title):
     def _setup_initial_ui_state(self):
         """Configure default window and button states."""
         self.setWindowTitle("Const Shear Rate Window")
-        self.button_stop.setDisabled(True)
 
     def _start_backend_threads(self):
         """Launch serial communication and data update threads."""
@@ -445,6 +444,10 @@ class PIDOutput(QMainWindow, Ui_Title):
         self.button_auto_range.clicked.connect(self.auto_range_event)
         self.save_button.clicked.connect(self.save_button_event)
         self.button_rotate.clicked.connect(self.rotate_magnet_event)
+        self.button_stop.clicked.connect(self.stop_button_push_event)
+        
+        
+        self.button_start.clicked.connect(self.start_data_event)
         # self.button_start.clicked.connect(sef.)
         
         
@@ -642,8 +645,8 @@ class PIDOutput(QMainWindow, Ui_Title):
 
             #--------------------- Update the Data Worker ---------------------
             self.worker_data_block.data_1 = 0.5 # Placeholder
-            self.worker_data_block.data_2 = 3  # Forced 3Hz Frequency
-            self.worker_data_block.data_current = (200, 0, 200, 0)  # Coil currents
+            self.worker_data_block.data_2 = 10  # Forced 3Hz Frequency
+            self.worker_data_block.data_current = (300, 0, 300, 0)  # Coil currents
 
             self.worker_data_block.data_7 = direction
             self.worker_data_block.data_8 = filter_val
@@ -658,12 +661,83 @@ class PIDOutput(QMainWindow, Ui_Title):
         except ValueError:
             # --------------------- If the user entered invalid text in the textboxes ---------------------
             self._update_transmission_ui(False, "Input Error: Check input values!")
+            
+    def start_data_event(self):
 
+            #  --------- Cleanup old files  --------------
+            dummy_path = os.path.join(self.project_root, "files", "dummy.csv")
+            if os.path.exists(dummy_path):
+                try:
+                    os.remove(dummy_path)
+                except OSError as e:
+                    print(f"File cleanup failed: {e}")
+
+            #  --------- Gather Inputs & Safety Check  ------------
+            fs_text = self.textbox_sample_frequency.text()
+            if not fs_text or int(fs_text) == 0:
+                return  # Silently exit if frequency is invalid/empty
+
+            #  --------- Downsampling Logic & Validation.  ---------
+            fs = float(fs_text)
+            tot_avg = 10000 // int(fs)
+            
+            #  --------- Validation: Ensure 5000 is divisible by tot_average  ---------
+            if not (5000 / tot_avg).is_integer():
+                return self.popout_window(5)
+
+            #   --------- Assignment (Success Path).  ------------------
+                        # --------- Mapping textbox data to worker block ---------
+            self.worker_data_block.time_acquisition = float(self.textbox_time.text())
+            
+            # --------- Setting downsample properties ---------
+            self.worker_downsample_property.time_increment = 1.0 / fs
+            self.worker_downsample_property.tot_average = tot_avg
+            self.worker_downsample_property.current_time = 0.0
+            self.worker_flag_run_time.flag_running_time = True
+            
+            sockets_files.file_name_change_set("dummy")
+
+            #--------- UI and Timer Execution.  ------------------
+            self._update_transmission_ui(True, "Saving!..")
+            
+            self.worker_sleep = SleepTimer()
+            self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
+            self.worker_sleep.start()
+            
+    def update_time_counter_acquisition(self, val):
+            self.lcdNumber.display(val)
+            
+            print(val)
+            
+    def stop_button_push_event(self):
+        
+        ########################### gives -500mA to the coil 1 and +500mA DC to completely stop the rotation of the magnet 
+        
+        ############################# send data to setter getter ######################################
+        self.worker_data_block.data_1 = 65534
+        self.worker_data_block.data_2_for_MCU  = 2.0
+        
+        self.worker_data_block.data_current = 0, 0, 0, 0
+
+
+        self.worker_data_block.data_8 = 2
+            
+        
+        #for data 10
+        self.worker_data_block.data_10 = 1 
+        ######################################################################################
+
+        
+        #---------------------  Physical Transmission ---------------------
+        # Setting the flag triggers the actual transmission thread
+        self.worker_flag_send.flag_tx = True
+
+        # UI Feedback
+        self._update_transmission_ui(success=True)
 
     def _update_transmission_ui(self, success, message="Data sent!"):
         """Handles button states and status labels."""
         if success:
-            self.button_stop.setEnabled(True)
             self.status_label.setStyleSheet("color: #32a83a;")  # Green
             self.status_label.setText(message)
         else:
@@ -746,6 +820,7 @@ class TabWindowPID(QMainWindow):
         # Add your classes as tabs
         tabs.addTab(PIDOutput(), "Main GUI")
         tabs.addTab(SendPIDCoeff(), "PID Tx")
+        tabs.addTab( AnalyseWindow(), "Data analyse")
         # Set central widget
         self.setCentralWidget(tabs)
         

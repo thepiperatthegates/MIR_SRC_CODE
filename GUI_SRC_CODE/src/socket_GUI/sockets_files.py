@@ -198,11 +198,11 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
                 count = 0
 
                 # -----  Start live graph process for the first time --------
-                if not worker_process_flag._flag_rx_process and received_data:
+                if not worker_process_flag.flag_process and received_data:
                     p1 = multiprocessing.Process(target=start_process_live_graph,
                                                   args=(q_to_process, q_to_graph, q_to_csv, q_to_norm, restart_event))
                     p1.start()
-                    worker_process_flag._flag_rx_process = True
+                    worker_process_flag.flag_process = True
 
                 q_to_process.put(received_data)
 
@@ -215,7 +215,7 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
                     pass  # timeout hit, restart the process
 
                 # ------ Restart process if norm triggered exit --------- 
-                if not p1.is_alive() and worker_process_flag._flag_rx_process:
+                if not p1.is_alive() and worker_process_flag.flag_process:
                     print("[RESTART] Restarting start_process_live_graph...")
                     restart_event.clear()
                     #-----  Drain all queues before restarting so no data conflict -----
@@ -230,7 +230,7 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
 
                 
                 # ---- Saving data function -------
-                if worker_data_flag.flag_csv_save:
+                if worker_data_flag.flag_running_time:
                     if sensor_data_recv:
                         save_sensors_data_to_csv(sensor_data_recv, worker_kb_property, worker_specific_downsampling,
                                                   worker_normalise_properties)
@@ -347,7 +347,7 @@ def file_name_change_set(prefix, extension=".csv"):
     
 
 def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
-                worker_specific_downsampling, worker_normalise_properties, num_columns=4):
+                worker_specific_downsampling, worker_normalise_properties, num_columns=5):
     """
     Process, calibrate, downsample, timestamp, and save measurement data to a CSV file.
 
@@ -432,16 +432,11 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
     reshaped_data = np.array(data).reshape(-1, num_columns)
     
 
-    col1 = reshaped_data[:, 0].astype(float)             # normalised hall 1 [no unit]
-    col2 = reshaped_data[:, 1].astype(float)              #normalised hall 2 [no unit]
-    col3 = reshaped_data[:, 2].astype(int)               #i1 [digital]
-    col4 = reshaped_data[:, 3].astype(int)                # i2 [digital]
-    col5 = reshaped_data[:, 4].astype(float)              # phase diff [rad]
-    
-    
-    #Hall Sensors (it's already normalised)
-    col1 = -col1
-    col2 = col2
+    col1 = reshaped_data[:, 0]          # normalised hall 1 [no unit]
+    col2 = reshaped_data[:, 1]             #normalised hall 2 [no unit]
+    col3 = reshaped_data[:, 2]           #i1 [digital]
+    col4 = reshaped_data[:, 3]             # i2 [digital]
+    col5 = reshaped_data[:, 4]            # phase diff [rad]
     
     #Current
     col3 = -packet_transmission.change_current_adc(col3)               #convert col1
@@ -454,8 +449,8 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
     col1 = packet_transmission.calibrated_hall_sensors1(worker_kb_property.k_b_1, col1, col3/1000)  
     col2 = packet_transmission.calibrated_hall_sensors2(worker_kb_property.k_b_2, col2, col4/1000)
 
-    col1 = (col1- worker_normalise_properties.zero_offset_voltage_1) / worker_normalise_properties.amp_voltage_1
-    col2 = (col2 - worker_normalise_properties.zero_offset_voltage_2) / worker_normalise_properties.amp_voltage_2
+    # col1 = (col1- worker_normalise_properties.zero_offset_voltage_1) / worker_normalise_properties.amp_voltage_1
+    # col2 = (col2 - worker_normalise_properties.zero_offset_voltage_2) / worker_normalise_properties.amp_voltage_2
 
     #Average values to reduce amount of data saved
     ####FOR CONSTANT SHEAR RATE 
@@ -488,18 +483,21 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
             col2 = average_values(col2, worker_specific_downsampling.tot_average_specified).ravel()
             col3 = average_values(col3, worker_specific_downsampling.tot_average_specified).ravel()
             col4 = average_values(col4, worker_specific_downsampling.tot_average_specified).ravel()
+            col5 = average_values(col5, worker_specific_downsampling.tot_average_specified).ravel()
     
     elif worker_specific_downsampling.flag_specific_downsample is False:
             col1 = average_values(col1, worker_specific_downsampling.tot_average).ravel()
             col2 = average_values(col2, worker_specific_downsampling.tot_average).ravel()
             col3 = average_values(col3, worker_specific_downsampling.tot_average).ravel()
             col4 = average_values(col4, worker_specific_downsampling.tot_average).ravel()
+            col5 = average_values(col5, worker_specific_downsampling.tot_average).ravel()
 
-    averaged_data = np.zeros((len(col1), 4))  # shape (100,4)
+    averaged_data = np.zeros((len(col1), num_columns))  # shape (100,4)
     averaged_data[:, 0] = col1
     averaged_data[:, 1] = col2
     averaged_data[:, 2] = col3
     averaged_data[:, 3] = col4
+    averaged_data[:, 4] = col5
     
     num_rows = averaged_data.shape[0] 
         
@@ -507,8 +505,6 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
         step = worker_specific_downsampling.time_increment_specified
     else:
         step = worker_specific_downsampling.time_increment
-        
-    print("What is the step?", step)
 
     time_column = (worker_specific_downsampling.current_time + np.arange(num_rows) * step).reshape(-1, 1)
 
