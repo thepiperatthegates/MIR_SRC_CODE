@@ -261,6 +261,24 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
         p1.terminate()
         p1.join()
     ser1.close() 
+    
+#-------------- MiR mode identifier -------------------
+PID_START = 1
+CONTROL_SHEAR_RATE  = 2
+#------------------------------------------------------
+
+#-------------- PID mode identifier -------------------
+PID_LOOP = 0
+PID_STOP = 2
+PID_NORM = 1
+PID_COEFF_CHANGE = 4
+#------------------------------------------------------
+
+# ------------ Control Shear Rate identifier ----------
+CSR_LOOP = 0
+CSR_COIL_CALIBRTAION = 1
+CSR_NORM = 2
+# ----------------------------------------------------
 
 def send_thread(serial_data):
     worker_combined_send = packet_transmission.TxData()

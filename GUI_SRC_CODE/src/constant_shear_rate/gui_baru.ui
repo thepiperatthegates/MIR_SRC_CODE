@@ -911,7 +911,7 @@ background-color: rgb(255, 170, 127);</string>
      <x>0</x>
      <y>0</y>
      <width>1307</width>
-     <height>21</height>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuRestart">
@@ -921,7 +921,14 @@ background-color: rgb(255, 170, 127);</string>
     <addaction name="actionHardware_reset"/>
     <addaction name="actionSoftware_restart"/>
    </widget>
+   <widget class="QMenu" name="flash_menu">
+    <property name="title">
+     <string>FLASH</string>
+    </property>
+    <addaction name="actionFlash_STM32"/>
+   </widget>
    <addaction name="menuRestart"/>
+   <addaction name="flash_menu"/>
   </widget>
   <widget class="QStatusBar" name="statusbar"/>
   <action name="actionHardware_reset">
@@ -932,6 +939,11 @@ background-color: rgb(255, 170, 127);</string>
   <action name="actionSoftware_restart">
    <property name="text">
     <string>Software restart</string>
+   </property>
+  </action>
+  <action name="actionFlash_STM32">
+   <property name="text">
+    <string>Flash STM32</string>
    </property>
   </action>
  </widget>

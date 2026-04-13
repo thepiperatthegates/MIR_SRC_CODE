@@ -64,10 +64,10 @@ class SendPIDCoeff(QMainWindow, Ui_Form):
     
         self.worker_data_block.data_5  = Ki_2
         self.worker_data_block.data_6 = Kd_2
-        self.worker_data_block.data_8 = 3
+        self.worker_data_block.data_8 = sockets_files.PID_COEFF_CHANGE
         
         #for data 10
-        self.worker_data_block.data_10 = 3 
+        self.worker_data_block.data_10 = sockets_files.PID_START 
         
         self.worker_flag_send.flag_tx = True
         
@@ -92,10 +92,10 @@ class SendPIDCoeff(QMainWindow, Ui_Form):
     
         self.worker_data_block.data_5  = Ki_2
         self.worker_data_block.data_6 = Kd_2
-        self.worker_data_block.data_8 = 3
+        self.worker_data_block.data_8 = sockets_files.PID_COEFF_CHANGE
         
         #for data 10
-        self.worker_data_block.data_10 = 3 
+        self.worker_data_block.data_10 = sockets_files.PID_START 
         
         self.worker_flag_send.flag_tx = True
 

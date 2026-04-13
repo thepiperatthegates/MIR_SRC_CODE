@@ -41,6 +41,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
     def __init__(self) -> None:
         super().__init__()
 
+        #------------------ init dir ------------------
         self.setupUi(self)
 
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -51,11 +52,11 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         refresh_icon_path = os.path.join(project_root, "pics", "refresh_icon.ico")
         self.refresh_Button.setIcon(QtGui.QIcon(refresh_icon_path))
+       
         
-        
-        
+        self.header = "time[s];voltage_1[V];voltage_2[V];current_1[mA];current_2[mA];phase_field[deg];phase_magnet[deg];phase_diff[deg];angular_vel[rad/s];torque[N/m];shear_rate[1/s];shear_stress[Pa];Viscosity[Pa*s];offset_1[mA];offset_2[mA];fr0[Nm];fr1[Nm *s/rad]"
 
-        ############################init variables for this class###############################
+        #------------------ init variables for this class ------------------
         self.data = np.array([])
         self.analyse_filename = ' '
         self.final_data_to_save = np.array([])
@@ -63,11 +64,11 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.num_rows = None
         self.num_column = None
         self.total_torque = None
-        #######################################################################################################
+        
 
-        ############calculation constant##############################################################
+        #------------------ calculation constant ------------------
 
-        ###############################inherited from another process
+        #------------------ inherited from another process ------------------
 
         self.worker_get_fr_coefficient = packet_transmission.fRCoefficients()
         self.fr0 = self.worker_get_fr_coefficient.fr0
@@ -76,35 +77,40 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
                               f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
 
-        ##########################################################
         self.COIL_CONSTANT = packet_transmission.COIL_CONSTANT  # in T / A
         self.DIPOLE_MOMENT = packet_transmission.DIPOLE_MOMENT  # in A m^2
         self.CALIBRATION_FACTOR = self.worker_get_fr_coefficient.CALIBRATION_FACTOR  # torque calibration no units (K)
 
         self.worker_get_offset = packet_transmission.TxData()
 
-        self.offset_1, self.offset_2 = self.worker_get_offset.data_offsets_creep
+        self.offset_1 = float(self.worker_get_offset.data_4)
+        self.offset_2 = float(self.worker_get_offset.data_6)
 
         # placeholder for the offsets input
         self.textbox_offset1.setText(str(self.offset_1))
         self.textbox_offset2.setText(str(self.offset_2))
 
-        ############geometry constants################################################################
+        # ------------------ geometry constants ------------------
         self.C_SS = 11160103  # conversion factor to stress in Pa / Nm
         self.C_SR = 37.099  # conversion factor to shear rate in s^-1 / s^-1
-        #######################################################################################################
+        
 
-        ################################variables to save#####################################
+        # ------------------variables to save ------------------
         # ready up variables
         self.time = None
         self.current_1 = None
         self.current_2 = None
         self.voltage_1 = None
         self.voltage_2 = None
+        # ------------------------------------------------------
 
-        # declare bunch of important variable stuffs
+        #------------------ declare bunch of important variable stuffs ------------------
         self.angle_magnetic_field = None
         self.angle_magnet = None
+        self.angle_magnetic_field_unwrapped = None
+        self.angle_magnet_unwrapped = None
+        self.angle_magnetic_field_degree = None
+        self.angle_magnet_degree = None 
         self.phase_difference = None
         self.angular_velocity = None
         self.fr1on_moment = None
@@ -113,16 +119,14 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.total_torque = None
         self.shear_stress = None
         self.viscosity = None
-        #######################################################################################################
-
-        #############################################################################
-        self.phase_difference_mean = None
+        
+        self.phase_difference_degree_mean = None
         self.angular_velocity_mean = None
         self.total_torque_mean = None
         self.shear_rate_mean = None
         self.shear_stress_mean = None
         self.viscosity_mean = None
-        #############################################################################
+        # ------------------------------------------------------------------------------------------
 
         self.setWindowTitle("Data analyse")
 
@@ -175,8 +179,29 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.data_show_comboBox.activated.connect(self.choose_option)
 
     def choose_option(self):
+        #------------------ read csv files ------------------
+        # Notes: the legacy codes has the files without headers, recent updates has a header for the variables 
+        with open(self.analyse_filename, 'r', encoding='utf-8-sig') as check:
+            # check the first line of csv files
+            first_line = check.readline().strip()
+            
+            
+        # check if the first line is a digit (or the first line contains digit with negative number)
+        if first_line[0].isdigit() or first_line[0] == '-':
+            skip_check = 0
+            print("Legacy code")
+        else:
+            skip_check = 1
+            print("New code")
 
-        self.data = pandas.read_csv(self.analyse_filename, sep=";", header=None).to_numpy()
+        # Load selected file
+        self.data = np.genfromtxt(
+            self.analyse_filename, 
+            delimiter=";", 
+            skip_header=skip_check, 
+            encoding='utf-8-sig'
+        )
+            
         mode = self.data_show_comboBox.currentText()
         self.num_rows, self.num_column = self.data.shape
 
@@ -186,6 +211,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             "Currents diagram" : self.draw_current_diagrams,
             "Voltage diagram" : self.draw_voltage_diagrams,
             "Phase diagram" : self.draw_phase_diagram,
+            "Phase difference diagram" : self.draw_phase_difference_diagram,
             "Angular velocity diagram" :  self.draw_angular_velocity_diagram,
             "Torque diagram" :          self.draw_torque_diagram,
             "Shear rate diagram":       self.draw_shear_rate_diagram,
@@ -263,7 +289,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
         # remaining columns with actual mean values
         values = [
-            self.phase_difference_mean,
+            self.phase_difference_degree_mean,
             self.angular_velocity_mean,
             self.total_torque_mean,
             self.shear_rate_mean,
@@ -287,7 +313,11 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.voltage_1 = np.zeros((self.num_rows, 1))
         self.voltage_2 = np.zeros((self.num_rows, 1))
         self.angle_magnetic_field = np.zeros((self.num_rows, 1))
+        self.angle_magnetic_field_unwrapped = np.zeros((self.num_rows, 1))
+        self.angle_magnetic_field_degree = np.zeros((self.num_rows, 1))
         self.angle_magnet = np.zeros((self.num_rows, 1))
+        self.angle_magnet_unwrapped = np.zeros((self.num_rows, 1))
+        self.angle_magnet_degree = np.zeros((self.num_rows, 1))
         self.phase_difference = np.zeros((self.num_rows, 1))
         self.angular_velocity = np.zeros((self.num_rows, 1))
         self.shear_rate = np.zeros((self.num_rows, 1))
@@ -301,7 +331,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.voltage_1 = self.data[:, 1]
         self.voltage_2 = self.data[:, 2]
         
-
+        print("self.offset_1, self.offset_2",  self.offset_1)
+        print(self.offset_2)
         self.data[:, 3] -= self.offset_1
         self.data[:, 4] -= self.offset_2
 
@@ -321,9 +352,9 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.calculate_shear_stress()
         self.calculate_viscosity()
 
-        amf = self.angle_magnetic_field.reshape(-1, 1)
-        amag = self.angle_magnet.reshape(-1, 1)
-        pd = self.phase_difference.reshape(-1, 1)
+        amf = self.angle_magnetic_field_degree.reshape(-1, 1)
+        amag = self.angle_magnet_degree.reshape(-1, 1)
+        pd = self.phase_difference_degree.reshape(-1, 1)
         angv = self.angular_velocity.reshape(-1, 1)
         trq = self.total_torque.reshape(-1, 1)
         sr1 = self.shear_rate.reshape(-1, 1)
@@ -391,7 +422,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.voltage_2 = self.final_data_to_show[:, 2]
         self.current_1 = self.final_data_to_show[:, 3]
         self.current_2 = self.final_data_to_show[:, 4]
-        self.calculate_magnitude_current()
+        self.magnitude_current = np.hypot(self.current_1 , self.current_2)
         self.angle_magnetic_field = self.final_data_to_show[:, 5]
         self.angle_magnet = self.final_data_to_show[:, 6]
         self.phase_difference = self.final_data_to_show[:, 7]
@@ -422,10 +453,10 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.textbox_offset2.setText(str(self.offset_2))
 
 
-        print("Offset 1 from csv:", self.offset_1)
-        print("Offset 2 from csv:", self.offset_2)
-        print("fr0 from csv:", self.fr0)
-        print("fr1 from csv:", self.fr1)
+        print("Offset 1 from csv:", self.offset_1)  #[mA]
+        print("Offset 2 from csv:", self.offset_2) #[mA]
+        print("fr0 from csv:", self.fr0) #[Nm]
+        print("fr1 from csv:", self.fr1)    #[Nm * s/rad]
 
 
     def save_button_event(self):
@@ -442,9 +473,10 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
                     filename += '.csv'
 
                 df = pandas.DataFrame(self.final_data_to_save)
+                header_list = self.header.split(';')
                 
                 # Added encoding for better compatibility
-                df.to_csv(filename, sep=";", index=False, header=None, encoding='utf-8-sig')
+                df.to_csv(filename, sep=";", index=False, header=header_list, encoding='utf-8-sig')
                 
                 print(f"File successfully saved to: {filename}")
                 
@@ -481,10 +513,15 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         # TODO: OFFSETS
 
         # calculate the angles
-        self.angle_magnetic_field = np.unwrap(self.angle_magnetic_field, axis=0)
-        self.angle_magnet = np.unwrap(self.angle_magnet, axis=0)
-
-        self.phase_difference = self.angle_magnetic_field - self.angle_magnet
+        
+        self.angle_magnetic_field_degree = np.degrees(self.angle_magnetic_field) #[deg]
+        self.angle_magnet_degree = np.degrees(self.angle_magnet) #[deg]
+        
+        self.angle_magnetic_field_unwrapped = np.unwrap(self.angle_magnetic_field, axis=0) #[rad]
+        self.angle_magnet_unwrapped = np.unwrap(self.angle_magnet, axis=0) #[rad]
+        
+        self.phase_difference = self.angle_magnetic_field_unwrapped - self.angle_magnet_unwrapped # [rad]
+        self.phase_difference_degree = np.degrees(self.phase_difference)  # [degree]
 
     def calculate_shear_rate(self):
         """
@@ -511,9 +548,9 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             - `delta` is set as the mean time step from `self.time`.
         """
         self.angular_velocity = savgol_filter(
-            self.angle_magnet[:, 0],  # your noisy angle signal
-            window_length=101,  # try 51, 101, etc. depending on how smooth you want
-            polyorder=2,  # 2 or 3 works well
+            self.angle_magnet_unwrapped[:, 0],  
+            window_length=101,  # try 51, 101
+            polyorder=2,  # 2 or 3 
             deriv=1,  # first derivative
             delta=np.mean(np.diff(self.time))  # time step
         )  # [rad /s]
@@ -524,7 +561,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.friction_moment = self.angular_velocity * self.fr1 + self.fr0  # - y_0        # [Nm]
         
     def calculate_magnitude_current(self):
-        self.magnitude_current = np.sqrt(self.current_1**2 + self.current_2**2)
+        self.magnitude_current = np.hypot(self.current_1, self.current_2) # [mA]
 
     def calculate_shear_stress(self):
 
@@ -543,8 +580,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
     def calculate_all_mean(self):
 
-        self.phase_difference_mean = np.mean(self.phase_difference)
-        print(self.phase_difference_mean)
+        self.phase_difference_degree_mean = np.mean(self.phase_difference_degree)
+        print(self.phase_difference_degree_mean)
         self.angular_velocity_mean = np.mean(self.angular_velocity)
         self.total_torque_mean = np.mean(self.total_torque)
         self.shear_rate_mean = np.mean(self.shear_rate)
@@ -553,7 +590,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
     def calculate_all_mean_after_save(self):
 
-        self.phase_difference_mean = np.mean(self.data[:, 7])
+        self.phase_difference_degree_mean = np.mean(self.data[:, 7])
         self.angular_velocity_mean = np.mean(self.data[:, 8])
         self.total_torque_mean = np.mean(self.data[:, 9])
         self.shear_rate_mean = np.mean(self.data[:, 10])
@@ -564,14 +601,16 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         
         # take from the main tab
         if self.take_Button.isChecked():
-            self.offset_1, self.offset_2 = self.worker_get_offset.data_offsets_creep
+            
+            self.offset_1 = float(self.worker_get_offset.data_4)
+            self.offset_2 = float(self.worker_get_offset.data_6)
             self.textbox_offset1.setDisabled(True)
             self.textbox_offset2.setDisabled(True)
         else:
             # take from the textbox fields
             try:
-                self.offset_1 = int(self.textbox_offset1.text())
-                self.offset_2 = int(self.textbox_offset2.text())
+                self.offset_1 = float(self.textbox_offset1.text())
+                self.offset_2 = float(self.textbox_offset2.text())
                 self.textbox_offset1.setDisabled(False)
                 self.textbox_offset2.setDisabled(False)
             except ValueError:
@@ -627,13 +666,21 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
     def draw_phase_diagram(self):
         title = "Phase diagram"
-        ylabel = r"Angle $\phi$ / rad"
+        ylabel = r"Angle $\phi$ / °"
         lines = [
-            {"y": self.angle_magnetic_field, "label": r"$\phi_B$", "color": "#890304"},
-            {"y": self.angle_magnet, "label": r"$\phi_m$", "color": "#00113a"},
-            {"y": self.phase_difference, "label": r"$\Delta\phi$", "color": "#7294D4"},
+            {"y": np.degrees(self.angle_magnetic_field.reshape(-1, 1)), "label": r"$\phi_B$", "color": "#890304"},
+            {"y": np.degrees(self.angle_magnet.reshape(-1, 1)), "label": r"$\phi_m$", "color": "#00113a"},
+            ]
+        self.template_draw_diagram(title, ylabel, lines)
+        
+        
+    def draw_phase_difference_diagram(self):
+        
+        title = "Phase difference diagram"
+        ylabel = r"Angle $\phi$ / °"
+        lines = [
+            {"y": self.phase_difference_degree, "label": r"$\Delta\phi$", "color": "#7294D4"}
         ]
-
         self.template_draw_diagram(title, ylabel, lines)
 
     def draw_angular_velocity_diagram(self):

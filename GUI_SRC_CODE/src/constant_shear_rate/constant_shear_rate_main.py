@@ -76,44 +76,50 @@ class DataUpdate(QThread):
     def __init__(self, main_window_ref=None):
         super().__init__()
         self.main_window_ref = main_window_ref
+        
+        # ---------------- Operational State ---------------
         self.running = True
         self.flag_calibrate = False
-
+        self.flag_normalise = False
+        self.flag_normalise_measurement = False
         self.flag_fR_measurement = False
+
+        # ----------- Accumulators & Totals (Hall/Current) ----------
         self.accumulate_hall_1 = 0.0
         self.accumulate_hall_2 = 0.0
         self.accumulate_current_1 = 0.0
         self.accumulate_current_2 = 0.0
-
-        # for normalise properties purposes
-        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
-        self.amplitude_voltage_1 = 0.0
-        self.zero_offset_voltage_1 = 0.0
-        self.amplitude_voltage_2 = 0.0
-        self.zero_offset_voltage_2 = 0.0
-
-        self.flag_normalise = False
-        self.flag_normalise_measurement = False
 
         self.total_hall_1 = None
         self.total_hall_2 = None
         self.total_current_1 = None
         self.total_current_2 = None
 
+        # ---------- Normalization Parameters -----------
+        self.amplitude_voltage_1 = 0.0
+        self.zero_offset_voltage_1 = 0.0
+        self.amplitude_voltage_2 = 0.0
+        self.zero_offset_voltage_2 = 0.0
+
+        # ------- Data Buffers (NumPy Arrays) --------
+        # Raw Data Slices
         self.v1_slice = np.array([], dtype=np.uint16)
         self.v2_slice = np.array([], dtype=np.uint16)
         self.i1_slice = np.array([], dtype=np.uint16)
         self.i2_slice = np.array([], dtype=np.uint16)
+        self.bytes_to_process = np.array([], dtype=np.uint16)
 
-        self.bytes_to_process = np.array([], dtype=np.uint16)  # Empty NumPy array for incoming data
-
+        #------------ Calculated Values ------------------------
         self.angle_permanent_magnet_val = np.array([], dtype=np.float32)
         self.angle_magnetic_field_val = np.array([], dtype=np.float32)
         self.phase_difference_val = np.array([], dtype=np.float32)
 
+        # ------ Helper Workers --------------------------------
+        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
         self.worker_array_setter = packet_transmission.StoreArrayGraph()
         self.worker_kb_property = packet_transmission.kbCoefficient()
-
+        
+        
     def run(self):
 
         """
@@ -182,12 +188,10 @@ class DataUpdate(QThread):
                                                                              self.v1_slice, self.i1_slice / 1000)
                 self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
                                                                              self.v2_slice, self.i2_slice / 1000)
-
-                # this is normalising step (still do not know whether I want to do it immidiately or not)
                 if self.flag_normalise:
                     self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amp_voltage_1
                     self.v2_slice = (self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amp_voltage_2
-
+                
                 # Calibrate process starts
                 # measurement fR process starts
                 # measurement to determine the normalising parameters (for first time rotation)
@@ -312,7 +316,7 @@ class SleepTimer(QObject):
             self.update_time_signal.emit(round(self.remaining, 1))
         else:
             self.timer.stop()
-            self.worker_flag_run_time.flag_csv_save = False
+            self.worker_flag_run_time.flag_running_time = False
 
 class SocketThread(QThread):
     
@@ -434,7 +438,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.button_stop.setDisabled(True)
         self.textbox_time.setPlaceholderText("Enter time in second")
         self.textbox_sample_frequency.setText("10000")
-
+        
         self.k_b_label.setText(
             f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
             f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
@@ -465,12 +469,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.button_start.clicked.connect(self.start_data_event)
         self.button_stop.clicked.connect(self.stop_button_push_event)
         
-        #--------- Popouts ---------
+        #--------- Add popouts ---------
         for btn in [self.button_send, self.button_start, self.button_stop, self.button_cal_constant]:
             btn.clicked.connect(lambda: self.popout_window(1))
 
         self.normalise_button.clicked.connect(self.start_normalise_event)
-        self.button_cal_constant.clicked.connect(lambda: self.start_calibration_event(-400, 1))
+        self.button_cal_constant.clicked.connect(lambda: self.start_coil_calibration_event(-400, 1))
         self.button_fr_constant.clicked.connect(lambda: self.start_friction_coeff_event_initiation(1, 1, 0))
         self.button_fr_constant.clicked.connect(lambda: self.popout_window(3))
         
@@ -480,7 +484,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.select_mode_comboBox.activated.connect(self.change_graph)
         self.timeInterval_comboBox.activated.connect(self.change_graph)
         self.save_button.clicked.connect(self.save_button_event)
-        self.button_rotate.clicked.connect(self.button_rotate_event)
+        self.button_rotate.clicked.connect(self.button_normalisation_event)
 
     def _start_services(self):
         """Launch background threads."""
@@ -489,169 +493,117 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         self.worker_DataUpdate = DataUpdate(self)
         
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        normalise_filepath = os.path.join(project_root, "files", "normalise_voltage_constant.csv")
+        normalise_filepath = os.path.join(self.project_root, "files", "normalise_voltage_constant.csv")
 
-        # If file exists → load values
+        # If file exists, then load values from csv
         if os.path.exists(normalise_filepath):
             self.worker_DataUpdate.flag_normalise_event(True)
         else:
             self.worker_DataUpdate.flag_normalise_event(False)
-        
+            
         self.worker_DataUpdate.start()
         
+        
+        
+        #----------------- start change_graph service ---------------
         self.change_graph()
         
     def change_graph(self):
-        
-        #get string from combo box
-        mode = self.select_mode_comboBox.currentText()
-        time_interval_var_string = self.timeInterval_comboBox.currentText()
-        time_interval_var_int = int(time_interval_var_string[:-2])
-        
-        
-        #clear graph and stop every time the event is connected
+        """Sets up the plotting environment based on UI selection."""
+        # -----------------------  Reset Plotting Area -----------------------
         self.graphicsView.clear()
         if hasattr(self, 'timer'):
             self.timer.stop()
 
-    
-        if mode == "View sensors":
-            
-            #this is to make sure x-axis is configured properly 
-            if time_interval_var_int == 100:
-                sockets_files.tot_count_accumulate_recv = 250
-                self.time_axis = [i * 0.0001 for i in range(1000)]
-            elif time_interval_var_int == 500:
-                sockets_files.tot_count_accumulate_recv = 5*250
-                self.time_axis = [i * 0.0001 for i in range(5*1000)]
-            elif time_interval_var_int == 1000:
-                sockets_files.tot_count_accumulate_recv = 10*250
-                self.time_axis = [i * 0.0001 for i in range(10*1000)]
-            
-            ######################
-            self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Hall sensors")
-            self.plot1.setLabel('left', 'Voltage', units='V')
-            self.plot1.setLabel('bottom', 'Time', units= 's')
-            self.plot1.addLegend()
-            self.plot1.showGrid(x=True, y=True)
-            self.curve_v1 = self.plot1.plot(pen='r', name="Hall sensors 1")
-            self.curve_v2 = self.plot1.plot(pen='b', name="Hall sensors 2")
-
-            
-            self.plot2 = self.graphicsView.addPlot(row=1, col=0, title="Current sensors")
-            self.plot2.setLabel('left', 'Current', units='mA')
-            self.plot2.setLabel('bottom', 'Time', units= 's')
-            self.plot2.addLegend()
-            self.plot2.showGrid(x=True, y=True)
-            
-            
-            self.curve_i1 = self.plot2.plot(pen='g', name="I1")
-            self.curve_i2 = self.plot2.plot(pen='y', name="I2")
-            
-            self.plot1.enableAutoRange(axis='x', enable=False)
-            self.plot2.enableAutoRange(axis='x', enable=False)
-            self.plot1.setXRange(0, 0.5)
-            self.plot2.setXRange(0, 0.5)
+        # ----------------------- Extract and Parse Inputs -----------------------
+        mode = self.select_mode_comboBox.currentText()
+        interval_str = self.timeInterval_comboBox.currentText()
+        interval_ms = int(interval_str[:-2])
         
-            # Create a timer for sensor updates
-            self.timer = QtCore.QTimer()
-            self.timer.setInterval(time_interval_var_int)  # 0.5 seconds interval
-            self.timer.timeout.connect(self.graph_update_sensors)
-            self.timer.start()
-
-        elif mode == "View angle":
-            
-            #this is to make sure x-axis is configured properly 
-            if time_interval_var_int == 100:
-                sockets_files.tot_count_accumulate_recv = 250
-                self.time_axis = [i * 0.0001 for i in range(1000)]
-            elif time_interval_var_int == 500:
-                sockets_files.tot_count_accumulate_recv = 5*250
-                self.time_axis = [i * 0.0001 for i in range(5*1000)]
-            elif time_interval_var_int == 1000:
-                sockets_files.tot_count_accumulate_recv = 10*250
-                self.time_axis = [i * 0.0001 for i in range(10*5000)]
-                
-            self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Permanent magnet angle")
-            self.plot1.setLabel('left', 'ϕ_m', units='rad')
-            self.plot1.setLabel('bottom', 'Time', units= 's')
-            self.plot1.addLegend()
-            self.plot1.showGrid(x=True, y=True)
-            self.curve_sigma_m = self.plot1.plot(pen='r', name="Sigma")
-    
-            
-            self.plot2 = self.graphicsView.addPlot(row=1, col=0, title="Magnetic field angle")
-            self.plot2.setLabel('left', 'ϕ_B', units='rad')
-            self.plot2.setLabel('bottom', 'Time', units= 's')
-            self.plot2.addLegend()
-            self.plot2.showGrid(x=True, y=True)
-            self.curve_sigma_b = self.plot2.plot(pen='g', name="B")
-            
-            self.plot1.enableAutoRange(axis='x', enable=False)
-            self.plot2.enableAutoRange(axis='x', enable=False)
-            self.plot1.setXRange(0, 0.5)
-            self.plot2.setXRange(0, 0.5)
-            
-            self.timer = QtCore.QTimer()
-            self.timer.setInterval(time_interval_var_int)  # 0.5 seconds interval
-            self.timer.timeout.connect(self.graph_update_angle)
-            self.timer.start()
-
-
-            
-        elif mode == "View phase difference":
-            
-            
-            #this is to make sure x-axis is configured properly 
-            #this is to make sure x-axis is configured properly 
-            if time_interval_var_int == 100:
-                sockets_files.tot_count_accumulate_recv = 250
-                self.time_axis = [i * 0.0001 for i in range(1000)]
-            elif time_interval_var_int == 500:
-                sockets_files.tot_count_accumulate_recv = 5*250
-                self.time_axis = [i * 0.0001 for i in range(5*1000)]
-            elif time_interval_var_int == 1000:
-                sockets_files.tot_count_accumulate_recv = 10*250
-                self.time_axis = [i * 0.0001 for i in range(10*1000)]
-                
-            self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Permanent magnet angle")
-            self.plot1.setLabel('left', 'Δϕ', units='rad')
-            self.plot1.setLabel('bottom', 'Time', units= 's')
-            self.plot1.showGrid(x=True, y=True)
-            self.curve_phase_difference = self.plot1.plot(pen='g')
-            self.plot1.addLegend()
+        #  ----------------------- Handle Scaling Logic -----------------------
+        # factor maps 100ms -> 1, 500ms -> 5, 1000ms -> 10
+        factor = interval_ms // 100
+        sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = factor * sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
         
-            self.plot1.enableAutoRange(axis='x', enable=False)
-            self.plot1.setXRange(0, 0.5)
+        #  ----------------------- Mode-specific time axis length  -----------------------
+        range_len = 50000 if (mode == "View angle" and interval_ms == 1000) else (factor * 1000)
+        self.time_axis = [i * 0.0001 for i in range(range_len)]
 
-            # Create a timer for angle updates
-            self.timer = QtCore.QTimer()
-            self.timer.setInterval(time_interval_var_int)  # 0.5 seconds interval
-            self.timer.timeout.connect(self.graph_phase_difference)
-            self.timer.start()
+        # ----------------------- Mode Configuration Map -----------------------
+        # Structure: { ModeName: (UpdateFunction, [Plot1_Setup, Plot2_Setup]) }
+        config = {
+            "View sensors": (self.graph_update_sensors, [
+                {"title": "Hall sensors", "y": "Voltage", "u": "V", "curves": [("r", "v1", "Hall 1"), ("b", "v2", "Hall 2")]},
+                {"title": "Current sensors", "y": "Current", "u": "mA", "curves": [("g", "i1", "I1"), ("y", "i2", "I2")]}
+            ]),
+            "View angle": (self.graph_update_angle, [
+                {"title": "Permanent magnet angle", "y": "ϕ_m", "u": "rad", "curves": [("r", "sigma_m", "Sigma")]},
+                {"title": "Magnetic field angle", "y": "ϕ_B", "u": "rad", "curves": [("g", "sigma_b", "B")]}
+            ]),
+            "View phase difference": (self.graph_phase_difference, [
+                {"title": "Phase Difference", "y": "Δϕ", "u": "rad", "curves": [("g", "phase_diff", "Delta")]}
+            ])
+        }
+
+        if mode not in config:
+            return
+
+        update_func, plots_setup = config[mode]
+
+        # ----------------------- Build the UI -----------------------
+        for row, setup in enumerate(plots_setup):
+            plot = self.graphicsView.addPlot(row=row, col=0, title=setup["title"])
+            self._apply_plot_style(plot, setup["y"], setup["u"])
             
+            for color, attr_suffix, name in setup["curves"]:
+                curve = plot.plot(pen=color, name=name)
+                # Dynamically set attribute (e.g., self.curve_v1)
+                setattr(self, f"curve_{attr_suffix}", curve)
+
+        # ----------------------- Initialize Timer -----------------------
+        self.timer = QtCore.QTimer()
+        self.timer.setInterval(interval_ms)
+        self.timer.timeout.connect(update_func)
+        self.timer.start()
+
+    def _apply_plot_style(self, plot, y_label, units):
+        """Standardizes plot appearance."""
+        plot.setLabel('left', y_label, units=units)
+        plot.setLabel('bottom', 'Time', units='s')
+        plot.addLegend()
+        plot.showGrid(x=True, y=True)
+        plot.enableAutoRange(axis='x', enable=False)
+        plot.setXRange(0, 0.5)
 
     def start_normalise_event(self):
-        
         if not self.worker_DataUpdate.flag_normalise:
             self.worker_DataUpdate.flag_normalise_event(True)
         else:
             self.worker_DataUpdate.flag_normalise_event(False)
-                
 
     def graph_update_sensors(self):
-        global data_mutex
+    # ----------------------- Access the slices once to minimize race condition window -----------------------
+        v1 = self.worker_getter_graph.v1_slice
+        v2 = self.worker_getter_graph.v2_slice
+        i1 = self.worker_getter_graph.i1_slice
+        i2 = self.worker_getter_graph.i2_slice
 
-        # data_mutex.lock()
+        # ----------------------- Determine the shortest length available right now -----------------------
+        # We compare the time_axis and all 4 data arrays
+        min_len = min(len(self.time_axis), len(v1), len(v2), len(i1), len(i2))
 
-        self.curve_v1.setData(self.time_axis,self.worker_getter_graph.v1_slice)
-        self.curve_v2.setData(self.time_axis,self.worker_getter_graph.v2_slice)
+        # 3. Validation
+        if min_len == 0:
+            return
+
+        # 4. Slice all arrays to the same length for this frame
+        t = self.time_axis[:min_len]
         
-        self.curve_i1.setData(self.time_axis,self.worker_getter_graph.i1_slice)
-        self.curve_i2.setData(self.time_axis,self.worker_getter_graph.i2_slice)
-        
-        # data_mutex.unlock()
+        self.curve_v1.setData(t, v1[:min_len])
+        self.curve_v2.setData(t, v2[:min_len])
+        self.curve_i1.setData(t, i1[:min_len])
+        self.curve_i2.setData(t, i2[:min_len])
+            # data_mutex.unlock()
         #
         
     def auto_range_event(self):
@@ -670,13 +622,15 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.curve_sigma_b.setData(self.time_axis, self.worker_getter_graph.angle_magnetic_field_val)
         
         data_mutex.unlock()
+        
     def graph_phase_difference(self):
         global data_mutex
         data_mutex.lock()
         
-        self.curve_phase_difference.setData(self.time_axis, self.worker_getter_graph.phase_difference_val)
+        self.curve_phase_diff.setData(self.time_axis, self.worker_getter_graph.phase_difference_val)
         
-        data_mutex.unlock()
+        data_mutex.unlock()            
+
         
         
     def send_parameter_event(self):
@@ -691,7 +645,13 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         # ----- Assign values to the worker data block --------
         self.worker_data_block.data_1 = 65534
-        self.worker_data_block.data_2 = self.textbox_frequency.text()
+        self.worker_data_block.data_2 = float(self.textbox_frequency.text())
+        
+        # ----- Case for ZERO frequency values (NOT ACCEPTED BY MCU) --------
+        
+        if self.worker_data_block.data_2 == 0.0:
+            #set the frequency to be as small as possible 
+            self.worker_data_block.data_2_for_MCU = 0.00429 #Hz
         
         # ------ Pack currents/offsets directly into a tuple. --------
         self.worker_data_block.data_current = (
@@ -701,8 +661,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         # --------- Apply direction and filter logic --------
         self.worker_data_block.data_7 = dir_map.get(self.comboBox_direction.currentText(), 1)
-        self.worker_data_block.data_8 = 0 if self.filter_checkbox.isChecked() else 2
-        self.worker_data_block.data_10 = 1 
+        self.worker_data_block.data_8 = sockets_files.CSR_LOOP
+        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE 
 
         # ---------- Hardware and UI triggers. ------------
         self.button_stop.setDisabled(False)  # Enable stop button
@@ -743,13 +703,13 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.textbox_amplitude1.text(), self.textbox_offset1.text(),
             self.textbox_amplitude2.text(), self.textbox_offset2.text()
         )
-        self.worker_data_block.data_10 = 1 
+        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE  
 
         # --------- Setting downsample properties ---------
         self.worker_downsample_property.time_increment = 1.0 / fs
         self.worker_downsample_property.tot_average = tot_avg
         self.worker_downsample_property.current_time = 0.0
-        self.worker_flag_run_time.flag_csv_save = True
+        self.worker_flag_run_time.flag_running_time = True
         
         sockets_files.file_name_change_set("dummy")
 
@@ -772,7 +732,10 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.button_stop.setDisabled(is_active)
         self.save_button.setDisabled(is_active)
 
-    def start_calibration_event(self, input_current = -400, count_recursion = 1 ):
+    def start_coil_calibration_event(self, input_current = -400, count_recursion = 1 ):
+        
+        self.worker_DataUpdate.flag_normalise_event(False)
+        
         print("Recursion in main func:", count_recursion)
         
         self.worker_k_b_property.k_b_1 = 0.0
@@ -783,16 +746,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         print("Input current for calibration:", input_current)
     
-        #from combobox direction
-        if self.comboBox_direction.currentText() == "Clockwise":
-            data_7 = 2
-        elif self.comboBox_direction.currentText() == "Anti-clockwise":
-            data_7 = 1
-            
-        data_8 = 3          #mode 3 to the board (for dc generator)
-        data_9= 0
-        data_10 = 1
-        
         ############################# send data to setter getter ############################################################################
         self.worker_data_block.data_1 = float(1.0) #seconds
         self.worker_data_block.data_2_for_MCU  = str(3) # Hz
@@ -802,16 +755,14 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #from combobox direction
         if self.comboBox_direction.currentText() == "Clockwise":
             self.worker_data_block.data_7 = 2
-            data_7 = self.worker_data_block.data_7
         elif self.comboBox_direction.currentText() == "Anti-clockwise":
             self.worker_data_block.data_7 = 1
-            data_7 = self.worker_data_block.data_7
             
 
-        self.worker_data_block.data_8 = 3
+        self.worker_data_block.data_8 = sockets_files.CSR_COIL_CALIBRTAION
         self.worker_data_block.data_9 = 0
         #for data 10
-        self.worker_data_block.data_10 = 1 
+        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE
         ############################################################################################################################
 
         ##send all data to microcontroller
@@ -855,7 +806,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 self.mean_current_2_0_A = np.mean(self.accumulate_current_2[1000:])
     
                 ### second recursion occurs
-                self.start_calibration_event(400, 2)
+                self.start_coil_calibration_event(400, 2)
             elif count_recursion == 2:
                 self.mean_hall_1_400_A = np.mean(self.accumulate_hall_1[1000:])
                 self.mean_hall_2_400_A = np.mean(self.accumulate_hall_2[1000:])
@@ -902,11 +853,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                     path_to_save_kb,
                     data,
                     delimiter=";",
-                    fmt=["%d", "%.18f", "%.18f"],
+                    fmt=["%d", "%.17g", "%.17g"],
                     header="ELECTRONICS_FLAG;k_b_1;k_b_2",
                     comments=""
                 )
-
+                
                 self.k_b_label.setText(
                     f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
                     f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
@@ -924,7 +875,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 self.button_stop.setDisabled(False)
                 
                 
-    def set_constant(self, get_accumulate_hall_1, get_accumulate_hall_2, get_accumulate_current_1, get_accumulate_current2):
+    def set_constant(self, get_accumulate_hall_1, get_accumulate_hall_2, get_accumulate_current_1, get_accumulate_current_2):
         """
         Set accumulated measurement values for Hall sensors and current sensors.
 
@@ -945,7 +896,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.accumulate_hall_1 = get_accumulate_hall_1
         self.accumulate_hall_2 = get_accumulate_hall_2
         self.accumulate_current_1 = get_accumulate_current_1
-        self.accumulate_current_2 = get_accumulate_current2
+        self.accumulate_current_2 = get_accumulate_current_2
     
     
     #initiation!!!!!
@@ -958,6 +909,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.worker_fr_property.fr1 = 0.0
             self.calculate_final_fR = 0
             
+        self.worker_DataUpdate.flag_normalise_event(False)
+            
         ############################# send data to setter getter ############################################################################
         self.worker_data_block.data_1 = str(5) #mA
         self.worker_data_block.data_2_for_MCU  = str(running_frequency) # Hz
@@ -965,14 +918,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_data_block.data_current = str(200), self.textbox_offset1.text(), str(200), self.textbox_offset2.text()
         self.worker_data_block.data_7 = rotation_direction
             
-        if self.filter_checkbox.isChecked():
-            self.worker_data_block.data_8 = 0
-        else:
-            self.worker_data_block.data_8 = 2
+        self.worker_data_block.data_8 = sockets_files.CSR_LOOP
             
         self.worker_data_block.data_9 = 0
         #for data 10
-        self.worker_data_block.data_10 = 1 
+        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE
         ############################################################################################################################
 
         ##send all data to microcontroller
@@ -994,18 +944,17 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         ############################# send data to setter getter ######################################
         self.worker_data_block.data_1 = float(10)
         self.worker_data_block.data_2_for_MCU  = str(running_frequency) # Hz
-        
+
         self.worker_data_block.data_current = input_current, self.textbox_offset1.text(), input_current, self.textbox_offset2.text()
         self.worker_data_block.data_7 = rotation_direction
             
-        if self.filter_checkbox.isChecked():
-            self.worker_data_block.data_8 = 0
-        else:
-            self.worker_data_block.data_8 = 2
+
+        self.worker_data_block.data_8 = sockets_files.CSR_LOOP
+
             
         self.worker_data_block.data_9 = 0
         #for data 10
-        self.worker_data_block.data_10 = 1 
+        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE
         ######################################################################################
         
         self.status_label.setText(
@@ -1141,7 +1090,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 
                 dir_fr_results = os.path.join(self.project_root, "files", "results_fr.csv")
                 # Save to CSV      
-                np.savetxt(dir_fr_results, data_to_save, delimiter=";", comments="", fmt="%.18f", header=header_text)
+                np.savetxt(dir_fr_results, data_to_save, delimiter=";", comments="", fmt="%.17g", header=header_text)
                 #calculate final fR
                 self.calculate_final_fR =  np.polyfit(self.calculated_angular_velocity, self.calculated_torque, 1)
                 self.popout_window(4, self.calculate_final_fR, self.worker_k_b_property.k_b_1, self.worker_k_b_property.k_b_2)
@@ -1153,7 +1102,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                     f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
                     f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
                     f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
-                    f"f<sub>R</sub> equation = {np.poly1d(self.calculate_final_fR)}"
+                    f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
                 )
                 
                 #refresh the graph
@@ -1196,19 +1145,18 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #from combobox direction
         if self.comboBox_direction.currentText() == "Clockwise":
             self.worker_data_block.data_7 = 2
-            data_7 = self.worker_data_block.data_7
+            self.worker_data_block.data_7 = self.worker_data_block.data_7
         elif self.comboBox_direction.currentText() == "Anti-clockwise":
             self.worker_data_block.data_7 = 1
-            data_7 = self.worker_data_block.data_7
+            self.worker_data_block.data_7 = self.worker_data_block.data_7
             
-        if self.filter_checkbox.isChecked():
-            self.worker_data_block.data_8 = 0
-        else:
-            self.worker_data_block.data_8 = 2
+
+        self.worker_data_block.data_8 = sockets_files.CSR_LOOP
+
             
         
         #for data 10
-        self.worker_data_block.data_10 = 1 
+        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE 
         ######################################################################################
 
         
@@ -1221,93 +1169,26 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.button_rotate.setDisabled(False)
 
 
-    def button_rotate_event(self):
-        
+    def button_normalisation_event(self):
         #Reset the normalise event state 
         self.worker_DataUpdate.flag_normalise_event(False)
+        
 
-        ############################# send data to setter getter ######################################
-        self.worker_data_block.data_1 =5.0 #second
-        # make the running frequency 200 Hz, does not matter since we will produce DC current anyway
-        # change to frequency for MCU
-        self.worker_data_block.data_2_for_MCU = 1 #Hz
+        # --------------------- Map UI logic ------------------------
+        direction = 2 if self.comboBox_direction.currentText() == "Clockwise" else 1
 
-        self.worker_data_block.data_current = 200, 0, 200, 0
+        #--------------------- Update the Data Worker ---------------------
+        self.worker_data_block.data_1 = 0.5 # Placeholder
+        self.worker_data_block.data_2 = 10  # Forced 3Hz Frequency
+        self.worker_data_block.data_current = (300, 0, 300, 0)  # Coil currents
 
-        # from combobox direction
-        self.worker_data_block.data_7 = 1
-
-        if self.filter_checkbox.isChecked():
-            self.worker_data_block.data_8 = 0
-        else:
-            self.worker_data_block.data_8 = 2
-
-        # for data 10
-        self.worker_data_block.data_10 = 1
-        ######################################################################################
-
-        ##send all data to microcontroller
-        #activate flag
-        self.worker_flag_send.flag_tx = True
+        self.worker_data_block.data_7 = direction
+        self.worker_data_block.data_8 = sockets_files.CSR_NORM
+        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE  # Rotation Mode (CRITICAL)
+        self.worker_data_block.data_11 = 0.0
 
         self.status_label.setStyleSheet("color: #7da832;")
         self.status_label.setText("Rotation starts for normalising!!!!")
-
-        self.worker_sleep = SleepTimer()
-        self.worker_sleep.update_time_signal.connect(self.update_timer_rotation)
-        self.worker_sleep.start()
-
-
-        #active the flag on DataUpdate side for finding normalising parameters for the voltages
-        self.worker_DataUpdate.flag_special_event(False, False, True)
-
-    def update_timer_rotation(self, val):
-        """
-        for rotation timer purposes
-        """
-        self.lcdNumber.display(val)
-
-        if val != 0.0:
-            self.button_send.setDisabled(True)
-            self.button_start.setDisabled(True)
-            self.button_stop.setDisabled(True)
-            self.button_rotate.setDisabled(True)
-            self.normalise_button.setDisabled(True)
-
-        elif val == 0.0:
-            self.button_send.setDisabled(False)
-            self.button_start.setDisabled(False)
-            self.button_stop.setDisabled(False)
-            self.normalise_button.setDisabled(False)
-            self.save_button.setDisabled(False)
-
-
-            #mark the end of the normalise measurement event
-            self.worker_DataUpdate.flag_special_event(False, False, False)
-
-
-            self.worker_normalise_properties.amp_voltage_1 = (np.max(self.accumulate_hall_1[10:]) - np.min(self.accumulate_hall_1[10:])) / 2
-            self.worker_normalise_properties.zero_offset_voltage_1 = (np.max(self.accumulate_hall_1[10:]) + np.min(self.accumulate_hall_1[10:])) / 2
-
-            self.worker_normalise_properties.amp_voltage_2 = (np.max(self.accumulate_hall_2[10:]) - np.min(self.accumulate_hall_2[10:])) /  2
-            self.worker_normalise_properties.zero_offset_voltage_2 = (np.max(self.accumulate_hall_2[10:]) + np.min(self.accumulate_hall_2[10:])) / 2
-
-            #File path for saving
-            header_text = "voltage_amp_1_V;voltage_zero_offset_1_V;voltage_amp_2_V;voltage_zero_offset_2_V"
-            dir_save_normalisation = os.path.join(self.project_root, "files", "normalise_voltage_constant.csv")
-            
-            data_to_save = np.column_stack((self.worker_normalise_properties.amp_voltage_1, self.worker_normalise_properties.zero_offset_voltage_1,
-                                            self.worker_normalise_properties.amp_voltage_2, self.worker_normalise_properties.zero_offset_voltage_2))
-
-            # Save to CSV      
-            np.savetxt(dir_save_normalisation, data_to_save, delimiter=";", comments="", fmt="%.18f", header=header_text)
-            
-            packet_transmission.VoltageNormaliseCoefficient.reload()
-
-            self.worker_DataUpdate.flag_normalise_event(True)
-
-
-            self.popout_window(6)
 
     def graph_stop_event(self):
         if self.stop_default_state == 1:
@@ -1365,7 +1246,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             dir_dummy_csv = os.path.join(self.project_root, "files", "dummy.csv")
 
             data_read = np.loadtxt(dir_dummy_csv, delimiter=';')
-            np.savetxt(filename_saving, data_read, delimiter=';')
+            np.savetxt(filename_saving, data_read, delimiter=';', fmt='%.17g')
 
         
     def popout_window(self, arg, calculate_final_fR = 0.0, k_b_1 = 0.0, k_b_2 = 0.0):
@@ -1407,7 +1288,7 @@ class TabWindowConstSR(QMainWindow):
         #stop all the background processes
 
             
-        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, sockets_files.q_to_csv, sockets_files.q_to_norm):
+        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, sockets_files.q_to_csv):
             q.close()
             q.join_thread()
 

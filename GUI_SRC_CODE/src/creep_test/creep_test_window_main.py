@@ -31,7 +31,7 @@ class DataUpdate(QThread):
     """
     Thread class responsible for receiving, processing, and managing ADC data streams for Hall sensors and current sensors in real-time.
 
-    This class reads incoming data packets from a queue, converts raw ADC values into meaningful voltage and current signals,
+    This class reads incoming data packets from a queue, converts raw ADC values into meaningful voltage and current signals, 
     applies calibration and normalization, and computes derived quantities such as magnetic field angles and phase differences.
 
     The processed data is stored in a separate worker class (`StoreArrayGraph`) for visualization or further analysis.
@@ -73,44 +73,50 @@ class DataUpdate(QThread):
     def __init__(self, main_window_ref=None):
         super().__init__()
         self.main_window_ref = main_window_ref
+        
+        # ---------------- Operational State ---------------
         self.running = True
         self.flag_calibrate = False
-
+        self.flag_normalise = False
+        self.flag_normalise_measurement = False
         self.flag_fR_measurement = False
+
+        # ----------- Accumulators & Totals (Hall/Current) ----------
         self.accumulate_hall_1 = 0.0
         self.accumulate_hall_2 = 0.0
         self.accumulate_current_1 = 0.0
         self.accumulate_current_2 = 0.0
-
-        # for normalise properties purposes
-        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
-        self.amplitude_voltage_1 = 0.0
-        self.zero_offset_voltage_1 = 0.0
-        self.amplitude_voltage_2 = 0.0
-        self.zero_offset_voltage_2 = 0.0
-
-        self.flag_normalise = False
-        self.flag_normalise_measurement = False
 
         self.total_hall_1 = None
         self.total_hall_2 = None
         self.total_current_1 = None
         self.total_current_2 = None
 
+        # ---------- Normalization Parameters -----------
+        self.amplitude_voltage_1 = 0.0
+        self.zero_offset_voltage_1 = 0.0
+        self.amplitude_voltage_2 = 0.0
+        self.zero_offset_voltage_2 = 0.0
+
+        # ------- Data Buffers (NumPy Arrays) --------
+        # Raw Data Slices
         self.v1_slice = np.array([], dtype=np.uint16)
         self.v2_slice = np.array([], dtype=np.uint16)
         self.i1_slice = np.array([], dtype=np.uint16)
         self.i2_slice = np.array([], dtype=np.uint16)
+        self.bytes_to_process = np.array([], dtype=np.uint16)
 
-        self.bytes_to_process = np.array([], dtype=np.uint16)  # Empty NumPy array for incoming data
-
+        #------------ Calculated Values ------------------------
         self.angle_permanent_magnet_val = np.array([], dtype=np.float32)
         self.angle_magnetic_field_val = np.array([], dtype=np.float32)
         self.phase_difference_val = np.array([], dtype=np.float32)
 
+        # ------ Helper Workers --------------------------------
+        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
         self.worker_array_setter = packet_transmission.StoreArrayGraph()
         self.worker_kb_property = packet_transmission.kbCoefficient()
-
+        
+        
     def run(self):
 
         """
@@ -161,6 +167,7 @@ class DataUpdate(QThread):
                 data_mutex.lock()
 
                 # Hall Sensors
+                #TODO: NEW FIRMWARE ITERACTIONS MUST NOT BE NEGATIVE FOR I1!!!!!!!!!
                 self.v1_slice = -packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
                 self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
 
@@ -173,25 +180,21 @@ class DataUpdate(QThread):
                 self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
 
 
-
-                # calibration for hall sensors
+                # calibration for  hall sensors
                 self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
                                                                              self.v1_slice, self.i1_slice / 1000)
                 self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
                                                                              self.v2_slice, self.i2_slice / 1000)
-
-
-
+                if self.flag_normalise:
+                    self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amp_voltage_1
+                    self.v2_slice = (self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amp_voltage_2
+                
                 # Calibrate process starts
                 # measurement fR process starts
                 # measurement to determine the normalising parameters (for first time rotation)
                 if self.flag_calibrate or self.flag_fR_measurement or self.flag_normalise_measurement:
                     self.accumulate_data_function(self.v1_slice, self.v2_slice, self.i1_slice, self.i2_slice)
 
-                # this is normalising step (still do not know whether I want to do it immidiately or not)
-                if self.flag_normalise:
-                    self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amplitude_voltage_1
-                    self.v2_slice = ( self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amplitude_voltage_2
 
                 #######################################################################################################
                 self.angle_permanent_magnet_val = np.arctan2(self.v2_slice, self.v1_slice)
@@ -250,23 +253,52 @@ class DataUpdate(QThread):
 
 
 class SleepTimer(QObject):
+    """
+    A countdown timer that emits time updates at fixed intervals using PyQt signals.
+
+    This class implements a simple countdown timer based on `QTimer`. It periodically
+    emits the remaining time (in seconds) until the countdown reaches zero. The timer
+    is intended to be used in GUI applications where a background countdown must update
+    a display or trigger an event when completed.
+
+    Attributes
+    ----------
+    update_time_signal : pyqtSignal(float)
+        Signal emitted with the remaining time in seconds (rounded to one decimal place)
+        after each timer tick.
+    remaining : float
+        The remaining time in seconds. Initialized from the global variable `data_1`.
+    timer : QTimer
+        Internal Qt timer that triggers the `_tick` method every 100 milliseconds.
+
+    Methods
+    -------
+    start()
+        Starts the countdown timer.
+    stop()
+        Stops the countdown timer.
+    _tick()
+        Decrements the remaining time by 0.1 seconds per tick, emits updates via
+        `update_time_signal`, and calls `packet_transmission.running_time_flag_setter(0)`
+        when the countdown reaches zero.
+
+    Notes
+    -----
+    - The initial countdown value is taken from the global variable `data_1`.
+    - Each tick occurs every 100 ms (0.1 s).
+    - When the countdown completes, the timer stops automatically.
+    """
     update_time_signal = pyqtSignal(float)  # emit float countdown values
 
     def __init__(self):
         super().__init__()
-
-        self.worker_remaining = packet_transmission.RemainingTimeForCreepTest()
-        self.remaining = float(self.worker_remaining.total_time_for_file_save)
-        self.time_for_resetting_time =  self.worker_remaining.time_for_resetting_time
-        
+        self.worker_remaining = packet_transmission.TxData()
+        self.remaining = float(self.worker_remaining.data_1) # get local_data_1 from global
+        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
+        self.worker_reset_current_time = packet_transmission.DownSampleSpecificFlag()
         self.timer = QTimer(self)
         self.timer.setInterval(100)  # 100 ms per tick
         self.timer.timeout.connect(self._tick)
-        
-        
-        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
-        self.worker_reset_current_time = packet_transmission.DownSampleSpecificFlag()
-        
         
 
     def start(self):
@@ -277,17 +309,11 @@ class SleepTimer(QObject):
 
     def _tick(self):
         self.remaining -= 0.1
-        if self.remaining >= 0.0000000:
-            
-            #STOPS THE SPECIFIC DOWNSAMPLE
-            if abs(self.remaining - self.time_for_resetting_time) < 0.0001:
-                self.worker_reset_current_time.flag_specific_downsample = False
+        if self.remaining >= 0.0:
             self.update_time_signal.emit(round(self.remaining, 1))
-            
         else:
-            self.worker_flag_run_time.flag_running_time = False
             self.timer.stop()
-        
+            self.worker_flag_run_time.flag_running_time = False
             
 class SleepTimerVector(QObject):
     
@@ -316,7 +342,10 @@ class SleepTimerVector(QObject):
         else:
             self.timer.stop()
 
+
+
 class SocketThread(QThread):
+    
     def __init__(self, parent=None):
         super().__init__(parent)
         self.running = True
@@ -325,8 +354,10 @@ class SocketThread(QThread):
         if self.running:
             sockets_files.thread_start()
 
+
     def stop(self):
         self.running = False
+    
         
 
 class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
@@ -641,13 +672,10 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.worker_data_block.data_10 = 1 
         ######################################################################################
         
-        self.worker_data_block.data_offsets_creep = self.textbox_offset_1.text(), self.textbox_offset_2.text()
-        
 
         ##send all data to microcontroller
         #activate flag
         self.worker_flag_send.flag_tx = True
-        
 
         self.status_label.setStyleSheet("color: #32a83a;")
         self.status_label.setText("Offsets sent!")
@@ -686,8 +714,6 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         ##send all data to microcontroller
         #activate flag
         self.worker_flag_send.flag_tx = True
-        
-        
         
 
         self.status_label.setStyleSheet("color: #32a83a;")
@@ -840,9 +866,6 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             
             #for specified sampling frequency 
             input_sampling_rate = int(self.textbox_input_sampling_rate.text())
-            input_sampling_time = float(self.textbox_input_sampling_time.text())
-            
-            
             
             if input_sampling_rate == '' or input_sampling_rate == 0:
                 pass
@@ -852,11 +875,6 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
                 
                 check = 5000 / int(self.worker_downsample_property.tot_average_specified)
                 print("check is", check)
-                    
-            
-            
-        
-        
             """
             Send the 2nd vector 
             """
@@ -986,20 +1004,37 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             self.button_start_acquistion.setDisabled(False)
             self.save_button.setDisabled(False)
 
-            # mark the end of the normalise measurement event
+                       #mark the end of the normalise measurement event
             self.worker_DataUpdate.flag_special_event(False, False, False)
 
-            self.worker_normalise_properties.amplitude_voltage_1 = (np.max(self.accumulate_hall_1[10:]) - np.min(
-                self.accumulate_hall_1[10:])) / 2
-            self.worker_normalise_properties.zero_offset_voltage_1 = (np.max(self.accumulate_hall_1[10:]) + np.min(
-                self.accumulate_hall_1[10:])) / 2
 
-            self.worker_normalise_properties.amplitude_voltage_2 = (np.max(self.accumulate_hall_2[10:]) - np.min(
-                self.accumulate_hall_2[10:])) / 2
-            self.worker_normalise_properties.zero_offset_voltage_2 = (np.max(self.accumulate_hall_2[10:]) + np.min(
-                self.accumulate_hall_2[10:])) / 2
+            self.worker_normalise_properties.amp_voltage_1 = (np.max(self.accumulate_hall_1[10:]) - np.min(self.accumulate_hall_1[10:])) / 2
+            self.worker_normalise_properties.zero_offset_voltage_1 = (np.max(self.accumulate_hall_1[10:]) + np.min(self.accumulate_hall_1[10:])) / 2
+
+            self.worker_normalise_properties.amp_voltage_2 = (np.max(self.accumulate_hall_2[10:]) - np.min(self.accumulate_hall_2[10:])) /  2
+            self.worker_normalise_properties.zero_offset_voltage_2 = (np.max(self.accumulate_hall_2[10:]) + np.min(self.accumulate_hall_2[10:])) / 2
+            
+            print("self.worker_normalise_properties.amp_voltage_1", self.worker_normalise_properties.amp_voltage_1)
+            print("self.worker_normalise_properties.zero_offset_voltage_1", self.worker_normalise_properties.zero_offset_voltage_1)
+            print("self.worker_normalise_properties.amp_voltage_2 ", self.worker_normalise_properties.amp_voltage_2 )
+            print("self.worker_normalise_properties.zero_offset_voltage_2 ", self.worker_normalise_properties.zero_offset_voltage_2 )
+
+            #File path for saving
+            header_text = "voltage_amp_1_V;voltage_zero_offset_1_V;voltage_amp_2_V;voltage_zero_offset_2_V"
+            dir_save_normalisation = os.path.join(self.project_root, "files", "normalise_voltage_constant.csv")
+            
+            data_to_save = np.column_stack((self.worker_normalise_properties.amp_voltage_1, self.worker_normalise_properties.zero_offset_voltage_1,
+                                            self.worker_normalise_properties.amp_voltage_2, self.worker_normalise_properties.zero_offset_voltage_2))
+            
+            print(self.worker_normalise_properties.amp_voltage_1)
+
+            # Save to CSV      
+            np.savetxt(dir_save_normalisation, data_to_save, delimiter=";", comments="", fmt="%.17g",  header=header_text)
+            
+            packet_transmission.VoltageNormaliseCoefficient.reload()
 
             self.worker_DataUpdate.flag_normalise_event(True)
+
 
             self.popout_window(6)
 

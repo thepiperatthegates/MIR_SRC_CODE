@@ -443,7 +443,7 @@ class PIDOutput(QMainWindow, Ui_Title):
         self.button_send.clicked.connect(self.send_parameter_event)
         self.button_auto_range.clicked.connect(self.auto_range_event)
         self.save_button.clicked.connect(self.save_button_event)
-        self.button_rotate.clicked.connect(self.rotate_magnet_event)
+        self.button_rotate.clicked.connect(self.normalisation_magnet_event)
         self.button_stop.clicked.connect(self.stop_button_push_event)
         
         
@@ -610,15 +610,12 @@ class PIDOutput(QMainWindow, Ui_Title):
             # Direction: Anti-clockwise = 1, Clockwise = 2
             direction_code = 2 if self.comboBox_direction.currentText() == "Clockwise" else 1
 
-            # --------------------- FIR Filter: Checked = 0 (On), Unchecked = 2 (Off) ---------------------
-            filter_code = 0 if self.filter_checkbox.isChecked() else 2
-
             # --------------------- Update the Data Worker ---------------------
             self.worker_data_block.data_1 = shear_rate
             self.worker_data_block.data_2 = torque_ref
             self.worker_data_block.data_7 = direction_code
-            self.worker_data_block.data_8 = filter_code
-            self.worker_data_block.data_10 = 1  # Command/Mode selector (PID CONTROLLER ON)
+            self.worker_data_block.data_8 = sockets_files.PID_LOOP
+            self.worker_data_block.data_10 = sockets_files.PID_START  # Command/Mode selector (PID CONTROLLER ON)
             self.worker_data_block.data_11 = delta_phi
 
             #---------------------  Physical Transmission ---------------------
@@ -632,7 +629,7 @@ class PIDOutput(QMainWindow, Ui_Title):
             # --------------------- If the user entered invalid text in the textboxes ---------------------
             self._update_transmission_ui(success=False, message="Invalid Input! Numbers only.")
 
-    def rotate_magnet_event(self):
+    def normalisation_magnet_event(self):
         """
         Forces the magnet into rotation mode (3Hz) with specific coil currents.
         """
@@ -641,7 +638,6 @@ class PIDOutput(QMainWindow, Ui_Title):
 
             # --------------------- Map UI logic ------------------------
             direction = 2 if self.comboBox_direction.currentText() == "Clockwise" else 1
-            filter_val = 0 if self.filter_checkbox.isChecked() else 2
 
             #--------------------- Update the Data Worker ---------------------
             self.worker_data_block.data_1 = 0.5 # Placeholder
@@ -649,8 +645,8 @@ class PIDOutput(QMainWindow, Ui_Title):
             self.worker_data_block.data_current = (300, 0, 300, 0)  # Coil currents
 
             self.worker_data_block.data_7 = direction
-            self.worker_data_block.data_8 = filter_val
-            self.worker_data_block.data_10 = 2  # Rotation Mode (CRITICAL)
+            self.worker_data_block.data_8 = sockets_files.PID_NORM
+            self.worker_data_block.data_10 = sockets_files.PID_START  # Rotation Mode (CRITICAL)
             self.worker_data_block.data_11 = delta_phi
 
             # ---------------------  Physical Transmission ---------------------
@@ -720,11 +716,9 @@ class PIDOutput(QMainWindow, Ui_Title):
         self.worker_data_block.data_current = 0, 0, 0, 0
 
 
-        self.worker_data_block.data_8 = 2
-            
-        
+        self.worker_data_block.data_8 = sockets_files.PID_STOP
         #for data 10
-        self.worker_data_block.data_10 = 1 
+        self.worker_data_block.data_10 = sockets_files.PID_START 
         ######################################################################################
 
         
