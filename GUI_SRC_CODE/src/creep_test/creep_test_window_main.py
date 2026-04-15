@@ -25,7 +25,6 @@ from .analyse_window_creep_test import AnalyseWindow
 data_mutex = QMutex()
 
 
-
 # function receiving data through pipe from another thread
 class DataUpdate(QThread):
     """
@@ -141,9 +140,11 @@ class DataUpdate(QThread):
         - Data from the queue (`q_to_graph`) must have a multiple of 4 samples,
           corresponding to [v1, v2, i1, i2].
         """
-        num_columns = 4
 
         data_from_pipe = []  # creating a list here because data from pipe is a list
+        
+        num_columns = 5  # v1, v2, i1, i2, phase_diff
+                
         while self.running:
             data_from_pipe = q_to_graph.get()
             if not self.running:
@@ -163,13 +164,14 @@ class DataUpdate(QThread):
                 self.v2_slice = reshaped_data[:, 1]
                 self.i1_slice = reshaped_data[:, 2]  # STIMMT
                 self.i2_slice = reshaped_data[:, 3]  # STIMMT
+                self.phase_diff_slice = reshaped_data[:, 4]         # phase diff [rad]
 
                 data_mutex.lock()
 
                 # Hall Sensors
                 #TODO: NEW FIRMWARE ITERACTIONS MUST NOT BE NEGATIVE FOR I1!!!!!!!!!
-                self.v1_slice = -packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
-                self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
+                # self.v1_slice = -packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
+                # self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
 
                 # Current
                 self.i1_slice = -packet_transmission.change_current_adc(self.i1_slice)  # convert col3 (in mA)
@@ -181,14 +183,11 @@ class DataUpdate(QThread):
 
 
                 # calibration for  hall sensors
-                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
-                                                                             self.v1_slice, self.i1_slice / 1000)
-                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
-                                                                             self.v2_slice, self.i2_slice / 1000)
-                if self.flag_normalise:
-                    self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amp_voltage_1
-                    self.v2_slice = (self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amp_voltage_2
-                
+                # self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
+                #                                                              self.v1_slice, self.i1_slice / 1000)
+                # self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
+                #                                                              self.v2_slice, self.i2_slice / 1000)
+
                 # Calibrate process starts
                 # measurement fR process starts
                 # measurement to determine the normalising parameters (for first time rotation)
@@ -203,7 +202,7 @@ class DataUpdate(QThread):
                 self.angle_permanent_magnet_val = np.unwrap(self.angle_permanent_magnet_val)
                 self.angle_magnetic_field_val = np.unwrap(self.angle_magnetic_field_val)
                 #######################################################################################################
-                self.phase_difference_val = self.angle_magnetic_field_val - self.angle_permanent_magnet_val
+                self.phase_difference_val = self.phase_diff_slice
 
                 ##send to setter class
                 self.worker_array_setter.v1_slice = self.v1_slice
@@ -250,6 +249,8 @@ class DataUpdate(QThread):
 
     def stop(self):
         self.running = False
+
+
 
 
 class SleepTimer(QObject):
@@ -391,12 +392,6 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.textbox_input_sampling_rate.setText("500")
         self.textbox_offset_1.setText("0")
         self.textbox_offset_2.setText("0")
-
-        #force everything to be disabled so one has to do the normalise event first
-        self.button_offsets.setDisabled(True)
-        self.button_send_start_vec.setDisabled(True)
-        self.button_start_acquistion.setDisabled(True)
-        
         ################################################################################################
 
         ################################ SET ICON ###################################################
@@ -428,7 +423,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.graph_stop_button.clicked.connect(self.graph_stop_event)
         self.button_auto_range.clicked.connect(self.auto_range_event)
 
-        self.button_rotate.clicked.connect(self.button_rotate_event)
+        self.button_rotate.clicked.connect(self.normalisation_magnet_event)
         
         ####################################################################################
         
@@ -488,145 +483,109 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.select_mode_comboBox.activated.connect(self.change_graph)
         ##### same as above but for time interval change
         self.timeInterval_comboBox.activated.connect(self.change_graph)
+        self._start_normalise_mcu()
 
 
     def change_graph(self):
-        
-        #get string from combo box
-        mode = self.select_mode_comboBox.currentText()
-        time_interval_var_string = self.timeInterval_comboBox.currentText()
-        time_interval_var_int = int(time_interval_var_string[:-2])
-        
-        
-        #clear graph and stop every time the event is connected
+        """Sets up the plotting environment based on UI selection."""
+        # -----------------------  Reset Plotting Area -----------------------
         self.graphicsView.clear()
         if hasattr(self, 'timer'):
             self.timer.stop()
 
-    
-        if mode == "View sensors":
-            
-            #this is to make sure x-axis is configured properly 
-            if time_interval_var_int == 100:
-                sockets_files.tot_count_accumulate_recv = 250
-                self.time_axis = [i * 0.0001 for i in range(1000)]
-            elif time_interval_var_int == 500:
-                sockets_files.tot_count_accumulate_recv = 5*250
-                self.time_axis = [i * 0.0001 for i in range(5*1000)]
-            elif time_interval_var_int == 1000:
-                sockets_files.tot_count_accumulate_recv = 10*250
-                self.time_axis = [i * 0.0001 for i in range(10*1000)]
-            
-            ######################
-            self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Hall sensors")
-            self.plot1.setLabel('left', 'Voltage', units='V')
-            self.plot1.setLabel('bottom', 'Time', units= 's')
-            self.plot1.addLegend()
-            self.plot1.showGrid(x=True, y=True)
-            self.curve_v1 = self.plot1.plot(pen='r', name="Hall sensors 1")
-            self.curve_v2 = self.plot1.plot(pen='b', name="Hall sensors 2")
-
-            
-            self.plot2 = self.graphicsView.addPlot(row=1, col=0, title="Current sensors")
-            self.plot2.setLabel('left', 'Current', units='mA')
-            self.plot2.setLabel('bottom', 'Time', units= 's')
-            self.plot2.addLegend()
-            self.plot2.showGrid(x=True, y=True)
-            
-            
-            self.curve_i1 = self.plot2.plot(pen='g', name="I1")
-            self.curve_i2 = self.plot2.plot(pen='y', name="I2")
-            
-            self.plot1.enableAutoRange(axis='x', enable=False)
-            self.plot2.enableAutoRange(axis='x', enable=False)
-            self.plot1.setXRange(0, 0.5)
-            self.plot2.setXRange(0, 0.5)
+        # ----------------------- Extract and Parse Inputs -----------------------
+        mode = self.select_mode_comboBox.currentText()
+        interval_str = self.timeInterval_comboBox.currentText()
+        interval_ms = int(interval_str[:-2])
         
-            # Create a timer for sensor updates
-            self.timer = QtCore.QTimer()
-            self.timer.setInterval(time_interval_var_int)  # 0.5 seconds interval
-            self.timer.timeout.connect(self.graph_update_sensors)
-            self.timer.start()
-
-        elif mode == "View angle":
-            
-            #this is to make sure x-axis is configured properly 
-            if time_interval_var_int == 100:
-                sockets_files.tot_count_accumulate_recv = 250
-                self.time_axis = [i * 0.0001 for i in range(1000)]
-            elif time_interval_var_int == 500:
-                sockets_files.tot_count_accumulate_recv = 5*250
-                self.time_axis = [i * 0.0001 for i in range(5*1000)]
-            elif time_interval_var_int == 1000:
-                sockets_files.tot_count_accumulate_recv = 10*250
-                self.time_axis = [i * 0.0001 for i in range(10*5000)]
-                
-            self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Permanent magnet angle")
-            self.plot1.setLabel('left', 'ϕ_m', units='rad')
-            self.plot1.setLabel('bottom', 'Time', units= 's')
-            self.plot1.addLegend()
-            self.plot1.showGrid(x=True, y=True)
-            self.curve_sigma_m = self.plot1.plot(pen='r', name="Sigma")
-    
-            
-            self.plot2 = self.graphicsView.addPlot(row=1, col=0, title="Magnetic field angle")
-            self.plot2.setLabel('left', 'ϕ_B', units='rad')
-            self.plot2.setLabel('bottom', 'Time', units= 's')
-            self.plot2.addLegend()
-            self.plot2.showGrid(x=True, y=True)
-            self.curve_sigma_b = self.plot2.plot(pen='g', name="B")
-            
-            self.plot1.enableAutoRange(axis='x', enable=False)
-            self.plot2.enableAutoRange(axis='x', enable=False)
-            self.plot1.setXRange(0, 0.5)
-            self.plot2.setXRange(0, 0.5)
-            
-            self.timer = QtCore.QTimer()
-            self.timer.setInterval(time_interval_var_int)  # 0.5 seconds interval
-            self.timer.timeout.connect(self.graph_update_angle)
-            self.timer.start()
-
-
-            
-        elif mode == "View phase difference":
-            #this is to make sure x-axis is configured properly 
-            if time_interval_var_int == 100:
-                sockets_files.tot_count_accumulate_recv = 250
-                self.time_axis = [i * 0.0001 for i in range(1000)]
-            elif time_interval_var_int == 500:
-                sockets_files.tot_count_accumulate_recv = 5*250
-                self.time_axis = [i * 0.0001 for i in range(5*1000)]
-            elif time_interval_var_int == 1000:
-                sockets_files.tot_count_accumulate_recv = 10*250
-                self.time_axis = [i * 0.0001 for i in range(10*1000)]
-                
-            self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Permanent magnet angle")
-            self.plot1.setLabel('left', 'Δϕ', units='rad')
-            self.plot1.setLabel('bottom', 'Time', units= 's')
-            self.plot1.showGrid(x=True, y=True)
-            self.curve_phase_difference = self.plot1.plot(pen='g')
-            self.plot1.addLegend()
+        #  ----------------------- Handle Scaling Logic -----------------------
+        # factor maps 100ms -> 1, 500ms -> 5, 1000ms -> 10
+        factor = interval_ms // 100
+        sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = factor * sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
         
-            self.plot1.enableAutoRange(axis='x', enable=False)
-            self.plot1.setXRange(0, 0.5)
+        #  ----------------------- Mode-specific time axis length  -----------------------
+        range_len = 50000 if (mode == "View angle" and interval_ms == 1000) else (factor * 1000)
+        self.time_axis = [i * 0.0001 for i in range(range_len)]
 
-            # Create a timer for angle updates
-            self.timer = QtCore.QTimer()
-            self.timer.setInterval(time_interval_var_int)  # 0.5 seconds interval
-            self.timer.timeout.connect(self.graph_phase_difference)
-            self.timer.start()
+        # ----------------------- Mode Configuration Map -----------------------
+        # Structure: { ModeName: (UpdateFunction, [Plot1_Setup, Plot2_Setup]) }
+        config = {
+            "View sensors": (self.graph_update_sensors, [
+                {"title": "Hall sensors", "y": "Hall Voltage", "u": "[norm]", "curves": [("r", "v1", "Hall 1"), ("b", "v2", "Hall 2")]},
+                {"title": "Current sensors", "y": "Current", "u": "mA", "curves": [("g", "i1", "I1"), ("y", "i2", "I2")]}
+            ]),
+            "View angle": (self.graph_update_angle, [
+                {"title": "Permanent magnet angle", "y": "ϕ_m", "u": "rad", "curves": [("r", "sigma_m", "Sigma")]},
+                {"title": "Magnetic field angle", "y": "ϕ_B", "u": "rad", "curves": [("g", "sigma_b", "B")]}
+            ]),
+            "View phase difference": (self.graph_phase_difference, [
+                {"title": "Phase Difference", "y": "Δϕ", "u": "rad", "curves": [("g", "phase_diff", "Delta")]}
+            ])
+        }
+
+        if mode not in config:
+            return
+
+        update_func, plots_setup = config[mode]
+
+        # ----------------------- Build the UI -----------------------
+        for row, setup in enumerate(plots_setup):
+            plot = self.graphicsView.addPlot(row=row, col=0, title=setup["title"])
+            self._apply_plot_style(plot, setup["y"], setup["u"])
             
+            for color, attr_suffix, name in setup["curves"]:
+                curve = plot.plot(pen=color, name=name)
+                # Dynamically set attribute (e.g., self.curve_v1)
+                setattr(self, f"curve_{attr_suffix}", curve)
+
+        # ----------------------- Initialize Timer -----------------------
+        self.timer = QtCore.QTimer()
+        self.timer.setInterval(interval_ms)
+        self.timer.timeout.connect(update_func)
+        self.timer.start()
+
+    def _apply_plot_style(self, plot, y_label, units):
+        """Standardizes plot appearance."""
+        plot.setLabel('left', y_label, units=units)
+        plot.setLabel('bottom', 'Time', units='s')
+        plot.addLegend()
+        plot.showGrid(x=True, y=True)
+        plot.enableAutoRange(axis='x', enable=False)
+        plot.setXRange(0, 0.5)
+
+    def start_normalise_event(self):
+        if not self.worker_DataUpdate.flag_normalise:
+            self.worker_DataUpdate.flag_normalise_event(True)
+        else:
+            self.worker_DataUpdate.flag_normalise_event(False)
+
     def graph_update_sensors(self):
-        global data_mutex
-        data_mutex.lock()
+    # ----------------------- Access the slices once to minimize race condition window -----------------------
+        v1 = self.worker_getter_graph.v1_slice
+        v2 = self.worker_getter_graph.v2_slice
+        i1 = self.worker_getter_graph.i1_slice
+        i2 = self.worker_getter_graph.i2_slice
+
+        # ----------------------- Determine the shortest length available right now -----------------------
+        # We compare the time_axis and all 4 data arrays
+        min_len = min(len(self.time_axis), len(v1), len(v2), len(i1), len(i2))
+
+        # 3. Validation
+        if min_len == 0:
+            return
+
+        # 4. Slice all arrays to the same length for this frame
+        t = self.time_axis[:min_len]
         
-        self.curve_v1.setData(self.time_axis,self.worker_getter_graph.v1_slice)
-        self.curve_v2.setData(self.time_axis,self.worker_getter_graph.v2_slice)
+        self.curve_v1.setData(t, v1[:min_len])
+        self.curve_v2.setData(t, v2[:min_len])
+        self.curve_i1.setData(t, i1[:min_len])
+        self.curve_i2.setData(t, i2[:min_len])
+            # data_mutex.unlock()
+        #
         
-        self.curve_i1.setData(self.time_axis,self.worker_getter_graph.i1_slice)
-        self.curve_i2.setData(self.time_axis,self.worker_getter_graph.i2_slice)
-        data_mutex.unlock()
     def auto_range_event(self):
+        
         self.plot1.enableAutoRange(axis='y', enable=True)
         self.plot2.enableAutoRange(axis='y', enable=True)
         # self.plot1.enableAutoRange(axis='x', enable=True)
@@ -636,15 +595,23 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
     def graph_update_angle(self):
         global data_mutex
         data_mutex.lock()
+        
         self.curve_sigma_m.setData(self.time_axis, self.worker_getter_graph.angle_permanent_magnet_val)
         self.curve_sigma_b.setData(self.time_axis, self.worker_getter_graph.angle_magnetic_field_val)
+        
         data_mutex.unlock()
         
     def graph_phase_difference(self):
         global data_mutex
         data_mutex.lock()
-        self.curve_phase_difference.setData(self.time_axis, self.worker_getter_graph.phase_difference_val)
-        data_mutex.unlock()
+        
+        self.curve_phase_diff.setData(self.time_axis, self.worker_getter_graph.phase_difference_val)
+        
+        data_mutex.unlock()           
+        
+    def _start_normalise_mcu(self) -> None:
+            self.worker_flag_send.flag_init_tx = True 
+
         
     def send_offsets(self):
         """
@@ -656,20 +623,13 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         #change to frequency for MCU
         self.worker_data_block.data_2_for_MCU  = 200 #Hz
         
-        self.worker_data_block.data_current = 0, self.textbox_offset_1.text(), 0, self.textbox_offset_2.text()
+        self.worker_data_block.data_current = self.textbox_offset_1.text(), 0, self.textbox_offset_2.text(), 0
 
         #from combobox direction
         self.worker_data_block.data_7 = 1
-
-
-            
-        if self.filter_checkbox.isChecked():
-            self.worker_data_block.data_8 = 0
-        else:
-            self.worker_data_block.data_8 =  2
-        
+        self.worker_data_block.data_8 = sockets_files.CSR_COIL_CALIBRATION
         #for data 10
-        self.worker_data_block.data_10 = 1 
+        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE
         ######################################################################################
         
 
@@ -694,20 +654,15 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         #change to frequency for MCU
         self.worker_data_block.data_2_for_MCU  = 200 #Hz
         
-        self.worker_data_block.data_current = 0, float(self.textbox_direction_start_x.text()) + float(self.textbox_offset_1.text()), 0, float(self.textbox_direction_start_y.text()) + float(self.textbox_offset_2.text())
-
+        self.worker_data_block.data_current = float(self.textbox_direction_start_x.text()) + float(self.textbox_offset_1.text()), 0, float(self.textbox_direction_start_y.text()) + float(self.textbox_offset_2.text()), 0
         #from combobox direction
         self.worker_data_block.data_7 = 1
 
+        self.worker_data_block.data_8 = sockets_files.CSR_COIL_CALIBRATION
 
-            
-        if self.filter_checkbox.isChecked():
-            self.worker_data_block.data_8 = 0
-        else:
-            self.worker_data_block.data_8 =  2
         
         #for data 10
-        self.worker_data_block.data_10 = 1 
+        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE
         ######################################################################################
         
         
@@ -763,20 +718,14 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         #change to frequency for MCU
         self.worker_data_block.data_2_for_MCU  = 200 #Hz
         
-        self.worker_data_block.data_current = 0, float(self.textbox_direction_start_x.text()) + float(self.textbox_offset_1.text()), 0, float(self.textbox_direction_start_y.text()) + float(self.textbox_offset_2.text())
+        self.worker_data_block.data_current = float(self.textbox_direction_start_x.text()) + float(self.textbox_offset_1.text()), 0, float(self.textbox_direction_start_y.text()) + float(self.textbox_offset_2.text()), 0
 
         #from combobox direction
         self.worker_data_block.data_7 = 1
 
-
-            
-        if self.filter_checkbox.isChecked():
-            self.worker_data_block.data_8 = 0
-        else:
-            self.worker_data_block.data_8 =  2
-        
+        self.worker_data_block.data_8 = sockets_files.CSR_COIL_CALIBRATION
         #for data 10
-        self.worker_data_block.data_10 = 1 
+        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE
         ######################################################################################
         
         ##send all data to microcontroller
@@ -885,20 +834,14 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             #change to frequency for MCU
             self.worker_data_block.data_2_for_MCU  = 200 #Hz
             
-            self.worker_data_block.data_current = 0, float(self.textbox_direction_end_x.text()) + float(self.textbox_offset_1.text()) , 0, float(self.textbox_direction_end_y.text()) + float(self.textbox_offset_2.text())
+            self.worker_data_block.data_current = float(self.textbox_direction_end_x.text()) + float(self.textbox_offset_1.text()) , 0, float(self.textbox_direction_end_y.text()) + float(self.textbox_offset_2.text()), 0
 
             #from combobox direction
             self.worker_data_block.data_7 = 1
-
-
-                
-            if self.filter_checkbox.isChecked():
-                self.worker_data_block.data_8 = 0
-            else:
-                self.worker_data_block.data_8 =  2
+            self.worker_data_block.data_8 = sockets_files.CSR_COIL_CALIBRATION
             
             #for data 10
-            self.worker_data_block.data_10 = 1 
+            self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE
             ############################################################################################################
             
             ##send all data to microcontroller
@@ -948,95 +891,23 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             self.button_start_acquistion.setDisabled(False)
 
 
-    def button_rotate_event(self):
+    def normalisation_magnet_event(self):
+        #Reset the normalise event state 
+        self.worker_DataUpdate.flag_normalise_event(False)
+        
+        #--------------------- Update the Data Worker ---------------------
+        self.worker_data_block.data_1 = 0.5 # Placeholder
+        self.worker_data_block.data_2_CSR = 10  # Forced 3Hz Frequency
+        self.worker_data_block.data_current = (300, 0, 300, 0)  # Coil currents
 
-        ############################# send data to setter getter ######################################
-
-        self.worker_data_block.data_1 = 5.0  # second
-        self.worker_remaining_time.total_time_for_file_save = 5.0 # second
-        # make the running frequency 200 Hz, does not matter since we will produce DC current anyway
-        # change to frequency for MCU
-        self.worker_data_block.data_2_for_MCU = 2  # Hz
-
-        self.worker_data_block.data_current = 300, 0, 300, 0
-
-        # from combobox direction
-        self.worker_data_block.data_7 = 1
-
-        if self.filter_checkbox.isChecked():
-            self.worker_data_block.data_8 = 0
-        else:
-            self.worker_data_block.data_8 = 2
-
-        # for data 10
-        self.worker_data_block.data_10 = 1
-        ######################################################################################
-
-        ##send all data to microcontroller
-        # activate flag
+        self.worker_data_block.data_7 = 2
+        self.worker_data_block.data_8 = sockets_files.CSR_NORM
+        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE  # Rotation Mode (CRITICAL)
+        self.worker_data_block.data_11 = 0.0
         self.worker_flag_send.flag_tx = True
-
         self.status_label.setStyleSheet("color: #7da832;")
         self.status_label.setText("Rotation starts for normalising!!!!")
-
-        self.worker_sleep = SleepTimer()
-        self.worker_sleep.update_time_signal.connect(self.update_timer_rotation)
-        self.worker_sleep.start()
-
-        # active the flag on DataUpdate side for finding normalising parameters for the voltages
-        self.worker_DataUpdate.flag_special_event(False, False, True)
-
-    def update_timer_rotation(self, val):
-        """
-        for rotation timer purposes
-        """
-        self.lcdNumber.display(val)
-
-        if val != 0.0:
-            self.button_offsets.setDisabled(True)
-            self.button_send_start_vec.setDisabled(True)
-            self.button_start_acquistion.setDisabled(True)
-            self.save_button.setDisabled(True)
-
-        elif val == 0.0:
-            self.button_offsets.setDisabled(False)
-            self.button_send_start_vec.setDisabled(False)
-            self.button_start_acquistion.setDisabled(False)
-            self.save_button.setDisabled(False)
-
-                       #mark the end of the normalise measurement event
-            self.worker_DataUpdate.flag_special_event(False, False, False)
-
-
-            self.worker_normalise_properties.amp_voltage_1 = (np.max(self.accumulate_hall_1[10:]) - np.min(self.accumulate_hall_1[10:])) / 2
-            self.worker_normalise_properties.zero_offset_voltage_1 = (np.max(self.accumulate_hall_1[10:]) + np.min(self.accumulate_hall_1[10:])) / 2
-
-            self.worker_normalise_properties.amp_voltage_2 = (np.max(self.accumulate_hall_2[10:]) - np.min(self.accumulate_hall_2[10:])) /  2
-            self.worker_normalise_properties.zero_offset_voltage_2 = (np.max(self.accumulate_hall_2[10:]) + np.min(self.accumulate_hall_2[10:])) / 2
-            
-            print("self.worker_normalise_properties.amp_voltage_1", self.worker_normalise_properties.amp_voltage_1)
-            print("self.worker_normalise_properties.zero_offset_voltage_1", self.worker_normalise_properties.zero_offset_voltage_1)
-            print("self.worker_normalise_properties.amp_voltage_2 ", self.worker_normalise_properties.amp_voltage_2 )
-            print("self.worker_normalise_properties.zero_offset_voltage_2 ", self.worker_normalise_properties.zero_offset_voltage_2 )
-
-            #File path for saving
-            header_text = "voltage_amp_1_V;voltage_zero_offset_1_V;voltage_amp_2_V;voltage_zero_offset_2_V"
-            dir_save_normalisation = os.path.join(self.project_root, "files", "normalise_voltage_constant.csv")
-            
-            data_to_save = np.column_stack((self.worker_normalise_properties.amp_voltage_1, self.worker_normalise_properties.zero_offset_voltage_1,
-                                            self.worker_normalise_properties.amp_voltage_2, self.worker_normalise_properties.zero_offset_voltage_2))
-            
-            print(self.worker_normalise_properties.amp_voltage_1)
-
-            # Save to CSV      
-            np.savetxt(dir_save_normalisation, data_to_save, delimiter=";", comments="", fmt="%.17g",  header=header_text)
-            
-            packet_transmission.VoltageNormaliseCoefficient.reload()
-
-            self.worker_DataUpdate.flag_normalise_event(True)
-
-
-            self.popout_window(6)
+        self.popout_window(6)
 
     def set_constant(self, get_accumulate_hall_1, get_accumulate_hall_2, get_accumulate_current_1,
                      get_accumulate_current2):

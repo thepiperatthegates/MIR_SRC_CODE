@@ -41,7 +41,7 @@
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
       </property>
-      <widget class="QWidget" name="">
+      <widget class="QWidget" name="layoutWidget">
        <layout class="QVBoxLayout" name="verticalLayout_2">
         <item>
          <layout class="QVBoxLayout" name="verticalLayout">
@@ -76,33 +76,6 @@
            </widget>
           </item>
           <item>
-           <widget class="QLabel" name="label_shear_rate">
-            <property name="font">
-             <font>
-              <family>Arial</family>
-              <pointsize>14</pointsize>
-              <italic>false</italic>
-             </font>
-            </property>
-            <property name="text">
-             <string>Shear rate γ̇ / Hz</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLineEdit" name="textbox_shear_rate">
-            <property name="font">
-             <font>
-              <family>Arial</family>
-              <italic>false</italic>
-             </font>
-            </property>
-            <property name="toolTip">
-             <string extracomment="in ms"/>
-            </property>
-           </widget>
-          </item>
-          <item>
            <widget class="QLabel" name="label_input_torque">
             <property name="font">
              <font>
@@ -118,33 +91,6 @@
           </item>
           <item>
            <widget class="QLineEdit" name="textbox_input_torque">
-            <property name="font">
-             <font>
-              <family>Arial</family>
-              <italic>false</italic>
-             </font>
-            </property>
-            <property name="toolTip">
-             <string extracomment="in ms"/>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLabel" name="label_phase_difference">
-            <property name="font">
-             <font>
-              <family>Arial</family>
-              <pointsize>14</pointsize>
-              <italic>false</italic>
-             </font>
-            </property>
-            <property name="text">
-             <string>Desired Δɸ / rad</string>
-            </property>
-           </widget>
-          </item>
-          <item>
-           <widget class="QLineEdit" name="textbox_phase_difference">
             <property name="font">
              <font>
               <family>Arial</family>
@@ -349,121 +295,7 @@ color: rgb(0, 0, 0);</string>
           </item>
           <item row="2" column="0">
            <layout class="QGridLayout" name="gridLayout_3">
-            <item row="0" column="0" colspan="3">
-             <widget class="QLabel" name="status_label">
-              <property name="font">
-               <font>
-                <family>Arial</family>
-                <pointsize>16</pointsize>
-                <weight>75</weight>
-                <italic>false</italic>
-                <bold>true</bold>
-               </font>
-              </property>
-              <property name="text">
-               <string>Status : Ready</string>
-              </property>
-             </widget>
-            </item>
-            <item row="5" column="0" colspan="3">
-             <widget class="QPushButton" name="normalise_button">
-              <property name="font">
-               <font>
-                <pointsize>12</pointsize>
-               </font>
-              </property>
-              <property name="styleSheet">
-               <string notr="true">background-color: rgb(81, 0, 255);</string>
-              </property>
-              <property name="text">
-               <string>Normalise Voltage</string>
-              </property>
-             </widget>
-            </item>
-            <item row="3" column="0" colspan="3">
-             <widget class="QPushButton" name="graph_stop_button">
-              <property name="font">
-               <font>
-                <pointsize>9</pointsize>
-               </font>
-              </property>
-              <property name="styleSheet">
-               <string notr="true">color: rgb(255, 85, 0);
-background-color: rgb(255, 170, 0);</string>
-              </property>
-              <property name="text">
-               <string>Pause live-graph</string>
-              </property>
-             </widget>
-            </item>
             <item row="4" column="0" colspan="3">
-             <widget class="QPushButton" name="button_auto_range">
-              <property name="font">
-               <font>
-                <pointsize>9</pointsize>
-               </font>
-              </property>
-              <property name="styleSheet">
-               <string notr="true">color: rgb(255, 85, 0);
-background-color: rgb(255, 170, 0);</string>
-              </property>
-              <property name="text">
-               <string>Auto-range</string>
-              </property>
-             </widget>
-            </item>
-            <item row="1" column="2">
-             <widget class="QLabel" name="label_time_2">
-              <property name="font">
-               <font>
-                <family>Linux Libertine</family>
-                <pointsize>11</pointsize>
-               </font>
-              </property>
-              <property name="text">
-               <string>Time Interval (s)</string>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="2">
-             <widget class="QComboBox" name="timeInterval_comboBox">
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
-              <item>
-               <property name="text">
-                <string>500ms</string>
-               </property>
-              </item>
-              <item>
-               <property name="text">
-                <string>100ms</string>
-               </property>
-              </item>
-              <item>
-               <property name="text">
-                <string>1000ms</string>
-               </property>
-              </item>
-             </widget>
-            </item>
-            <item row="1" column="0" rowspan="2" colspan="2">
-             <widget class="QLCDNumber" name="lcdNumber">
-              <property name="font">
-               <font>
-                <pointsize>9</pointsize>
-               </font>
-              </property>
-              <property name="styleSheet">
-               <string notr="true">background-color: rgb(0, 0, 0);
-color: rgb(30, 229, 0);
-border-color: rgb(255, 255, 127);</string>
-              </property>
-             </widget>
-            </item>
-            <item row="6" column="0" colspan="3">
              <widget class="QPushButton" name="button_fr_constant">
               <property name="sizePolicy">
                <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
@@ -670,6 +502,89 @@ background-color: rgb(255, 152, 222);</string>
               </property>
              </widget>
             </item>
+            <item row="1" column="0" rowspan="2" colspan="2">
+             <widget class="QLCDNumber" name="lcdNumber">
+              <property name="font">
+               <font>
+                <pointsize>9</pointsize>
+               </font>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">background-color: rgb(0, 0, 0);
+color: rgb(30, 229, 0);
+border-color: rgb(255, 255, 127);</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="2">
+             <widget class="QLabel" name="label_time_2">
+              <property name="font">
+               <font>
+                <family>Linux Libertine</family>
+                <pointsize>11</pointsize>
+               </font>
+              </property>
+              <property name="text">
+               <string>Time Interval (s)</string>
+              </property>
+             </widget>
+            </item>
+            <item row="2" column="2">
+             <widget class="QComboBox" name="timeInterval_comboBox">
+              <property name="font">
+               <font>
+                <pointsize>10</pointsize>
+               </font>
+              </property>
+              <item>
+               <property name="text">
+                <string>500ms</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>100ms</string>
+               </property>
+              </item>
+              <item>
+               <property name="text">
+                <string>1000ms</string>
+               </property>
+              </item>
+             </widget>
+            </item>
+            <item row="3" column="0" colspan="3">
+             <widget class="QPushButton" name="graph_stop_button">
+              <property name="font">
+               <font>
+                <pointsize>9</pointsize>
+               </font>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">color: rgb(255, 85, 0);
+background-color: rgb(255, 170, 0);</string>
+              </property>
+              <property name="text">
+               <string>Pause live-graph</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="0" colspan="3">
+             <widget class="QLabel" name="status_label">
+              <property name="font">
+               <font>
+                <family>Arial</family>
+                <pointsize>16</pointsize>
+                <weight>75</weight>
+                <italic>false</italic>
+                <bold>true</bold>
+               </font>
+              </property>
+              <property name="text">
+               <string>Status : Ready</string>
+              </property>
+             </widget>
+            </item>
            </layout>
           </item>
          </layout>
@@ -708,7 +623,7 @@ background-color: rgb(255, 170, 127);</string>
         </item>
        </layout>
       </widget>
-      <widget class="QWidget" name="">
+      <widget class="QWidget" name="layoutWidget">
        <layout class="QGridLayout" name="gridLayout_5">
         <item row="0" column="0">
          <widget class="QLabel" name="TITLE">
@@ -730,14 +645,27 @@ background-color: rgb(255, 170, 127);</string>
           </property>
          </widget>
         </item>
-        <item row="2" column="0" colspan="3">
+        <item row="1" column="0" colspan="2">
+         <widget class="GraphicsLayoutWidget" name="graphicsView">
+          <property name="font">
+           <font>
+            <family>Arial</family>
+            <italic>false</italic>
+           </font>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">background-color: rgb(0, 0, 0);</string>
+          </property>
+         </widget>
+        </item>
+        <item row="2" column="0" colspan="2">
          <widget class="QLabel" name="k_b_label">
           <property name="text">
            <string>k_b_1  =                     k_b_2=                                          </string>
           </property>
          </widget>
         </item>
-        <item row="0" column="2">
+        <item row="0" column="1">
          <widget class="QComboBox" name="select_mode_comboBox">
           <property name="font">
            <font>
@@ -761,43 +689,11 @@ background-color: rgb(255, 170, 127);</string>
             <string>View phase difference</string>
            </property>
           </item>
-         </widget>
-        </item>
-        <item row="0" column="1">
-         <widget class="QCheckBox" name="filter_checkbox">
-          <property name="enabled">
-           <bool>true</bool>
-          </property>
-          <property name="font">
-           <font>
-            <family>Arial</family>
-            <pointsize>12</pointsize>
-            <weight>50</weight>
-            <italic>true</italic>
-            <bold>false</bold>
-            <underline>false</underline>
-            <strikeout>false</strikeout>
-           </font>
-          </property>
-          <property name="text">
-           <string>Use live FIR filter</string>
-          </property>
-          <property name="checked">
-           <bool>true</bool>
-          </property>
-         </widget>
-        </item>
-        <item row="1" column="0" colspan="3">
-         <widget class="GraphicsLayoutWidget" name="graphicsView">
-          <property name="font">
-           <font>
-            <family>Arial</family>
-            <italic>false</italic>
-           </font>
-          </property>
-          <property name="styleSheet">
-           <string notr="true">background-color: rgb(0, 0, 0);</string>
-          </property>
+          <item>
+           <property name="text">
+            <string>View torque</string>
+           </property>
+          </item>
          </widget>
         </item>
        </layout>
@@ -812,7 +708,7 @@ background-color: rgb(255, 170, 127);</string>
      <x>0</x>
      <y>0</y>
      <width>1307</width>
-     <height>37</height>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuRestart">

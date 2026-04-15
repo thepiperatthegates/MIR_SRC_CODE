@@ -51,6 +51,10 @@ class TxData():
     _data_1 = _data_2 = _data_3 = _data_4 = _data_5 = _data_6 = _data_7 = _data_8 = _data_9 = _data_10 = _data_11 = _data_offset_creep_1 = _data_offset_creep_2 = 0
     _time_acquisition = 0
     
+    FRAME_HEADER_1     =  0xCA
+    FRAME_HEADER_INPUT = 0xCB
+    FRAME_HEADER_COMP  = 0xCD
+        
     @property
     def send_data(self):
         return ( self.__class__._data_1, self.__class__._data_2, self.__class__._data_3, self.__class__._data_4, self.__class__._data_5, self.__class__._data_6, 
@@ -87,6 +91,17 @@ class TxData():
         running_frequency = float(val)/(2*pi*C_SR)
         # ---------------------- we will be taking the desired shear rate here directly ----------------------
         self.__class__._data_2 = val
+        
+    @property
+    def data_2_CSR(self):
+        return self.__class__._data_2
+    
+    @data_2_CSR.setter
+    def data_2_CSR(self, val):
+        C_SR = 37.099
+        running_frequency = float(val)/(2*pi*C_SR)
+        # ---------------------- we will be taking the desired shear rate here directly ----------------------
+        self.__class__._data_2 = running_frequency
         
     @property
     def data_2_for_MCU(self):
@@ -183,17 +198,14 @@ class TxData():
     @property 
     def data_offsets(self):
         return self.__class__._data_4, self.__class__._data_6
-
     
-        
-    
-    def combine_data(self):
+    def combine_input_data(self):
         #ARM Microcontroller is Little Endian, for integer we will be shifting the 
         #bits ourselves but for float, we need to send it little endian preemptively
         
         ## TODO: CHANGE BYTE_SEND TO FLOAT 
         print("Frequency of DAC", self.__class__._data_2)
-        
+       
         byte_send1 = struct.pack('<f', float(self.__class__._data_1))       
         byte_send2 = struct.pack('<f', float(self.__class__._data_2))             #running frequency of MCU 
         byte_send3 = struct.pack('<f', float(self.__class__._data_3))              #amplitude1
@@ -206,14 +218,26 @@ class TxData():
         byte_send10 = struct.pack('>I', int(self.__class__._data_10))                 #mir mode
         byte_send11 = struct.pack('<f', float(self.__class__._data_11))             # shear stress/torque reference
 
-        combined_send = b''.join([byte_send1, byte_send2, byte_send3, 
+        payload = b''.join([byte_send1, byte_send2, byte_send3, 
                                 byte_send4, byte_send5, byte_send6, byte_send7, byte_send8, byte_send9, byte_send10, byte_send11])
         
-        combined_send = b''.join([byte_send1, byte_send2, byte_send3, byte_send4, byte_send5, byte_send6, byte_send7, byte_send8, byte_send9, byte_send10])
+        # sending data with input frameheader
+        return bytes([self.__class__.FRAME_HEADER_1, self.__class__.FRAME_HEADER_INPUT]) + payload
+    
+    def combine_additional_data(self, data1, data2, data3, data4):
         
-        return combined_send
+        byte_1 = struct.pack('<f', int(data1))
+        byte_2 = struct.pack('<f', int(data2))
+        byte_3 = struct.pack('<f', int(data3))
+        byte_4 = struct.pack('<f', int(data4))
+        
+        payload = b''.join([byte_1, byte_2, byte_3, byte_4])
+        
+        return bytes([self.__class__.FRAME_HEADER_1, self.__class__.FRAME_HEADER_COMP]) + payload
+    
 class TxFlag():
     _flag_tx = False
+    _flag_init_tx = False
     
     @property
     def flag_tx(self):
@@ -222,6 +246,14 @@ class TxFlag():
     @flag_tx.setter
     def flag_tx(self, val):
         self.__class__._flag_tx = bool(val)
+        
+    @property
+    def flag_init_tx(self):
+        return self.__class__._flag_init_tx 
+    
+    @flag_init_tx.setter
+    def flag_init_tx(self, val):
+        self.__class__._flag_init_tx = bool(val)
 
 class RemainingTimeForCreepTest():
     _total_time_for_file_save  = 0.0 
@@ -386,6 +418,7 @@ class StoreArrayGraph():
     _angle_permanent_magnet_val = np.array([], dtype=np.float32)
     _angle_magnetic_field_val = np.array([], dtype=np.float32)
     _phase_difference_val = np.array([], dtype=np.float32)
+    _actual_torque_val =  np.array([], dtype=np.float32)
     
     @property
     def v1_slice(self):
@@ -436,7 +469,6 @@ class StoreArrayGraph():
     def angle_magnetic_field_val(self, val):
         self.__class__._angle_magnetic_field_val = val
         
-        
     @property
     def phase_difference_val(self):
         return self.__class__._phase_difference_val
@@ -444,6 +476,14 @@ class StoreArrayGraph():
     @phase_difference_val.setter
     def phase_difference_val(self, val):
         self.__class__._phase_difference_val = val
+        
+    @property
+    def actual_torque_val(self):
+        return self.__class__._actual_torque_val
+    
+    @actual_torque_val.setter
+    def actual_torque_val(self, val):
+        self.__class__._actual_torque_val = val
 
 
 class fRCoefficients:
@@ -725,16 +765,27 @@ def get_electronics_flag():
 
 # ---------- FIRST ELECTRONIC ----------
 #first sensor coefficient version 1
-CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 = -4.61934
-CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 = 0.99182
-CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 =  -4.24388e-6
-CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 =  -5.40711e-8
+# CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 = -4.61934
+# CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 = 0.99182
+# CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 =  -4.24388e-6
+# CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 =  -5.40711e-8
+
+# #second sensor coefficient version 1
+# CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 = 3.86547
+# CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 = 0.98655
+# CURRENT_COEFF_SECOND_SENSOR_C_VERSION1= 3.02401e-6
+# CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 = -3.98871e-8
+
+CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 = 0   
+CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 = 1
+CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 =  0
+CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 =  0
 
 #second sensor coefficient version 1
-CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 = 3.86547
-CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 = 0.98655
-CURRENT_COEFF_SECOND_SENSOR_C_VERSION1= 3.02401e-6
-CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 = -3.98871e-8
+CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 = 0
+CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 = 1
+CURRENT_COEFF_SECOND_SENSOR_C_VERSION1= 0
+CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 = 0
 #----------------------------------------
 
 # ---------- SECOND ELECTRONIC ----------

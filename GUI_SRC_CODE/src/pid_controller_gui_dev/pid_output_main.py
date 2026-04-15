@@ -104,6 +104,7 @@ class DataUpdate(QThread):
         self.i1_slice = np.array([], dtype=np.uint16)
         self.i2_slice = np.array([], dtype=np.uint16)
         self.phase_diff_slice = np.array([], dtype=np.float32)
+        self.actual_torque = np.array([], dtype=np.float32)
 
         self.bytes_to_process = np.array([], dtype=np.uint16)  # Empty NumPy array for incoming data
 
@@ -140,14 +141,15 @@ class DataUpdate(QThread):
         """
 
         data_from_pipe = []  # creating a list here because data from pipe is a list
+        
+        num_columns = 6  # v1, v2, i1, i2, phase_diff
+        
         while self.running:
             data_from_pipe = q_to_graph.get()
             if not self.running:
                 break
             if data_from_pipe:
                 self.bytes_to_process = np.array(data_from_pipe, dtype=float)
-
-                num_columns = 5  # v1, v2, i1, i2, phase_diff
 
                 trimmed_size = len(self.bytes_to_process) - (len(self.bytes_to_process) % num_columns)
                 self.bytes_to_process = self.bytes_to_process[:trimmed_size]
@@ -162,6 +164,7 @@ class DataUpdate(QThread):
                 self.i1_slice = reshaped_data[:, 2]     #i1 [digital]
                 self.i2_slice = reshaped_data[:, 3]     # i2 [digital]
                 self.phase_diff_slice = reshaped_data[:, 4]         # phase diff [rad]
+                self.torque_slice = reshaped_data[:, 5]         # phase diff [rad]
 
 
                 data_mutex.lock()
@@ -201,6 +204,7 @@ class DataUpdate(QThread):
                 self.angle_magnetic_field_val = np.unwrap(self.angle_magnetic_field_val)
                 #######################################################################################################
                 self.phase_difference_val = self.phase_diff_slice
+                self.actual_torque =  self.torque_slice
 
                 ##send to setter class
                 self.worker_array_setter.v1_slice = self.v1_slice
@@ -210,8 +214,9 @@ class DataUpdate(QThread):
 
                 self.worker_array_setter.angle_permanent_magnet_val = self.angle_permanent_magnet_val
                 self.worker_array_setter.angle_magnetic_field_val = self.angle_magnetic_field_val
-
                 self.worker_array_setter.phase_difference_val = self.phase_difference_val
+                
+                self.worker_array_setter.actual_torque_val = self.actual_torque
 
                 data_mutex.unlock()
 
@@ -350,6 +355,7 @@ class PIDOutput(QMainWindow, Ui_Title):
         self._start_backend_threads()
         self._connect_signals()
         self._setup_ui_elements()
+        self._start_normalise_mcu()
 
     def _configure_display(self):
         """Handle High DPI scaling settings."""
@@ -379,7 +385,7 @@ class PIDOutput(QMainWindow, Ui_Title):
         self._plot_ref1 = self._plot_ref2 = self.before1 = self.before2 = None
         self.curve_v1 = self.curve_v2 = self.curve_i1 = self.curve_i2 = None
         self.curve_sigma_b = self.curve_sigma_m = None
-        self.curve_phase_difference = None
+        self.curve_phase_difference = self.curve_torque = None
         
         self.time_axis = [i * 0.0001 for i in range(1000)]
         self.flag_fR = self.flag_K = False
@@ -441,7 +447,6 @@ class PIDOutput(QMainWindow, Ui_Title):
         """Link UI interactions to their respective methods."""
         # ----------------------- Buttons ----------    print(len(data))-------------
         self.button_send.clicked.connect(self.send_parameter_event)
-        self.button_auto_range.clicked.connect(self.auto_range_event)
         self.save_button.clicked.connect(self.save_button_event)
         self.button_rotate.clicked.connect(self.normalisation_magnet_event)
         self.button_stop.clicked.connect(self.stop_button_push_event)
@@ -499,7 +504,7 @@ class PIDOutput(QMainWindow, Ui_Title):
         # Structure: { ModeName: (UpdateFunction, [Plot1_Setup, Plot2_Setup]) }
         config = {
             "View sensors": (self.graph_update_sensors, [
-                {"title": "Hall sensors", "y": "Voltage", "u": "V", "curves": [("r", "v1", "Hall 1"), ("b", "v2", "Hall 2")]},
+                {"title": "Hall sensors", "y": "Hall Voltage", "u": "[norm]", "curves": [("r", "v1", "Hall 1"), ("b", "v2", "Hall 2")]},
                 {"title": "Current sensors", "y": "Current", "u": "mA", "curves": [("g", "i1", "I1"), ("y", "i2", "I2")]}
             ]),
             "View angle": (self.graph_update_angle, [
@@ -508,6 +513,9 @@ class PIDOutput(QMainWindow, Ui_Title):
             ]),
             "View phase difference": (self.graph_phase_difference, [
                 {"title": "Phase Difference", "y": "Δϕ", "u": "rad", "curves": [("g", "phase_diff", "Delta")]}
+            ]),
+            "View torque": (self.graph_update_torque, [
+                {"title": "Torque", "y": "τ", "u": "N•m", "curves": [("g", "torque", "Delta")]}
             ])
         }
 
@@ -570,14 +578,6 @@ class PIDOutput(QMainWindow, Ui_Title):
         self.curve_i1.setData(t, i1[:min_len])
         self.curve_i2.setData(t, i2[:min_len])
             # data_mutex.unlock()
-        #
-        
-    def auto_range_event(self):
-        
-        self.plot1.enableAutoRange(axis='y', enable=True)
-        self.plot2.enableAutoRange(axis='y', enable=True)
-        # self.plot1.enableAutoRange(axis='x', enable=True)
-        # self.plot2.enableAutoRange(axis='x', enable=True)
         
 
     def graph_update_angle(self):
@@ -595,6 +595,17 @@ class PIDOutput(QMainWindow, Ui_Title):
         self.curve_phase_diff.setData(self.time_axis, self.worker_getter_graph.phase_difference_val)
         
         data_mutex.unlock()
+        
+    def graph_update_torque(self):
+        global data_mutex
+        data_mutex.lock()
+        
+        self.curve_torque.setData(self.time_axis, self.worker_getter_graph.angle_permanent_magnet_val)
+        
+        data_mutex.unlock()
+        
+    def _start_normalise_mcu(self):
+            self.worker_flag_send.flag_init_tx = True
 
     def send_parameter_event(self):
         """
@@ -603,15 +614,14 @@ class PIDOutput(QMainWindow, Ui_Title):
         """
         try:
             # --------------------- Parse and Validate Inputs ---------------------
-            shear_rate = float(self.textbox_shear_rate.text() or 0)
-            delta_phi = float(self.textbox_phase_difference.text() or 0)
+            delta_phi = 1.0
             torque_ref = float(self.textbox_input_torque.text() or 0)
             # --------------------- Map UI States to Hardware Codes ---------------------
             # Direction: Anti-clockwise = 1, Clockwise = 2
             direction_code = 2 if self.comboBox_direction.currentText() == "Clockwise" else 1
 
             # --------------------- Update the Data Worker ---------------------
-            self.worker_data_block.data_1 = shear_rate
+            self.worker_data_block.data_1 = 1
             self.worker_data_block.data_2 = torque_ref
             self.worker_data_block.data_7 = direction_code
             self.worker_data_block.data_8 = sockets_files.PID_LOOP
@@ -634,7 +644,7 @@ class PIDOutput(QMainWindow, Ui_Title):
         Forces the magnet into rotation mode (3Hz) with specific coil currents.
         """
         try:
-            delta_phi = float(self.textbox_phase_difference.text() or 0)
+            delta_phi = 1.0
 
             # --------------------- Map UI logic ------------------------
             direction = 2 if self.comboBox_direction.currentText() == "Clockwise" else 1

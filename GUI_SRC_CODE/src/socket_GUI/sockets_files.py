@@ -59,7 +59,7 @@ FLOAT32_SIZE = 4
 # Frame structure: [Header (2 bytes)] + [Payload]
 DMA_BUFFER_SIZE      = 2
 HEADER_SIZE          = 2 * UINT8_SIZE
-PAYLOAD_DATA_SIZE    = (2 * UINT16_SIZE) + (3 * FLOAT32_SIZE)
+PAYLOAD_DATA_SIZE    = (2 * UINT16_SIZE) + (4 * FLOAT32_SIZE)
 BYTES_PER_SAMPLE     = HEADER_SIZE + PAYLOAD_DATA_SIZE
 TOTAL_ONE_CYCLE_BYTES    = BYTES_PER_SAMPLE * DMA_BUFFER_SIZE
 
@@ -72,9 +72,9 @@ TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC   = int(0.1 / SAMPLE_PERIOD)
 # --- Protocol Headers & Formatting ---
 # Format: < (Little Endian), f (float), H (unsigned short)
 FRAME_SIZE  = BYTES_PER_SAMPLE      # 2 header + 4+4+2+2+4 payload
-NORM_SIZE   =  HEADER_SIZE + (4 * (UINT16_SIZE))      # 2 header + 2+2+2+2 payload
-FRAME_FMT   = '<ffHHf'  # H1, H2, C1, C2, PD
-NORM_FMT    = '<HHHH'   # max_h1, min_h1, max_h2, min_h2
+NORM_SIZE   =  HEADER_SIZE + (4 * (FLOAT32_SIZE))      # 2 header + 2+2+2+2 payload
+FRAME_FMT   = '<ffHHff'  # H1, H2, C1, C2, PD, TORQUE
+NORM_FMT    = '<ffff'   # max_h1, min_h1, max_h2, min_h2
 
 SENSOR_H1 = 0xAA
 SENSOR_H2 = 0xAB
@@ -158,6 +158,7 @@ def thread_start():
     ser1 = socket_start_connect()
     worker_kb_property = packet_transmission.kbCoefficient()
     worker_specific_downsampling = packet_transmission.DownSampleSpecificFlag()
+    worker_normalisation  = packet_transmission.VoltageNormaliseCoefficient()
     #Event for run time receiving data from Serial Porte
     thread_recv = threading.Thread(target=recv_thread, args=(ser1,worker_kb_property, worker_specific_downsampling))
     thread_recv.start()
@@ -166,10 +167,16 @@ def thread_start():
 
     while True:
         if worker_flag_send.flag_tx:
-            thread_send = threading.Thread(target=send_thread, daemon=False, args=(ser1,))
+            thread_send = threading.Thread(target=send_thread, daemon=False, args=(ser1, "input"))
             thread_send.start()
             #reset the flag
             worker_flag_send.flag_tx = False
+        elif worker_flag_send.flag_init_tx:
+            thread_send = threading.Thread(target=send_thread, daemon=False, args=(ser1, "norm", worker_normalisation.amp_voltage_1, worker_normalisation.zero_offset_voltage_1, 
+                                        worker_normalisation.amp_voltage_2, worker_normalisation.zero_offset_voltage_2))
+            thread_send.start()
+            #reset the flag
+            worker_flag_send.flag_init_tx = False
         else:
             time.sleep(1)
 
@@ -263,31 +270,46 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
     ser1.close() 
     
 #-------------- MiR mode identifier -------------------
-PID_START = 1
-CONTROL_SHEAR_RATE  = 2
+FRAME_HEADER_1 = 0xCA
+FRAME_HEADER_INPUT = 0xCB
+FRAME_HEADER_COMP = 0xCD
+#-----------------------------------------------------
+    
+#-------------- MiR mode (data_10) identifier -------------------
+PID_START = 0x10
+CONTROL_SHEAR_RATE  = 0x20
 #------------------------------------------------------
 
-#-------------- PID mode identifier -------------------
-PID_LOOP = 0
-PID_STOP = 2
-PID_NORM = 1
-PID_COEFF_CHANGE = 4
+#-------------- PID mode (data_8) identifier -------------------
+PID_LOOP = 0x11
+PID_STOP = 0x12 
+PID_NORM = 0x13
+PID_COEFF_CHANGE = 0x14
 #------------------------------------------------------
 
-# ------------ Control Shear Rate identifier ----------
-CSR_LOOP = 0
-CSR_COIL_CALIBRTAION = 1
-CSR_NORM = 2
+# ------------ Control Shear Rate (data_8) identifier ----------
+CSR_LOOP = 0x21
+CSR_COIL_CALIBRATION = 0x22
+CSR_NORM = 0x23
 # ----------------------------------------------------
 
-def send_thread(serial_data):
-    worker_combined_send = packet_transmission.TxData()
-    combined_send = worker_combined_send.combine_data()
-    try:
-        serial_data.write(combined_send)
-    except Exception as e:
-        print("Cannot send data!", e)
-        
+def send_thread(serial_data, mode="input", amp1=0.0, zero_off1=0.0,amp2=0.0, zero_off2=0.0 ) -> None:
+    if mode == "input":
+        worker_combined_send = packet_transmission.TxData()
+        combined_send = worker_combined_send.combine_input_data()
+        print(combined_send)
+        try:
+            serial_data.write(combined_send)
+        except Exception as e:
+            print("Cannot send data!", e)
+    elif mode == "norm":
+        worker_combined_send = packet_transmission.TxData()
+        combined_send = worker_combined_send.combine_additional_data(amp1, zero_off1, amp2, zero_off2)
+        print("norm")
+        try:
+            serial_data.write(combined_send)
+        except Exception as e:
+            print("Cannot send data!", e)
         
 def drain_queue(q):
     """Remove all items from a queue without blocking."""
@@ -296,8 +318,6 @@ def drain_queue(q):
             q.get_nowait()
         except:
             break
-
-
 def start_process_live_graph(q_to_process, q_to_graph, q_to_csv, q_to_norm, restart_event):
     
     leftover = b''
@@ -341,8 +361,8 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv, q_to_norm, rest
                 if end > buf_len:
                     leftover = recv_buffer[index:]
                     break
-                h1, h2, c1, c2, pd = struct.unpack(FRAME_FMT, recv_buffer[index+2 : end])
-                batch_frames.extend([h1, h2, c1, c2, pd])
+                h1, h2, c1, c2, pd, torque = struct.unpack(FRAME_FMT, recv_buffer[index+2 : end])
+                batch_frames.extend([h1, h2, c1, c2, pd, torque])
                 index = end
                 
                 continue
@@ -455,6 +475,7 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
     col3 = reshaped_data[:, 2]           #i1 [digital]
     col4 = reshaped_data[:, 3]             # i2 [digital]
     col5 = reshaped_data[:, 4]            # phase diff [rad]
+    col6 = reshaped_data[:, 5]            # actual torque [rad]
     
     #Current
     col3 = -packet_transmission.change_current_adc(col3)               #convert col1
@@ -515,7 +536,9 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
     averaged_data[:, 1] = col2
     averaged_data[:, 2] = col3
     averaged_data[:, 3] = col4
+    #phase diff
     averaged_data[:, 4] = col5
+    averaged_data[:, 5] = col6
     
     num_rows = averaged_data.shape[0] 
         
@@ -600,7 +623,7 @@ def save_norm_data_to_csv(packed_norm_data, filename="normalise_voltage_constant
     #-------------- reshaped into 4 columns ----------------
     data = data.reshape(-1, 4)
     
-    headers_name = "max_hall_1_V;zero_offset_hall_1_V;max_hall_2_V;zero_offset_hall_2_V"
+    headers_name = "voltage_amp_1_V;voltage_zero_offset_1_V;voltage_amp_2_V;voltage_zero_offset_2_V"
     
     project_root =  os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     file_name_full = os.path.join(project_root, "files", filename)

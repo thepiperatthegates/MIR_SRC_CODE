@@ -144,9 +144,11 @@ class DataUpdate(QThread):
         - Data from the queue (`q_to_graph`) must have a multiple of 4 samples,
           corresponding to [v1, v2, i1, i2].
         """
-        num_columns = 4
 
         data_from_pipe = []  # creating a list here because data from pipe is a list
+        
+        num_columns = 5  # v1, v2, i1, i2, phase_diff
+                
         while self.running:
             data_from_pipe = q_to_graph.get()
             if not self.running:
@@ -166,13 +168,14 @@ class DataUpdate(QThread):
                 self.v2_slice = reshaped_data[:, 1]
                 self.i1_slice = reshaped_data[:, 2]  # STIMMT
                 self.i2_slice = reshaped_data[:, 3]  # STIMMT
+                self.phase_diff_slice = reshaped_data[:, 4]         # phase diff [rad]
 
                 data_mutex.lock()
 
                 # Hall Sensors
                 #TODO: NEW FIRMWARE ITERACTIONS MUST NOT BE NEGATIVE FOR I1!!!!!!!!!
-                self.v1_slice = -packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
-                self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
+                # self.v1_slice = -packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
+                # self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
 
                 # Current
                 self.i1_slice = -packet_transmission.change_current_adc(self.i1_slice)  # convert col3 (in mA)
@@ -184,14 +187,11 @@ class DataUpdate(QThread):
 
 
                 # calibration for  hall sensors
-                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
-                                                                             self.v1_slice, self.i1_slice / 1000)
-                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
-                                                                             self.v2_slice, self.i2_slice / 1000)
-                if self.flag_normalise:
-                    self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amp_voltage_1
-                    self.v2_slice = (self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amp_voltage_2
-                
+                # self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
+                #                                                              self.v1_slice, self.i1_slice / 1000)
+                # self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
+                #                                                              self.v2_slice, self.i2_slice / 1000)
+
                 # Calibrate process starts
                 # measurement fR process starts
                 # measurement to determine the normalising parameters (for first time rotation)
@@ -206,7 +206,7 @@ class DataUpdate(QThread):
                 self.angle_permanent_magnet_val = np.unwrap(self.angle_permanent_magnet_val)
                 self.angle_magnetic_field_val = np.unwrap(self.angle_magnetic_field_val)
                 #######################################################################################################
-                self.phase_difference_val = self.angle_magnetic_field_val - self.angle_permanent_magnet_val
+                self.phase_difference_val = self.phase_diff_slice
 
                 ##send to setter class
                 self.worker_array_setter.v1_slice = self.v1_slice
@@ -356,6 +356,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self._connect_signals()
 
         # --------  Start Background Services. ------------
+        self._start_normalise_mcu()
         self._start_services()
 
     def _init_system_settings(self):
@@ -473,7 +474,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         for btn in [self.button_send, self.button_start, self.button_stop, self.button_cal_constant]:
             btn.clicked.connect(lambda: self.popout_window(1))
 
-        self.normalise_button.clicked.connect(self.start_normalise_event)
         self.button_cal_constant.clicked.connect(lambda: self.start_coil_calibration_event(-400, 1))
         self.button_fr_constant.clicked.connect(lambda: self.start_friction_coeff_event_initiation(1, 1, 0))
         self.button_fr_constant.clicked.connect(lambda: self.popout_window(3))
@@ -494,7 +494,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_DataUpdate = DataUpdate(self)
         
         normalise_filepath = os.path.join(self.project_root, "files", "normalise_voltage_constant.csv")
-
+    
         # If file exists, then load values from csv
         if os.path.exists(normalise_filepath):
             self.worker_DataUpdate.flag_normalise_event(True)
@@ -503,10 +503,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             
         self.worker_DataUpdate.start()
         
-        
-        
         #----------------- start change_graph service ---------------
         self.change_graph()
+        
+    def _start_normalise_mcu(self):
+            self.worker_flag_send.flag_init_tx = True
+        
         
     def change_graph(self):
         """Sets up the plotting environment based on UI selection."""
@@ -533,7 +535,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         # Structure: { ModeName: (UpdateFunction, [Plot1_Setup, Plot2_Setup]) }
         config = {
             "View sensors": (self.graph_update_sensors, [
-                {"title": "Hall sensors", "y": "Voltage", "u": "V", "curves": [("r", "v1", "Hall 1"), ("b", "v2", "Hall 2")]},
+                {"title": "Hall sensors", "y": "Hall Voltage", "u": "[norm]", "curves": [("r", "v1", "Hall 1"), ("b", "v2", "Hall 2")]},
                 {"title": "Current sensors", "y": "Current", "u": "mA", "curves": [("g", "i1", "I1"), ("y", "i2", "I2")]}
             ]),
             "View angle": (self.graph_update_angle, [
@@ -575,7 +577,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         plot.enableAutoRange(axis='x', enable=False)
         plot.setXRange(0, 0.5)
 
-    def start_normalise_event(self):
+    def normalisation_magnet_event(self):
         if not self.worker_DataUpdate.flag_normalise:
             self.worker_DataUpdate.flag_normalise_event(True)
         else:
@@ -645,11 +647,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         # ----- Assign values to the worker data block --------
         self.worker_data_block.data_1 = 65534
-        self.worker_data_block.data_2 = float(self.textbox_frequency.text())
+        self.worker_data_block.data_2_CSR = float(self.textbox_frequency.text())
         
         # ----- Case for ZERO frequency values (NOT ACCEPTED BY MCU) --------
         
-        if self.worker_data_block.data_2 == 0.0:
+        if self.worker_data_block.data_2_CSR == 0.0:
             #set the frequency to be as small as possible 
             self.worker_data_block.data_2_for_MCU = 0.00429 #Hz
         
@@ -698,7 +700,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #   --------- Assignment (Success Path).  ------------------
         # --------- Mapping textbox data to worker block ---------
         self.worker_data_block.data_1 = self.textbox_time.text()
-        self.worker_data_block.data_2 = self.textbox_frequency.text()
+        self.worker_data_block.data_2_CSR = self.textbox_frequency.text()
         self.worker_data_block.data_current = (
             self.textbox_amplitude1.text(), self.textbox_offset1.text(),
             self.textbox_amplitude2.text(), self.textbox_offset2.text()
@@ -759,7 +761,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.worker_data_block.data_7 = 1
             
 
-        self.worker_data_block.data_8 = sockets_files.CSR_COIL_CALIBRTAION
+        self.worker_data_block.data_8 = sockets_files.CSR_COIL_CALIBRATION
         self.worker_data_block.data_9 = 0
         #for data 10
         self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE
@@ -958,7 +960,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         ######################################################################################
         
         self.status_label.setText(
-            f"Recursion {count_recursion} with direction {self.worker_data_block.data_7} and frequency of {self.worker_data_block.data_2}"
+            f"Recursion {count_recursion} with direction {self.worker_data_block.data_7} and frequency of {self.worker_data_block.data_2_CSR}"
         )
         
         ##send all data to microcontroller
@@ -1173,13 +1175,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #Reset the normalise event state 
         self.worker_DataUpdate.flag_normalise_event(False)
         
-
         # --------------------- Map UI logic ------------------------
         direction = 2 if self.comboBox_direction.currentText() == "Clockwise" else 1
 
         #--------------------- Update the Data Worker ---------------------
         self.worker_data_block.data_1 = 0.5 # Placeholder
-        self.worker_data_block.data_2 = 10  # Forced 3Hz Frequency
+        self.worker_data_block.data_2_CSR = 10  # Forced 3Hz Frequency
         self.worker_data_block.data_current = (300, 0, 300, 0)  # Coil currents
 
         self.worker_data_block.data_7 = direction
@@ -1187,6 +1188,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE  # Rotation Mode (CRITICAL)
         self.worker_data_block.data_11 = 0.0
 
+        self.worker_flag_send.flag_tx = True
         self.status_label.setStyleSheet("color: #7da832;")
         self.status_label.setText("Rotation starts for normalising!!!!")
 

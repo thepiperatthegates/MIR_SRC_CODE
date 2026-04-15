@@ -264,7 +264,7 @@
           </column>
           <column>
            <property name="text">
-            <string>Angle of permanent magnet Φ_B / °</string>
+            <string>Angle of magnetic field Φ_B / °</string>
            </property>
           </column>
           <column>

@@ -111,7 +111,7 @@ color: rgb(255, 85, 0);</string>
               <widget class="QWidget" name="layoutWidget">
                <layout class="QGridLayout" name="gridLayout" rowstretch="0,0,0,0,0,0,0,0">
                 <property name="spacing">
-                 <number>-1</number>
+                 <number>6</number>
                 </property>
                 <item row="6" column="1">
                  <widget class="QLineEdit" name="textbox_offset_2">
@@ -693,8 +693,26 @@ color: rgb(255, 85, 0);</string>
           <item row="3" column="0">
            <layout class="QGridLayout" name="gridLayout_3">
             <property name="spacing">
-             <number>-1</number>
+             <number>6</number>
             </property>
+            <item row="2" column="0">
+             <widget class="QPushButton" name="graph_stop_button">
+              <property name="font">
+               <font>
+                <pointsize>9</pointsize>
+                <weight>75</weight>
+                <bold>true</bold>
+               </font>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">color: rgb(255, 85, 0);
+background-color: rgb(255, 170, 0);</string>
+              </property>
+              <property name="text">
+               <string>Pause live-graph</string>
+              </property>
+             </widget>
+            </item>
             <item row="3" column="1">
              <widget class="QComboBox" name="timeInterval_comboBox">
               <property name="font">
@@ -721,54 +739,17 @@ color: rgb(255, 85, 0);</string>
               </item>
              </widget>
             </item>
-            <item row="2" column="0">
-             <widget class="QPushButton" name="graph_stop_button">
+            <item row="1" column="0">
+             <widget class="QLCDNumber" name="lcdNumber">
               <property name="font">
                <font>
                 <pointsize>9</pointsize>
-                <weight>75</weight>
-                <bold>true</bold>
                </font>
               </property>
               <property name="styleSheet">
-               <string notr="true">color: rgb(255, 85, 0);
-background-color: rgb(255, 170, 0);</string>
-              </property>
-              <property name="text">
-               <string>Pause live-graph</string>
-              </property>
-             </widget>
-            </item>
-            <item row="4" column="0" colspan="2">
-             <widget class="QPushButton" name="normalise_button">
-              <property name="font">
-               <font>
-                <pointsize>12</pointsize>
-               </font>
-              </property>
-              <property name="styleSheet">
-               <string notr="true">background-color: rgb(81, 0, 255);</string>
-              </property>
-              <property name="text">
-               <string>Normalise Voltage</string>
-              </property>
-             </widget>
-            </item>
-            <item row="2" column="1">
-             <widget class="QPushButton" name="button_auto_range">
-              <property name="font">
-               <font>
-                <pointsize>9</pointsize>
-                <weight>75</weight>
-                <bold>true</bold>
-               </font>
-              </property>
-              <property name="styleSheet">
-               <string notr="true">color: rgb(255, 85, 0);
-background-color: rgb(255, 170, 0);</string>
-              </property>
-              <property name="text">
-               <string>Auto-range</string>
+               <string notr="true">background-color: rgb(0, 0, 0);
+color: rgb(30, 229, 0);
+border-color: rgb(255, 255, 127);</string>
               </property>
              </widget>
             </item>
@@ -820,31 +801,21 @@ p, li { white-space: pre-wrap; }
               </property>
              </widget>
             </item>
-            <item row="1" column="0">
-             <widget class="QLCDNumber" name="lcdNumber">
+            <item row="2" column="1">
+             <widget class="QPushButton" name="button_auto_range">
               <property name="font">
                <font>
                 <pointsize>9</pointsize>
+                <weight>75</weight>
+                <bold>true</bold>
                </font>
               </property>
               <property name="styleSheet">
-               <string notr="true">background-color: rgb(0, 0, 0);
-color: rgb(30, 229, 0);
-border-color: rgb(255, 255, 127);</string>
+               <string notr="true">color: rgb(255, 85, 0);
+background-color: rgb(255, 170, 0);</string>
               </property>
-             </widget>
-            </item>
-            <item row="1" column="1">
-             <widget class="QLCDNumber" name="lcdNumber_vector">
-              <property name="font">
-               <font>
-                <pointsize>10</pointsize>
-               </font>
-              </property>
-              <property name="styleSheet">
-               <string notr="true">background-color: rgb(0, 0, 0);
-color: rgb(30, 229, 0);
-border-color: rgb(255, 255, 127);</string>
+              <property name="text">
+               <string>Auto-range</string>
               </property>
              </widget>
             </item>
@@ -870,7 +841,7 @@ border-color: rgb(255, 255, 127);</string>
               </property>
              </widget>
             </item>
-            <item row="5" column="0" colspan="2">
+            <item row="4" column="0" colspan="2">
              <widget class="QPushButton" name="button_rotate">
               <property name="font">
                <font>
@@ -889,6 +860,20 @@ border-color: rgb(255, 255, 127);</string>
               </property>
               <property name="text">
                <string>Rotate magnet for first 10 rotation</string>
+              </property>
+             </widget>
+            </item>
+            <item row="1" column="1">
+             <widget class="QLCDNumber" name="lcdNumber_vector">
+              <property name="font">
+               <font>
+                <pointsize>10</pointsize>
+               </font>
+              </property>
+              <property name="styleSheet">
+               <string notr="true">background-color: rgb(0, 0, 0);
+color: rgb(30, 229, 0);
+border-color: rgb(255, 255, 127);</string>
               </property>
              </widget>
             </item>
@@ -1034,7 +1019,7 @@ border-color: rgb(255, 255, 127);</string>
      <x>0</x>
      <y>0</y>
      <width>1337</width>
-     <height>37</height>
+     <height>22</height>
     </rect>
    </property>
    <property name="font">

@@ -1,2 +1,2 @@
-max_hall_1_V;zero_offset_hall_1_V;max_hall_2_V;zero_offset_hall_2_V
-38659;27087;38928;26902
+voltage_amp_1_V;voltage_zero_offset_1_V;voltage_amp_2_V;voltage_zero_offset_2_V
+5799;32861;6002;32919
