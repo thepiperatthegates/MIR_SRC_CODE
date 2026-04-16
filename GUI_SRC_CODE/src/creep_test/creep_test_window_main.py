@@ -643,9 +643,9 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.worker_data_block.data_10 = 1 
         ######################################################################################
         
-        self.worker_data_block.data_offsets_creep = self.textbox_offset_1.text(), self.textbox_offset_2.text()
-        
-
+        self.worker_data_block.data_4 = self.textbox_offset_1.text()
+        self.worker_data_block.data_6 = self.textbox_offset_2.text()
+    
         ##send all data to microcontroller
         #activate flag
         self.worker_flag_send.flag_tx = True
