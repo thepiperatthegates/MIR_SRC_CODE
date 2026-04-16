@@ -362,11 +362,6 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.textbox_input_sampling_rate.setText("500")
         self.textbox_offset_1.setText("0")
         self.textbox_offset_2.setText("0")
-
-        #force everything to be disabled so one has to do the normalise event first
-        self.button_offsets.setDisabled(True)
-        self.button_send_start_vec.setDisabled(True)
-        self.button_start_acquistion.setDisabled(True)
         
         ################################################################################################
 
