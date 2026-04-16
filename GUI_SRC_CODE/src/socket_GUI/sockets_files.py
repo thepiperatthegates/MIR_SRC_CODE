@@ -485,8 +485,8 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
     col4 = packet_transmission.calibration_input_coil_2(col4)
 
     #Justified hall sensors
-    col1 = packet_transmission.calibrated_hall_sensors1(worker_kb_property.k_b_1, col1, col3/1000)  
-    col2 = packet_transmission.calibrated_hall_sensors2(worker_kb_property.k_b_2, col2, col4/1000)
+    # col1 = packet_transmission.calibrated_hall_sensors1(worker_kb_property.k_b_1, col1, col3/1000)  
+    # col2 = packet_transmission.calibrated_hall_sensors2(worker_kb_property.k_b_2, col2, col4/1000)
 
     # col1 = (col1- worker_normalise_properties.zero_offset_voltage_1) / worker_normalise_properties.amp_voltage_1
     # col2 = (col2 - worker_normalise_properties.zero_offset_voltage_2) / worker_normalise_properties.amp_voltage_2
