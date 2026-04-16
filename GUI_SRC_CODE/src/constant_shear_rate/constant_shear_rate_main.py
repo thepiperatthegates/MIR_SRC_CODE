@@ -1183,7 +1183,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         #--------------------- Update the Data Worker ---------------------
         self.worker_data_block.data_1 = 0.5 # Placeholder
-        self.worker_data_block.data_2_CSR = 10  # Forced 3Hz Frequency
+        self.worker_data_block.data_2_CSR = 30  # Forced 3Hz Frequency
         self.worker_data_block.data_current = (300, 0, 300, 0)  # Coil currents
 
         self.worker_data_block.data_7 = direction

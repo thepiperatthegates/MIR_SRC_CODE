@@ -385,7 +385,7 @@ def file_name_change_set(prefix, extension=".csv"):
     
 
 def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
-                worker_specific_downsampling, worker_normalise_properties, num_columns=5):
+                worker_specific_downsampling, worker_normalise_properties, num_columns=6):
     """
     Process, calibrate, downsample, timestamp, and save measurement data to a CSV file.
 
@@ -523,6 +523,7 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
             col3 = average_values(col3, worker_specific_downsampling.tot_average_specified).ravel()
             col4 = average_values(col4, worker_specific_downsampling.tot_average_specified).ravel()
             col5 = average_values(col5, worker_specific_downsampling.tot_average_specified).ravel()
+            col6 = average_values(col6, worker_specific_downsampling.tot_average_specified).ravel()
     
     elif worker_specific_downsampling.flag_specific_downsample is False:
             col1 = average_values(col1, worker_specific_downsampling.tot_average).ravel()
@@ -530,15 +531,17 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
             col3 = average_values(col3, worker_specific_downsampling.tot_average).ravel()
             col4 = average_values(col4, worker_specific_downsampling.tot_average).ravel()
             col5 = average_values(col5, worker_specific_downsampling.tot_average).ravel()
+            col6 = average_values(col5, worker_specific_downsampling.tot_average).ravel()
 
-    averaged_data = np.zeros((len(col1), num_columns))  # shape (100,4)
+    num_columns_average = 4
+    averaged_data = np.zeros((len(col1), num_columns_average))  # shape (100,4)
     averaged_data[:, 0] = col1
     averaged_data[:, 1] = col2
     averaged_data[:, 2] = col3
     averaged_data[:, 3] = col4
     #phase diff
-    averaged_data[:, 4] = col5
-    averaged_data[:, 5] = col6
+    # averaged_data[:, 4] = col5
+    # averaged_data[:, 5] = col6
     
     num_rows = averaged_data.shape[0] 
         
@@ -553,7 +556,8 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
     
 
     final_data = np.hstack((time_column, averaged_data))
-
+    
+    
             
 
     #always save the data to file dir
