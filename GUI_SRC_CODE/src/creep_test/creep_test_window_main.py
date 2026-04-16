@@ -31,7 +31,7 @@ class DataUpdate(QThread):
     """
     Thread class responsible for receiving, processing, and managing ADC data streams for Hall sensors and current sensors in real-time.
 
-    This class reads incoming data packets from a queue, converts raw ADC values into meaningful voltage and current signals,
+    This class reads incoming data packets from a queue, converts raw ADC values into meaningful voltage and current signals, 
     applies calibration and normalization, and computes derived quantities such as magnetic field angles and phase differences.
 
     The processed data is stored in a separate worker class (`StoreArrayGraph`) for visualization or further analysis.
@@ -73,44 +73,50 @@ class DataUpdate(QThread):
     def __init__(self, main_window_ref=None):
         super().__init__()
         self.main_window_ref = main_window_ref
+        
+        # ---------------- Operational State ---------------
         self.running = True
         self.flag_calibrate = False
-
+        self.flag_normalise = False
+        self.flag_normalise_measurement = False
         self.flag_fR_measurement = False
+
+        # ----------- Accumulators & Totals (Hall/Current) ----------
         self.accumulate_hall_1 = 0.0
         self.accumulate_hall_2 = 0.0
         self.accumulate_current_1 = 0.0
         self.accumulate_current_2 = 0.0
-
-        # for normalise properties purposes
-        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
-        self.amplitude_voltage_1 = 0.0
-        self.zero_offset_voltage_1 = 0.0
-        self.amplitude_voltage_2 = 0.0
-        self.zero_offset_voltage_2 = 0.0
-
-        self.flag_normalise = False
-        self.flag_normalise_measurement = False
 
         self.total_hall_1 = None
         self.total_hall_2 = None
         self.total_current_1 = None
         self.total_current_2 = None
 
+        # ---------- Normalization Parameters -----------
+        self.amplitude_voltage_1 = 0.0
+        self.zero_offset_voltage_1 = 0.0
+        self.amplitude_voltage_2 = 0.0
+        self.zero_offset_voltage_2 = 0.0
+
+        # ------- Data Buffers (NumPy Arrays) --------
+        # Raw Data Slices
         self.v1_slice = np.array([], dtype=np.uint16)
         self.v2_slice = np.array([], dtype=np.uint16)
         self.i1_slice = np.array([], dtype=np.uint16)
         self.i2_slice = np.array([], dtype=np.uint16)
+        self.bytes_to_process = np.array([], dtype=np.uint16)
 
-        self.bytes_to_process = np.array([], dtype=np.uint16)  # Empty NumPy array for incoming data
-
+        #------------ Calculated Values ------------------------
         self.angle_permanent_magnet_val = np.array([], dtype=np.float32)
         self.angle_magnetic_field_val = np.array([], dtype=np.float32)
         self.phase_difference_val = np.array([], dtype=np.float32)
 
+        # ------ Helper Workers --------------------------------
+        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
         self.worker_array_setter = packet_transmission.StoreArrayGraph()
         self.worker_kb_property = packet_transmission.kbCoefficient()
-
+        
+        
     def run(self):
 
         """
@@ -161,6 +167,7 @@ class DataUpdate(QThread):
                 data_mutex.lock()
 
                 # Hall Sensors
+                #TODO: NEW FIRMWARE ITERACTIONS MUST NOT BE NEGATIVE FOR I1!!!!!!!!!
                 self.v1_slice = -packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
                 self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
 
@@ -173,25 +180,21 @@ class DataUpdate(QThread):
                 self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
 
 
-
-                # calibration for hall sensors
+                # calibration for  hall sensors
                 self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
                                                                              self.v1_slice, self.i1_slice / 1000)
                 self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
                                                                              self.v2_slice, self.i2_slice / 1000)
-
-
-
+                if self.flag_normalise:
+                    self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amp_voltage_1
+                    self.v2_slice = (self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amp_voltage_2
+                
                 # Calibrate process starts
                 # measurement fR process starts
                 # measurement to determine the normalising parameters (for first time rotation)
                 if self.flag_calibrate or self.flag_fR_measurement or self.flag_normalise_measurement:
                     self.accumulate_data_function(self.v1_slice, self.v2_slice, self.i1_slice, self.i2_slice)
 
-                # this is normalising step (still do not know whether I want to do it immidiately or not)
-                if self.flag_normalise:
-                    self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amplitude_voltage_1
-                    self.v2_slice = ( self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amplitude_voltage_2
 
                 #######################################################################################################
                 self.angle_permanent_magnet_val = np.arctan2(self.v2_slice, self.v1_slice)
@@ -247,7 +250,6 @@ class DataUpdate(QThread):
 
     def stop(self):
         self.running = False
-
 
 class SleepTimer(QObject):
     update_time_signal = pyqtSignal(float)  # emit float countdown values
@@ -932,15 +934,17 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
 
     def button_rotate_event(self):
 
-        ############################# send data to setter getter ######################################
+        #Reset the normalise event state 
+        self.worker_DataUpdate.flag_normalise_event(False)
+        
 
-        self.worker_data_block.data_1 = 5.0  # second
-        self.worker_remaining_time.total_time_for_file_save = 5.0 # second
+        ############################# send data to setter getter ######################################
+        self.worker_data_block.data_1 =5.0 #second
         # make the running frequency 200 Hz, does not matter since we will produce DC current anyway
         # change to frequency for MCU
-        self.worker_data_block.data_2_for_MCU = 2  # Hz
+        self.worker_data_block.data_2_for_MCU = 2 #Hz
 
-        self.worker_data_block.data_current = 300, 0, 300, 0
+        self.worker_data_block.data_current = 400, 0, 400, 0
 
         # from combobox direction
         self.worker_data_block.data_7 = 1
@@ -955,7 +959,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         ######################################################################################
 
         ##send all data to microcontroller
-        # activate flag
+        #activate flag
         self.worker_flag_send.flag_tx = True
 
         self.status_label.setStyleSheet("color: #7da832;")
@@ -965,7 +969,8 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.worker_sleep.update_time_signal.connect(self.update_timer_rotation)
         self.worker_sleep.start()
 
-        # active the flag on DataUpdate side for finding normalising parameters for the voltages
+
+        #active the flag on DataUpdate side for finding normalising parameters for the voltages
         self.worker_DataUpdate.flag_special_event(False, False, True)
 
     def update_timer_rotation(self, val):
