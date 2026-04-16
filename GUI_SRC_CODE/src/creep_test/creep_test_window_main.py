@@ -460,7 +460,6 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         ##### same as above but for time interval change
         self.timeInterval_comboBox.activated.connect(self.change_graph)
 
-
     def change_graph(self):
         
         #get string from combo box
@@ -560,6 +559,9 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
 
             
         elif mode == "View phase difference":
+            
+            
+            #this is to make sure x-axis is configured properly 
             #this is to make sure x-axis is configured properly 
             if time_interval_var_int == 100:
                 sockets_files.tot_count_accumulate_recv = 250
@@ -587,17 +589,31 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             self.timer.timeout.connect(self.graph_phase_difference)
             self.timer.start()
             
+
+    def start_normalise_event(self):
+        
+        if not self.worker_DataUpdate.flag_normalise:
+            self.worker_DataUpdate.flag_normalise_event(True)
+        else:
+            self.worker_DataUpdate.flag_normalise_event(False)
+                
+
     def graph_update_sensors(self):
         global data_mutex
-        data_mutex.lock()
-        
+
+        # data_mutex.lock()
+
         self.curve_v1.setData(self.time_axis,self.worker_getter_graph.v1_slice)
         self.curve_v2.setData(self.time_axis,self.worker_getter_graph.v2_slice)
         
         self.curve_i1.setData(self.time_axis,self.worker_getter_graph.i1_slice)
         self.curve_i2.setData(self.time_axis,self.worker_getter_graph.i2_slice)
-        data_mutex.unlock()
+        
+        # data_mutex.unlock()
+        #
+        
     def auto_range_event(self):
+        
         self.plot1.enableAutoRange(axis='y', enable=True)
         self.plot2.enableAutoRange(axis='y', enable=True)
         # self.plot1.enableAutoRange(axis='x', enable=True)
@@ -607,14 +623,17 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
     def graph_update_angle(self):
         global data_mutex
         data_mutex.lock()
+        
         self.curve_sigma_m.setData(self.time_axis, self.worker_getter_graph.angle_permanent_magnet_val)
         self.curve_sigma_b.setData(self.time_axis, self.worker_getter_graph.angle_magnetic_field_val)
-        data_mutex.unlock()
         
+        data_mutex.unlock()
     def graph_phase_difference(self):
         global data_mutex
         data_mutex.lock()
+        
         self.curve_phase_difference.setData(self.time_axis, self.worker_getter_graph.phase_difference_val)
+        
         data_mutex.unlock()
         
     def send_offsets(self):
