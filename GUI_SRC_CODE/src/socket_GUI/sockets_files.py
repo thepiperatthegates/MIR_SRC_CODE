@@ -74,7 +74,7 @@ TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC   = int(0.1 / SAMPLE_PERIOD)
 FRAME_SIZE  = BYTES_PER_SAMPLE      # 2 header + 4+4+2+2+4 payload
 NORM_SIZE   =  HEADER_SIZE + (4 * (FLOAT32_SIZE))      # 2 header + 2+2+2+2 payload
 FRAME_FMT   = '<ffHHff'  # H1, H2, C1, C2, PD, TORQUE
-NORM_FMT    = '<ffff'   # max_h1, min_h1, max_h2, min_h2
+NORM_FMT    = '<HHHH'   # max_h1, min_h1, max_h2, min_h2
 
 SENSOR_H1 = 0xAA
 SENSOR_H2 = 0xAB
