@@ -226,10 +226,10 @@ class TxData():
     
     def combine_additional_data(self, data1, data2, data3, data4):
         
-        byte_1 = struct.pack('<f', int(data1))
-        byte_2 = struct.pack('<f', int(data2))
-        byte_3 = struct.pack('<f', int(data3))
-        byte_4 = struct.pack('<f', int(data4))
+        byte_1 = struct.pack('<H', int(data1))
+        byte_2 = struct.pack('<H', int(data2))
+        byte_3 = struct.pack('<H', int(data3))
+        byte_4 = struct.pack('<H', int(data4))
         
         payload = b''.join([byte_1, byte_2, byte_3, byte_4])
         
