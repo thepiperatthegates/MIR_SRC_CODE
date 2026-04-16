@@ -166,7 +166,6 @@ class DataUpdate(QThread):
                 self.phase_diff_slice = reshaped_data[:, 4]         # phase diff [rad]
                 self.torque_slice = reshaped_data[:, 5]         # phase diff [rad]
 
-
                 data_mutex.lock()
 
                 # Hall Sensors

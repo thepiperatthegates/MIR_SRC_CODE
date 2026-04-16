@@ -109,6 +109,7 @@ class DataUpdate(QThread):
         self.angle_permanent_magnet_val = np.array([], dtype=np.float32)
         self.angle_magnetic_field_val = np.array([], dtype=np.float32)
         self.phase_difference_val = np.array([], dtype=np.float32)
+        self.actual_torque = np.array([], dtype=np.float32)
 
         # ------ Helper Workers --------------------------------
         self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
@@ -143,7 +144,7 @@ class DataUpdate(QThread):
 
         data_from_pipe = []  # creating a list here because data from pipe is a list
         
-        num_columns = 5  # v1, v2, i1, i2, phase_diff
+        num_columns = 6  # v1, v2, i1, i2, phase_diff
                 
         while self.running:
             data_from_pipe = q_to_graph.get()
@@ -165,6 +166,7 @@ class DataUpdate(QThread):
                 self.i1_slice = reshaped_data[:, 2]  # STIMMT
                 self.i2_slice = reshaped_data[:, 3]  # STIMMT
                 self.phase_diff_slice = reshaped_data[:, 4]         # phase diff [rad]
+                self.torque_slice = reshaped_data[:, 5]         # phase diff [rad]
 
                 data_mutex.lock()
 
@@ -214,6 +216,9 @@ class DataUpdate(QThread):
                 self.worker_array_setter.angle_magnetic_field_val = self.angle_magnetic_field_val
 
                 self.worker_array_setter.phase_difference_val = self.phase_difference_val
+                                
+                self.worker_array_setter.actual_torque_val = self.actual_torque
+
 
                 data_mutex.unlock()
 
