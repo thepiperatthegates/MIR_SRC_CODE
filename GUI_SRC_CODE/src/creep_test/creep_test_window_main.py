@@ -8,17 +8,17 @@ import os
 from pathlib import Path
 
 
-import packet_transmission
+import socket_GUI.device_state as device_state
 
 # #fix cache problem with MATHPLOTLIB
 os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
 import sys
 
-from socket_GUI import sockets_files
-from socket_GUI.sockets_files import q_to_graph
+from socket_GUI import serial_backend
+from socket_GUI.serial_backend import q_to_graph
 
 from .creep_test_gui import Ui_CreepTestGUI
-from .analyse_window_creep_test import AnalyseWindow
+from analyse_window.analyse_window_main import AnalyseWindow 
 
 
 
@@ -112,9 +112,9 @@ class DataUpdate(QThread):
         self.actual_torque = np.array([], dtype=np.float32)
 
         # ------ Helper Workers --------------------------------
-        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
-        self.worker_array_setter = packet_transmission.StoreArrayGraph()
-        self.worker_kb_property = packet_transmission.kbCoefficient()
+        self.worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
+        self.worker_array_setter = device_state.StoreArrayGraph()
+        self.worker_kb_property = device_state.kbCoefficient()
         
         
     def run(self):
@@ -176,12 +176,12 @@ class DataUpdate(QThread):
                 # self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
 
                 # Current
-                self.i1_slice = -packet_transmission.change_current_adc(self.i1_slice)  # convert col3 (in mA)
-                self.i2_slice = packet_transmission.change_current_adc(self.i2_slice)  # convert col4 (in mA)
+                self.i1_slice = -device_state.change_current_adc(self.i1_slice)  # convert col3 (in mA)
+                self.i2_slice = device_state.change_current_adc(self.i2_slice)  # convert col4 (in mA)
 
                 # calibration for current sensor
-                self.i1_slice = packet_transmission.calibration_input_coil_1(self.i1_slice)
-                self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
+                self.i1_slice = device_state.calibration_input_coil_1(self.i1_slice)
+                self.i2_slice = device_state.calibration_input_coil_2(self.i2_slice)
 
 
                 # calibration for  hall sensors
@@ -298,10 +298,10 @@ class SleepTimer(QObject):
 
     def __init__(self):
         super().__init__()
-        self.worker_remaining = packet_transmission.TxData()
+        self.worker_remaining = device_state.TxData()
         self.remaining = float(self.worker_remaining.data_1) # get local_data_1 from global
-        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
-        self.worker_reset_current_time = packet_transmission.DownSampleSpecificFlag()
+        self.worker_flag_run_time = device_state.RunningTimeFlag()
+        self.worker_reset_current_time = device_state.DownSampleSpecificFlag()
         self.timer = QTimer(self)
         self.timer.setInterval(100)  # 100 ms per tick
         self.timer.timeout.connect(self._tick)
@@ -358,7 +358,7 @@ class SocketThread(QThread):
 
     def run(self):
         if self.running:
-            sockets_files.thread_start()
+            serial_backend.thread_start()
 
 
     def stop(self):
@@ -446,42 +446,42 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         ####### flag init ##############################################################################
         
         #for receive thread
-        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
+        self.worker_flag_run_time = device_state.RunningTimeFlag()
         #for tx data
-        self.worker_data_block = packet_transmission.TxData()
+        self.worker_data_block = device_state.TxData()
         #for transmitting thread
-        self.worker_flag_send = packet_transmission.TxFlag()
+        self.worker_flag_send = device_state.TxFlag()
         #for data straight from graph
-        self.worker_getter_graph = packet_transmission.StoreArrayGraph()
+        self.worker_getter_graph = device_state.StoreArrayGraph()
         #for downsampling purposes
-        self.worker_downsample_property = packet_transmission.DownSampleSpecificFlag()
+        self.worker_downsample_property = device_state.DownSampleSpecificFlag()
         self.tot_average = self.worker_downsample_property.tot_average
         self.tot_average_specified = self.worker_downsample_property.tot_average_specified
         self.time_increment = self.worker_downsample_property.time_increment
         self.time_increment_specified = self.worker_downsample_property.time_increment_specified
         self.current_time = self.worker_downsample_property.current_time
         
-        self.worker_remaining_time = packet_transmission.RemainingTimeForCreepTest()
+        self.worker_remaining_time = device_state.RemainingTimeForCreepTest()
         self.time_for_resetting_flag = self.worker_remaining_time.time_for_resetting_time
         
         self.start_vector_time = self.worker_remaining_time.start_vector_time
         self.end_vector_time = self.worker_remaining_time.end_vector_time
         
-        self.worker_get = packet_transmission.fRCoefficients()
-        packet_transmission.CALIBRATION_FACTOR = self.worker_get.CALIBRATION_FACTOR # torque calibration no units (K)
+        self.worker_get = device_state.fRCoefficients()
+        device_state.CALIBRATION_FACTOR = self.worker_get.CALIBRATION_FACTOR # torque calibration no units (K)
 
         #for k_b setter getter
-        self.worker_k_b_property = packet_transmission.kbCoefficient()
+        self.worker_k_b_property = device_state.kbCoefficient()
         self.k_b_label.setTextFormat(Qt.RichText)
         self.k_b_label.setText(
             f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
             f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
-            f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
+            f"K = {device_state.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
         )
 
 
         #for normalising properties purposes
-        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
+        self.worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
         ################################################################################################
         
         ##### combobox for live graph mode
@@ -506,7 +506,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         #  ----------------------- Handle Scaling Logic -----------------------
         # factor maps 100ms -> 1, 500ms -> 5, 1000ms -> 10
         factor = interval_ms // 100
-        sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = factor * sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
+        serial_backend.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = factor * serial_backend.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
         
         #  ----------------------- Mode-specific time axis length  -----------------------
         range_len = 50000 if (mode == "View angle" and interval_ms == 1000) else (factor * 1000)
@@ -632,9 +632,9 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
 
         #from combobox direction
         self.worker_data_block.data_7 = 1
-        self.worker_data_block.data_8 = sockets_files.CSR_COIL_CALIBRATION
+        self.worker_data_block.data_8 = serial_backend.CSR_COIL_CALIBRATION
         #for data 10
-        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE
+        self.worker_data_block.data_10 = serial_backend.CONTROL_SHEAR_RATE
         ######################################################################################
         
 
@@ -663,11 +663,11 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         #from combobox direction
         self.worker_data_block.data_7 = 1
 
-        self.worker_data_block.data_8 = sockets_files.CSR_COIL_CALIBRATION
+        self.worker_data_block.data_8 = serial_backend.CSR_COIL_CALIBRATION
 
         
         #for data 10
-        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE
+        self.worker_data_block.data_10 = serial_backend.CONTROL_SHEAR_RATE
         ######################################################################################
         
         
@@ -728,9 +728,9 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         #from combobox direction
         self.worker_data_block.data_7 = 1
 
-        self.worker_data_block.data_8 = sockets_files.CSR_COIL_CALIBRATION
+        self.worker_data_block.data_8 = serial_backend.CSR_COIL_CALIBRATION
         #for data 10
-        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE
+        self.worker_data_block.data_10 = serial_backend.CONTROL_SHEAR_RATE
         ######################################################################################
         
         ##send all data to microcontroller
@@ -773,7 +773,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             #start specific 
             self.worker_downsample_property.flag_specific_downsample = True
             
-            sockets_files.file_name_change_set("dummy")        #set file name from gui
+            serial_backend.file_name_change_set("dummy")        #set file name from gui
             print("check is", check3)
 
 
@@ -843,10 +843,10 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
 
             #from combobox direction
             self.worker_data_block.data_7 = 1
-            self.worker_data_block.data_8 = sockets_files.CSR_COIL_CALIBRATION
+            self.worker_data_block.data_8 = serial_backend.CSR_COIL_CALIBRATION
             
             #for data 10
-            self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE
+            self.worker_data_block.data_10 = serial_backend.CONTROL_SHEAR_RATE
             ############################################################################################################
             
             ##send all data to microcontroller
@@ -906,8 +906,8 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.worker_data_block.data_current = (300, 0, 300, 0)  # Coil currents
 
         self.worker_data_block.data_7 = 2
-        self.worker_data_block.data_8 = sockets_files.CSR_NORM
-        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE  # Rotation Mode (CRITICAL)
+        self.worker_data_block.data_8 = serial_backend.CSR_NORM
+        self.worker_data_block.data_10 = serial_backend.CONTROL_SHEAR_RATE  # Rotation Mode (CRITICAL)
         self.worker_data_block.data_11 = 0.0
         self.worker_flag_send.flag_tx = True
         self.status_label.setStyleSheet("color: #7da832;")
@@ -975,8 +975,8 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             self.p_window_data.join()
 
         #terminate the other subprocess
-        sockets_files.p1.terminate()
-        sockets_files.p1.join()
+        serial_backend.p1.terminate()
+        serial_backend.p1.join()
 
         #stop all the threads
         self.worker_socket.stop()
@@ -1006,7 +1006,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         
         msg = QMessageBox()
         
-        text = packet_transmission.set_popout_text(arg)
+        text = device_state.set_popout_text(arg)
         msg.setText(text)
         
         msg.setIcon(QMessageBox.Question)
@@ -1035,14 +1035,14 @@ class TabWindowCreepTest(QMainWindow):
         #stop all the background processes
 
             
-        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, sockets_files.q_to_csv):
+        for q in (serial_backend.q_to_process, serial_backend.q_to_graph, serial_backend.q_to_csv):
             q.close()
             q.join_thread()
 
 
         #terminate the other subprocess
-        sockets_files.p1.terminate()
-        sockets_files.p1.join()
+        serial_backend.p1.terminate()
+        serial_backend.p1.join()
 
         #stop all the threads
         

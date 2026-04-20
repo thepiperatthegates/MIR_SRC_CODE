@@ -13,10 +13,10 @@ os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
 import multiprocessing
 import sys
 
-import socket_GUI.sockets_files as sockets_files
-from socket_GUI.sockets_files import q_to_graph
+import socket_GUI.serial_backend as serial_backend
+from socket_GUI.serial_backend import q_to_graph
 
-import packet_transmission as backend
+import socket_GUI.device_state as backend
 from .change_coeff import Ui_Form
 
 
@@ -64,10 +64,10 @@ class SendPIDCoeff(QMainWindow, Ui_Form):
     
         self.worker_data_block.data_5  = Ki_2
         self.worker_data_block.data_6 = Kd_2
-        self.worker_data_block.data_8 = sockets_files.PID_COEFF_CHANGE
+        self.worker_data_block.data_8 = serial_backend.PID_COEFF_CHANGE
         
         #for data 10
-        self.worker_data_block.data_10 = sockets_files.PID_START 
+        self.worker_data_block.data_10 = serial_backend.PID_START 
         
         self.worker_flag_send.flag_tx = True
         
@@ -92,10 +92,10 @@ class SendPIDCoeff(QMainWindow, Ui_Form):
     
         self.worker_data_block.data_5  = Ki_2
         self.worker_data_block.data_6 = Kd_2
-        self.worker_data_block.data_8 = sockets_files.PID_COEFF_CHANGE
+        self.worker_data_block.data_8 = serial_backend.PID_COEFF_CHANGE
         
         #for data 10
-        self.worker_data_block.data_10 = sockets_files.PID_START 
+        self.worker_data_block.data_10 = serial_backend.PID_START 
         
         self.worker_flag_send.flag_tx = True
 

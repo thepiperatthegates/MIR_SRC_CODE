@@ -1,6 +1,6 @@
 #---------------------- functions for socket backend ----------------------
 
-import packet_transmission as packet_transmission
+from . import device_state
 
 import numpy as np
 import os
@@ -43,7 +43,7 @@ flag_test = None
 
 p1 = None
 
-worker_data_flag = packet_transmission.RunningTimeFlag()
+worker_data_flag = device_state.RunningTimeFlag()
 
 
 restart_event = multiprocessing.Event()
@@ -72,7 +72,7 @@ TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC   = int(0.1 / SAMPLE_PERIOD)
 # --- Protocol Headers & Formatting ---
 # Format: < (Little Endian), f (float), H (unsigned short)
 FRAME_SIZE  = BYTES_PER_SAMPLE      # 2 header + 4+4+2+2+4 payload
-NORM_SIZE   =  HEADER_SIZE + (4 * (FLOAT32_SIZE))      # 2 header + 2+2+2+2 payload
+NORM_SIZE   =  HEADER_SIZE + (4 * (UINT16_SIZE))      # 2 header + 2+2+2+2 payload
 FRAME_FMT   = '<ffHHff'  # H1, H2, C1, C2, PD, TORQUE
 NORM_FMT    = '<HHHH'   # max_h1, min_h1, max_h2, min_h2
 
@@ -156,14 +156,14 @@ def thread_start():
         - A small delay (`time.sleep(0.001)`) is used to reduce CPU usage.
     """
     ser1 = socket_start_connect()
-    worker_kb_property = packet_transmission.kbCoefficient()
-    worker_specific_downsampling = packet_transmission.DownSampleSpecificFlag()
-    worker_normalisation  = packet_transmission.VoltageNormaliseCoefficient()
+    worker_kb_property = device_state.kbCoefficient()
+    worker_specific_downsampling = device_state.DownSampleSpecificFlag()
+    worker_normalisation  = device_state.VoltageNormaliseCoefficient()
     #Event for run time receiving data from Serial Porte
     thread_recv = threading.Thread(target=recv_thread, args=(ser1,worker_kb_property, worker_specific_downsampling))
     thread_recv.start()
     
-    worker_flag_send = packet_transmission.TxFlag()
+    worker_flag_send = device_state.TxFlag()
 
     while True:
         if worker_flag_send.flag_tx:
@@ -171,6 +171,7 @@ def thread_start():
             thread_send.start()
             #reset the flag
             worker_flag_send.flag_tx = False
+            
         elif worker_flag_send.flag_init_tx:
             thread_send = threading.Thread(target=send_thread, daemon=False, args=(ser1, "norm", worker_normalisation.amp_voltage_1, worker_normalisation.zero_offset_voltage_1, 
                                         worker_normalisation.amp_voltage_2, worker_normalisation.zero_offset_voltage_2))
@@ -184,8 +185,8 @@ def thread_start():
 def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
     
     #----- pasing worker objects ------------
-    worker_process_flag = packet_transmission.ProcessUnpackingFlag()
-    worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
+    worker_process_flag = device_state.ProcessUnpackingFlag()
+    worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
 
     restart_event = multiprocessing.Event()
 
@@ -294,16 +295,19 @@ CSR_NORM = 0x23
 # ----------------------------------------------------
 
 def send_thread(serial_data, mode="input", amp1=0.0, zero_off1=0.0,amp2=0.0, zero_off2=0.0 ) -> None:
+    
     if mode == "input":
-        worker_combined_send = packet_transmission.TxData()
+        worker_combined_send = device_state.TxData()
         combined_send = worker_combined_send.combine_input_data()
         print(combined_send)
         try:
             serial_data.write(combined_send)
         except Exception as e:
             print("Cannot send data!", e)
+            
+
     elif mode == "norm":
-        worker_combined_send = packet_transmission.TxData()
+        worker_combined_send = device_state.TxData()
         combined_send = worker_combined_send.combine_additional_data(amp1, zero_off1, amp2, zero_off2)
         print("norm")
         try:
@@ -478,11 +482,11 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
     col6 = reshaped_data[:, 5]            # actual torque [rad]
     
     #Current
-    col3 = -packet_transmission.change_current_adc(col3)               #convert col1
-    col4 = packet_transmission.change_current_adc(col4)               #convert col2
+    col3 = -device_state.change_current_adc(col3)               #convert col1
+    col4 = device_state.change_current_adc(col4)               #convert col2
 
-    col3 = packet_transmission.calibration_input_coil_1(col3)
-    col4 = packet_transmission.calibration_input_coil_2(col4)
+    col3 = device_state.calibration_input_coil_1(col3)
+    col4 = device_state.calibration_input_coil_2(col4)
 
     #Justified hall sensors
     # col1 = packet_transmission.calibrated_hall_sensors1(worker_kb_property.k_b_1, col1, col3/1000)  
@@ -531,7 +535,7 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
             col3 = average_values(col3, worker_specific_downsampling.tot_average).ravel()
             col4 = average_values(col4, worker_specific_downsampling.tot_average).ravel()
             col5 = average_values(col5, worker_specific_downsampling.tot_average).ravel()
-            col6 = average_values(col5, worker_specific_downsampling.tot_average).ravel()
+            col6 = average_values(col6, worker_specific_downsampling.tot_average).ravel()
 
     num_columns_average = 4
     averaged_data = np.zeros((len(col1), num_columns_average))  # shape (100,4)
@@ -572,15 +576,6 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
                 np.savetxt(f, final_data, delimiter=";",   fmt='%.17g')
     except Exception as e:
         print(f"The fuck?: {e}")
-
-def downsampling_values (col1, col2, col3, col4, tot_average):
-        
-    col1_after_average = average_values(col1, tot_average).ravel()
-    col2_after_average = average_values(col2, tot_average).ravel()
-    col3_after_average = average_values(col3, tot_average).ravel()
-    col4_after_average = average_values(col4, tot_average).ravel()
-    
-    return col1_after_average, col2_after_average, col3_after_average, col4_after_average
     
     
 #for decreasing data size for csv purposes 
@@ -627,7 +622,7 @@ def save_norm_data_to_csv(packed_norm_data, filename="normalise_voltage_constant
     #-------------- reshaped into 4 columns ----------------
     data = data.reshape(-1, 4)
     
-    headers_name = "voltage_amp_1_V;voltage_zero_offset_1_V;voltage_amp_2_V;voltage_zero_offset_2_V"
+    headers_name = "min_hall_1_v;max_hall_1_v;min_hall_2_v;max_hall_2_v"
     
     project_root =  os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     file_name_full = os.path.join(project_root, "files", filename)

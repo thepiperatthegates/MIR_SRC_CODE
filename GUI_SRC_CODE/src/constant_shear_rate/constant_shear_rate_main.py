@@ -16,17 +16,18 @@ import multiprocessing
 import sys
 from .gui_baru import Ui_Title
 
-import socket_GUI.sockets_files as sockets_files
-from socket_GUI.sockets_files import q_to_graph
+import socket_GUI.serial_backend as serial_backend
+from socket_GUI.serial_backend import q_to_graph
 
-import packet_transmission as packet_transmission
-from .analyse_window_const_sr import AnalyseWindow
+import socket_GUI.device_state as device_state
+from analyse_window.analyse_window_main import AnalyseWindow
 from .graph_fr import PlotWindow
 
 
 
 # GLOBAL VARIABLES
 data_mutex = QMutex()
+
 
 
 # function receiving data through pipe from another thread
@@ -76,51 +77,46 @@ class DataUpdate(QThread):
     def __init__(self, main_window_ref=None):
         super().__init__()
         self.main_window_ref = main_window_ref
-        
-        # ---------------- Operational State ---------------
         self.running = True
         self.flag_calibrate = False
-        self.flag_normalise = False
-        self.flag_normalise_measurement = False
-        self.flag_fR_measurement = False
 
-        # ----------- Accumulators & Totals (Hall/Current) ----------
+        self.flag_fR_measurement = False
         self.accumulate_hall_1 = 0.0
         self.accumulate_hall_2 = 0.0
         self.accumulate_current_1 = 0.0
         self.accumulate_current_2 = 0.0
+
+        # for normalise properties purposes
+        self.worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
+        self.amplitude_voltage_1 = 0.0
+        self.zero_offset_voltage_1 = 0.0
+        self.amplitude_voltage_2 = 0.0
+        self.zero_offset_voltage_2 = 0.0
+
+        self.flag_normalise = False
+        self.flag_normalise_measurement = False
 
         self.total_hall_1 = None
         self.total_hall_2 = None
         self.total_current_1 = None
         self.total_current_2 = None
 
-        # ---------- Normalization Parameters -----------
-        self.amplitude_voltage_1 = 0.0
-        self.zero_offset_voltage_1 = 0.0
-        self.amplitude_voltage_2 = 0.0
-        self.zero_offset_voltage_2 = 0.0
-
-        # ------- Data Buffers (NumPy Arrays) --------
-        # Raw Data Slices
         self.v1_slice = np.array([], dtype=np.uint16)
         self.v2_slice = np.array([], dtype=np.uint16)
         self.i1_slice = np.array([], dtype=np.uint16)
         self.i2_slice = np.array([], dtype=np.uint16)
-        self.bytes_to_process = np.array([], dtype=np.uint16)
+        self.phase_diff_slice = np.array([], dtype=np.float32)
+        self.actual_torque = np.array([], dtype=np.float32)
 
-        #------------ Calculated Values ------------------------
+        self.bytes_to_process = np.array([], dtype=np.uint16)  # Empty NumPy array for incoming data
+
         self.angle_permanent_magnet_val = np.array([], dtype=np.float32)
         self.angle_magnetic_field_val = np.array([], dtype=np.float32)
         self.phase_difference_val = np.array([], dtype=np.float32)
-        self.actual_torque = np.array([], dtype=np.float32)
 
-        # ------ Helper Workers --------------------------------
-        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
-        self.worker_array_setter = packet_transmission.StoreArrayGraph()
-        self.worker_kb_property = packet_transmission.kbCoefficient()
-        
-        
+        self.worker_array_setter = device_state.StoreArrayGraph()
+        self.worker_kb_property = device_state.kbCoefficient()
+
     def run(self):
 
         """
@@ -149,51 +145,51 @@ class DataUpdate(QThread):
         data_from_pipe = []  # creating a list here because data from pipe is a list
         
         num_columns = 6  # v1, v2, i1, i2, phase_diff
-                
+        
         while self.running:
             data_from_pipe = q_to_graph.get()
             if not self.running:
                 break
             if data_from_pipe:
-                self.bytes_to_process = data_from_pipe  # now changes to np array so we can work with it better
+                self.bytes_to_process = np.array(data_from_pipe, dtype=float)
 
                 trimmed_size = len(self.bytes_to_process) - (len(self.bytes_to_process) % num_columns)
                 self.bytes_to_process = self.bytes_to_process[:trimmed_size]
 
-                if len(self.bytes_to_process) == 0:
+                if self.bytes_to_process.size == 0:
                     return
-                reshaped_data = np.array(self.bytes_to_process).reshape(-1, num_columns)
-                reshaped_data = reshaped_data.astype(float)
 
-                self.v1_slice = reshaped_data[:, 0]
-                self.v2_slice = reshaped_data[:, 1]
-                self.i1_slice = reshaped_data[:, 2]  # STIMMT
-                self.i2_slice = reshaped_data[:, 3]  # STIMMT
+                reshaped_data = self.bytes_to_process.reshape(-1, num_columns)
+
+                self.v1_slice = reshaped_data[:, 0]     # normalised hall 1 [no unit]
+                self.v2_slice = reshaped_data[:, 1]     #normalised hall 2 [no unit]
+                self.i1_slice = reshaped_data[:, 2]     #i1 [digital]
+                self.i2_slice = reshaped_data[:, 3]     # i2 [digital]
                 self.phase_diff_slice = reshaped_data[:, 4]         # phase diff [rad]
                 self.torque_slice = reshaped_data[:, 5]         # phase diff [rad]
 
                 data_mutex.lock()
 
                 # Hall Sensors
-                #TODO: NEW FIRMWARE ITERACTIONS MUST NOT BE NEGATIVE FOR I1!!!!!!!!!
-                # self.v1_slice = -packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
-                # self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
+                
+                # self.v1_slice = device_state.change_adc_hall(self.v1_slice)  # convert col1 (in V)
+                # self.v2_slice = device_state.change_adc_hall(self.v2_slice)  # convert col2 (in V)
 
                 # Current
-                self.i1_slice = -packet_transmission.change_current_adc(self.i1_slice)  # convert col3 (in mA)
-                self.i2_slice = packet_transmission.change_current_adc(self.i2_slice)  # convert col4 (in mA)
+                self.i1_slice = -device_state.change_current_adc(self.i1_slice)  # convert col3 (in mA)
+                self.i2_slice = device_state.change_current_adc(self.i2_slice)  # convert col4 (in mA)
 
-                # calibration for current sensor
-                self.i1_slice = packet_transmission.calibration_input_coil_1(self.i1_slice)
-                self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
+                # Calibration for current sensor
+                self.i1_slice = device_state.calibration_input_coil_1(self.i1_slice)
+                self.i2_slice = device_state.calibration_input_coil_2(self.i2_slice)
 
 
-                # calibration for  hall sensors
-                # self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
+                # # calibration for  hall sensors
+                # self.v1_slice = device_state.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
                 #                                                              self.v1_slice, self.i1_slice / 1000)
-                # self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
+                # self.v2_slice = device_state.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
                 #                                                              self.v2_slice, self.i2_slice / 1000)
-
+                
                 # Calibrate process starts
                 # measurement fR process starts
                 # measurement to determine the normalising parameters (for first time rotation)
@@ -209,6 +205,7 @@ class DataUpdate(QThread):
                 self.angle_magnetic_field_val = np.unwrap(self.angle_magnetic_field_val)
                 #######################################################################################################
                 self.phase_difference_val = self.phase_diff_slice
+                self.actual_torque =  self.torque_slice
 
                 ##send to setter class
                 self.worker_array_setter.v1_slice = self.v1_slice
@@ -218,8 +215,8 @@ class DataUpdate(QThread):
 
                 self.worker_array_setter.angle_permanent_magnet_val = self.angle_permanent_magnet_val
                 self.worker_array_setter.angle_magnetic_field_val = self.angle_magnetic_field_val
-
                 self.worker_array_setter.phase_difference_val = self.phase_difference_val
+                
                 self.worker_array_setter.actual_torque_val = self.actual_torque
 
                 data_mutex.unlock()
@@ -285,7 +282,7 @@ class SleepTimer(QObject):
         Stops the countdown timer.
     _tick()
         Decrements the remaining time by 0.1 seconds per tick, emits updates via
-        `update_time_signal`, and calls `packet_transmission.running_time_flag_setter(0)`
+        `update_time_signal`, and calls `device_state.running_time_flag_setter(0)`
         when the countdown reaches zero.
 
     Notes
@@ -298,10 +295,10 @@ class SleepTimer(QObject):
 
     def __init__(self):
         super().__init__()
-        self.worker_remaining = packet_transmission.TxData()
+        self.worker_remaining = device_state.TxData()
         self.remaining = float(self.worker_remaining.data_1) # get local_data_1 from global
-        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
-        self.worker_reset_current_time = packet_transmission.DownSampleSpecificFlag()
+        self.worker_flag_run_time = device_state.RunningTimeFlag()
+        self.worker_reset_current_time = device_state.DownSampleSpecificFlag()
         self.timer = QTimer(self)
         self.timer.setInterval(100)  # 100 ms per tick
         self.timer.timeout.connect(self._tick)
@@ -329,7 +326,7 @@ class SocketThread(QThread):
 
     def run(self):
         if self.running:
-            sockets_files.thread_start()
+            serial_backend.thread_start()
 
 
     def stop(self):
@@ -411,24 +408,24 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.calculate_final_fR = 0
 
     def _init_workers(self):
-        """Initialize packet_transmission workers."""
-        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
-        self.worker_data_block = packet_transmission.TxData()
-        self.worker_flag_send = packet_transmission.TxFlag()
-        self.worker_getter_graph = packet_transmission.StoreArrayGraph()
-        self.worker_fr_property = packet_transmission.fRCoefficients()
-        self.worker_k_b_property = packet_transmission.kbCoefficient()
-        self.worker_downsample_property = packet_transmission.DownSampleSpecificFlag()
-        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
+        """Initialize device_state workers."""
+        self.worker_flag_run_time = device_state.RunningTimeFlag()
+        self.worker_data_block = device_state.TxData()
+        self.worker_flag_send = device_state.TxFlag()
+        self.worker_getter_graph = device_state.StoreArrayGraph()
+        self.worker_fr_property = device_state.fRCoefficients()
+        self.worker_k_b_property = device_state.kbCoefficient()
+        self.worker_downsample_property = device_state.DownSampleSpecificFlag()
+        self.worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
         
         #--------- Constants ---------
         self.tot_average = self.worker_downsample_property.tot_average
         self.time_increment = self.worker_downsample_property.current_time
-        self.COIL_CONSTANT = packet_transmission.COIL_CONSTANT
-        self.DIPOLE_MOMENT = packet_transmission.DIPOLE_MOMENT
+        self.COIL_CONSTANT = device_state.COIL_CONSTANT
+        self.DIPOLE_MOMENT = device_state.DIPOLE_MOMENT
         
         #--------- Global sync ---------
-        packet_transmission.CALIBRATION_FACTOR = self.worker_fr_property.CALIBRATION_FACTOR
+        device_state.CALIBRATION_FACTOR = self.worker_fr_property.CALIBRATION_FACTOR
 
     def _setup_ui_elements(self):
         """Set icons, placeholders, and labels."""
@@ -446,7 +443,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.k_b_label.setText(
             f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
             f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
-            f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
+            f"K = {device_state.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
             f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
         )
         
@@ -528,7 +525,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #  ----------------------- Handle Scaling Logic -----------------------
         # factor maps 100ms -> 1, 500ms -> 5, 1000ms -> 10
         factor = interval_ms // 100
-        sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = factor * sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
+        serial_backend.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = factor * serial_backend.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
         
         #  ----------------------- Mode-specific time axis length  -----------------------
         range_len = 50000 if (mode == "View angle" and interval_ms == 1000) else (factor * 1000)
@@ -666,8 +663,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         # --------- Apply direction and filter logic --------
         self.worker_data_block.data_7 = dir_map.get(self.comboBox_direction.currentText(), 1)
-        self.worker_data_block.data_8 = sockets_files.CSR_LOOP
-        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE 
+        self.worker_data_block.data_8 = serial_backend.CSR_LOOP
+        self.worker_data_block.data_10 = serial_backend.CONTROL_SHEAR_RATE 
 
         # ---------- Hardware and UI triggers. ------------
         self.button_stop.setDisabled(False)  # Enable stop button
@@ -708,7 +705,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.textbox_amplitude1.text(), self.textbox_offset1.text(),
             self.textbox_amplitude2.text(), self.textbox_offset2.text()
         )
-        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE  
+        self.worker_data_block.data_10 = serial_backend.CONTROL_SHEAR_RATE  
 
         # --------- Setting downsample properties ---------
         self.worker_downsample_property.time_increment = 1.0 / fs
@@ -716,7 +713,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_downsample_property.current_time = 0.0
         self.worker_flag_run_time.flag_running_time = True
         
-        sockets_files.file_name_change_set("dummy")
+        serial_backend.file_name_change_set("dummy")
 
         #--------- UI and Timer Execution.  ------------------
         self.status_label.setStyleSheet("color: #7da832;")
@@ -764,10 +761,10 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.worker_data_block.data_7 = 1
             
 
-        self.worker_data_block.data_8 = sockets_files.CSR_COIL_CALIBRATION
+        self.worker_data_block.data_8 = serial_backend.CSR_COIL_CALIBRATION
         self.worker_data_block.data_9 = 0
         #for data 10
-        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE
+        self.worker_data_block.data_10 = serial_backend.CONTROL_SHEAR_RATE
         ############################################################################################################################
 
         ##send all data to microcontroller
@@ -840,7 +837,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                     
                 #---- get the current used eletronic flags ----
                 
-                electronic_flags = packet_transmission.get_electronics_flag()
+                electronic_flags = device_state.get_electronics_flag()
                 index = data["ELECTRONICS_FLAG"] == electronic_flags
                 
                 if np.any(index):
@@ -866,12 +863,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 self.k_b_label.setText(
                     f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
                     f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
-                    f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
+                    f"K = {device_state.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
                     f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
                 )
                 
                 #---- reload the file ----
-                packet_transmission.kbCoefficient.reload()
+                device_state.kbCoefficient.reload()
                 
                 self.popout_window(4, self.calculate_final_fR, self.worker_k_b_property.k_b_1, self.worker_k_b_property.k_b_2)
                 #enable the button again
@@ -923,11 +920,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_data_block.data_current = str(200), self.textbox_offset1.text(), str(200), self.textbox_offset2.text()
         self.worker_data_block.data_7 = rotation_direction
             
-        self.worker_data_block.data_8 = sockets_files.CSR_LOOP
+        self.worker_data_block.data_8 = serial_backend.CSR_LOOP
             
         self.worker_data_block.data_9 = 0
         #for data 10
-        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE
+        self.worker_data_block.data_10 = serial_backend.CONTROL_SHEAR_RATE
         ############################################################################################################################
 
         ##send all data to microcontroller
@@ -954,12 +951,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_data_block.data_7 = rotation_direction
             
 
-        self.worker_data_block.data_8 = sockets_files.CSR_LOOP
+        self.worker_data_block.data_8 = serial_backend.CSR_LOOP
 
             
         self.worker_data_block.data_9 = 0
         #for data 10
-        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE
+        self.worker_data_block.data_10 = serial_backend.CONTROL_SHEAR_RATE
         ######################################################################################
         
         self.status_label.setText(
@@ -1040,14 +1037,14 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
                 # Determine sign of angular velocity
                 if count_recursion < 10:  # positive / anticlockwise sweep
-                    angular_velocity = np.mean(packet_transmission.calculate_radial_frequency(running_frequency))
+                    angular_velocity = np.mean(device_state.calculate_radial_frequency(running_frequency))
                     rotation_direction = 1
                 else:  # negative / clockwise sweep
-                    angular_velocity = -np.mean(packet_transmission.calculate_radial_frequency(running_frequency))
+                    angular_velocity = -np.mean(device_state.calculate_radial_frequency(running_frequency))
                     rotation_direction = 2
 
                 # Calculate torque and phase
-                torque_values, phase_values = packet_transmission.calculate_torque_fR(
+                torque_values, phase_values = device_state.calculate_torque_fR(
                     self.current1_fR, self.current2_fR, self.hall1_fR, self.hall2_fR, data_4, data_6
                 )
 
@@ -1106,7 +1103,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 self.k_b_label.setText(
                     f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
                     f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
-                    f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
+                    f"K = {device_state.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
                     f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
                 )
                 
@@ -1156,12 +1153,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.worker_data_block.data_7 = self.worker_data_block.data_7
             
 
-        self.worker_data_block.data_8 = sockets_files.CSR_LOOP
+        self.worker_data_block.data_8 = serial_backend.CSR_LOOP
 
             
         
         #for data 10
-        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE 
+        self.worker_data_block.data_10 = serial_backend.CONTROL_SHEAR_RATE 
         ######################################################################################
 
         
@@ -1187,8 +1184,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_data_block.data_current = (300, 0, 300, 0)  # Coil currents
 
         self.worker_data_block.data_7 = direction
-        self.worker_data_block.data_8 = sockets_files.CSR_NORM
-        self.worker_data_block.data_10 = sockets_files.CONTROL_SHEAR_RATE  # Rotation Mode (CRITICAL)
+        self.worker_data_block.data_8 = serial_backend.CSR_NORM
+        self.worker_data_block.data_10 = serial_backend.CONTROL_SHEAR_RATE  # Rotation Mode (CRITICAL)
         self.worker_data_block.data_11 = 0.0
 
         self.worker_flag_send.flag_tx = True
@@ -1224,8 +1221,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.p_window_data.join()
 
         #terminate the other subprocess
-        sockets_files.p1.terminate()
-        sockets_files.p1.join()
+        serial_backend.p1.terminate()
+        serial_backend.p1.join()
 
         #stop all the threads
         self.worker_socket.stop()
@@ -1258,7 +1255,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         msg = QMessageBox()
         
-        text = packet_transmission.set_popout_text(arg, calculate_final_fR, k_b_1, k_b_2)
+        text = device_state.set_popout_text(arg, calculate_final_fR, k_b_1, k_b_2)
         msg.setText(text)
         
         msg.setIcon(QMessageBox.Question)
@@ -1293,14 +1290,14 @@ class TabWindowConstSR(QMainWindow):
         #stop all the background processes
 
             
-        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, sockets_files.q_to_csv):
+        for q in (serial_backend.q_to_process, serial_backend.q_to_graph, serial_backend.q_to_csv):
             q.close()
             q.join_thread()
 
 
         #terminate the other subprocess
-        sockets_files.p1.terminate()
-        sockets_files.p1.join()
+        serial_backend.p1.terminate()
+        serial_backend.p1.join()
 
         #stop all the threads
         

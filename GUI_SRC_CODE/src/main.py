@@ -20,7 +20,7 @@ from PyQt5 import QtCore, QtGui
 os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
 import multiprocessing
 import sys
-import packet_transmission as packet_transmission
+import socket_GUI.device_state as device_state
 import socket_GUI
 from main_window_gui import Ui_MainWindow # pyright: ignore[reportAttributeAccessIssue]
 from creep_test.creep_test_window_main import TabWindowCreepTest
@@ -116,7 +116,7 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
             self.choose_electronic_comboBox.setEnabled(False)
         else:
             self.choose_electronic_comboBox.setEnabled(True)
-            socket_GUI.sockets_files.port_name_setter(choose_com_text)
+            socket_GUI.serial_backend.port_name_setter(choose_com_text)
         
 
     
@@ -138,10 +138,10 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
             
             ##set the flag for electronics
             if current_text == "Electronic 1":
-                packet_transmission.set_electronics_flag(1)
+                device_state.set_electronics_flag(1)
             elif current_text == "Electronic 2":
-                packet_transmission.set_electronics_flag(2)
-                print("Elecrtonics flag", packet_transmission.ELECTRONICS_FLAG)
+                device_state.set_electronics_flag(2)
+                print("Elecrtonics flag", device_state.ELECTRONICS_FLAG)
         else:
             self.choose_experiment_comboBox.setEnabled(False)
             self.choose_experiment_comboBox.setCurrentIndex(0)

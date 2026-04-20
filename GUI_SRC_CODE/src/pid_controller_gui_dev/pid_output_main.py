@@ -16,11 +16,11 @@ import sys
 from .pid_output import Ui_Title
 from .change_coeff_tab import SendPIDCoeff
 
-import socket_GUI.sockets_files as sockets_files
-from socket_GUI.sockets_files import q_to_graph
+import socket_GUI.serial_backend as serial_backend
+from socket_GUI.serial_backend import q_to_graph
 
-import packet_transmission as packet_transmission
-from .analyse_window_pid import AnalyseWindow
+import socket_GUI.device_state as device_state
+from analyse_window.analyse_window_main import AnalyseWindow
 
 
 
@@ -85,7 +85,7 @@ class DataUpdate(QThread):
         self.accumulate_current_2 = 0.0
 
         # for normalise properties purposes
-        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
+        self.worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
         self.amplitude_voltage_1 = 0.0
         self.zero_offset_voltage_1 = 0.0
         self.amplitude_voltage_2 = 0.0
@@ -112,8 +112,8 @@ class DataUpdate(QThread):
         self.angle_magnetic_field_val = np.array([], dtype=np.float32)
         self.phase_difference_val = np.array([], dtype=np.float32)
 
-        self.worker_array_setter = packet_transmission.StoreArrayGraph()
-        self.worker_kb_property = packet_transmission.kbCoefficient()
+        self.worker_array_setter = device_state.StoreArrayGraph()
+        self.worker_kb_property = device_state.kbCoefficient()
 
     def run(self):
 
@@ -170,22 +170,22 @@ class DataUpdate(QThread):
 
                 # Hall Sensors
                 
-                # self.v1_slice = packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
-                # self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
+                # self.v1_slice = device_state.change_adc_hall(self.v1_slice)  # convert col1 (in V)
+                # self.v2_slice = device_state.change_adc_hall(self.v2_slice)  # convert col2 (in V)
 
                 # Current
-                self.i1_slice = -packet_transmission.change_current_adc(self.i1_slice)  # convert col3 (in mA)
-                self.i2_slice = packet_transmission.change_current_adc(self.i2_slice)  # convert col4 (in mA)
+                self.i1_slice = -device_state.change_current_adc(self.i1_slice)  # convert col3 (in mA)
+                self.i2_slice = device_state.change_current_adc(self.i2_slice)  # convert col4 (in mA)
 
                 # Calibration for current sensor
-                self.i1_slice = packet_transmission.calibration_input_coil_1(self.i1_slice)
-                self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
+                self.i1_slice = device_state.calibration_input_coil_1(self.i1_slice)
+                self.i2_slice = device_state.calibration_input_coil_2(self.i2_slice)
 
 
                 # # calibration for  hall sensors
-                # self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
+                # self.v1_slice = device_state.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
                 #                                                              self.v1_slice, self.i1_slice / 1000)
-                # self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
+                # self.v2_slice = device_state.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
                 #                                                              self.v2_slice, self.i2_slice / 1000)
                 
                 # Calibrate process starts
@@ -280,7 +280,7 @@ class SleepTimer(QObject):
         Stops the countdown timer.
     _tick()
         Decrements the remaining time by 0.1 seconds per tick, emits updates via
-        `update_time_signal`, and calls `packet_transmission.running_time_flag_setter(0)`
+        `update_time_signal`, and calls `device_state.running_time_flag_setter(0)`
         when the countdown reaches zero.
 
     Notes
@@ -293,10 +293,10 @@ class SleepTimer(QObject):
 
     def __init__(self):
         super().__init__()
-        self.worker_remaining = packet_transmission.TxData()
+        self.worker_remaining = device_state.TxData()
         self.remaining = float(self.worker_remaining.time_acquisition) # get local_data_1 from global
-        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
-        self.worker_reset_current_time = packet_transmission.DownSampleSpecificFlag()
+        self.worker_flag_run_time = device_state.RunningTimeFlag()
+        self.worker_reset_current_time = device_state.DownSampleSpecificFlag()
         self.timer = QTimer(self)
         self.timer.setInterval(100)  # 100 ms per tick
         self.timer.timeout.connect(self._tick)
@@ -325,7 +325,7 @@ class SocketThread(QThread):
 
     def run(self):
         if self.running:
-            sockets_files.thread_start()
+            serial_backend.thread_start()
 
 
     def stop(self):
@@ -410,15 +410,15 @@ class PIDOutput(QMainWindow, Ui_Title):
         self.calculate_final_fR = 0
 
     def _init_workers(self):
-        """Initialize all setter/getter flags from packet_transmission."""
-        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
-        self.worker_data_block = packet_transmission.TxData()
-        self.worker_flag_send = packet_transmission.TxFlag()
-        self.worker_getter_graph = packet_transmission.StoreArrayGraph()
-        self.worker_fr_property = packet_transmission.fRCoefficients()
-        self.worker_k_b_property = packet_transmission.kbCoefficient()
-        self.worker_downsample_property = packet_transmission.DownSampleSpecificFlag()
-        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
+        """Initialize all setter/getter flags from device_state."""
+        self.worker_flag_run_time = device_state.RunningTimeFlag()
+        self.worker_data_block = device_state.TxData()
+        self.worker_flag_send = device_state.TxFlag()
+        self.worker_getter_graph = device_state.StoreArrayGraph()
+        self.worker_fr_property = device_state.fRCoefficients()
+        self.worker_k_b_property = device_state.kbCoefficient()
+        self.worker_downsample_property = device_state.DownSampleSpecificFlag()
+        self.worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
         
         # ----------------------- Sync downsampling local vars -----------------------
         self.tot_average = self.worker_downsample_property.tot_average
@@ -426,10 +426,10 @@ class PIDOutput(QMainWindow, Ui_Title):
 
     def _init_physics_constants(self):
         """Load static physics constants and coefficients."""
-        self.COIL_CONSTANT = packet_transmission.COIL_CONSTANT
-        self.DIPOLE_MOMENT = packet_transmission.DIPOLE_MOMENT
-        self.worker_get = packet_transmission.fRCoefficients()
-        packet_transmission.CALIBRATION_FACTOR = self.worker_get.CALIBRATION_FACTOR
+        self.COIL_CONSTANT = device_state.COIL_CONSTANT
+        self.DIPOLE_MOMENT = device_state.DIPOLE_MOMENT
+        self.worker_get = device_state.fRCoefficients()
+        device_state.CALIBRATION_FACTOR = self.worker_get.CALIBRATION_FACTOR
 
     def _setup_initial_ui_state(self):
         """Configure default window and button states."""
@@ -474,7 +474,7 @@ class PIDOutput(QMainWindow, Ui_Title):
         self.k_b_label.setText(
             f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
             f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
-            f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
+            f"K = {device_state.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
             f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
         )
 
@@ -493,7 +493,7 @@ class PIDOutput(QMainWindow, Ui_Title):
         #  ----------------------- Handle Scaling Logic -----------------------
         # factor maps 100ms -> 1, 500ms -> 5, 1000ms -> 10
         factor = interval_ms // 100
-        sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = factor * sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
+        serial_backend.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = factor * serial_backend.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
         
         #  ----------------------- Mode-specific time axis length  -----------------------
         range_len = 50000 if (mode == "View angle" and interval_ms == 1000) else (factor * 1000)
@@ -623,8 +623,8 @@ class PIDOutput(QMainWindow, Ui_Title):
             self.worker_data_block.data_1 = 1
             self.worker_data_block.data_2 = torque_ref
             self.worker_data_block.data_7 = direction_code
-            self.worker_data_block.data_8 = sockets_files.PID_LOOP
-            self.worker_data_block.data_10 = sockets_files.PID_START  # Command/Mode selector (PID CONTROLLER ON)
+            self.worker_data_block.data_8 = serial_backend.PID_LOOP
+            self.worker_data_block.data_10 = serial_backend.PID_START  # Command/Mode selector (PID CONTROLLER ON)
             self.worker_data_block.data_11 = delta_phi
 
             #---------------------  Physical Transmission ---------------------
@@ -654,8 +654,8 @@ class PIDOutput(QMainWindow, Ui_Title):
             self.worker_data_block.data_current = (300, 0, 300, 0)  # Coil currents
 
             self.worker_data_block.data_7 = direction
-            self.worker_data_block.data_8 = sockets_files.PID_NORM
-            self.worker_data_block.data_10 = sockets_files.PID_START  # Rotation Mode (CRITICAL)
+            self.worker_data_block.data_8 = serial_backend.PID_NORM
+            self.worker_data_block.data_10 = serial_backend.PID_START  # Rotation Mode (CRITICAL)
             self.worker_data_block.data_11 = delta_phi
 
             # ---------------------  Physical Transmission ---------------------
@@ -700,7 +700,7 @@ class PIDOutput(QMainWindow, Ui_Title):
             self.worker_downsample_property.current_time = 0.0
             self.worker_flag_run_time.flag_running_time = True
             
-            sockets_files.file_name_change_set("dummy")
+            serial_backend.file_name_change_set("dummy")
 
             #--------- UI and Timer Execution.  ------------------
             self._update_transmission_ui(True, "Saving!..")
@@ -725,9 +725,9 @@ class PIDOutput(QMainWindow, Ui_Title):
         self.worker_data_block.data_current = 0, 0, 0, 0
 
 
-        self.worker_data_block.data_8 = sockets_files.PID_STOP
+        self.worker_data_block.data_8 = serial_backend.PID_STOP
         #for data 10
-        self.worker_data_block.data_10 = sockets_files.PID_START 
+        self.worker_data_block.data_10 = serial_backend.PID_START 
         ######################################################################################
 
         
@@ -763,8 +763,8 @@ class PIDOutput(QMainWindow, Ui_Title):
             self.p_window_data.join()
 
         #terminate the other subprocess
-        sockets_files.p1.terminate()
-        sockets_files.p1.join()
+        serial_backend.p1.terminate()
+        serial_backend.p1.join()
 
         #stop all the threads
         self.worker_socket.stop()
@@ -797,7 +797,7 @@ class PIDOutput(QMainWindow, Ui_Title):
 
         msg = QMessageBox()
         
-        text = packet_transmission.set_popout_text(arg, calculate_final_fR, k_b_1, k_b_2)
+        text = device_state.set_popout_text(arg, calculate_final_fR, k_b_1, k_b_2)
         msg.setText(text)
 
         msg.setIcon(QMessageBox.Question)
@@ -834,8 +834,8 @@ class TabWindowPID(QMainWindow):
 
         # 1. SEND SIGNAL: Tell the process to stop
         # Do NOT call q.close() here yet!
-        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, 
-                sockets_files.q_to_csv, sockets_files.q_to_norm):
+        for q in (serial_backend.q_to_process, serial_backend.q_to_graph, 
+                serial_backend.q_to_csv, serial_backend.q_to_norm):
             try:
                 # Clear the queue if it's full so the 'None' can get in
                 while not q.empty():
@@ -845,7 +845,7 @@ class TabWindowPID(QMainWindow):
                 pass
 
         # 2. WAIT: Give the background process time to see the 'None' and exit
-        p1 = getattr(sockets_files, 'p1', None)
+        p1 = getattr(serial_backend, 'p1', None)
         if p1 is not None and p1.is_alive():
             # join() blocks the GUI for up to 2 seconds waiting for p1 to finish
             p1.join(timeout=4.0) 
@@ -856,8 +856,8 @@ class TabWindowPID(QMainWindow):
                 p1.join()
 
         # 3. CLEANUP: Now that the process is DEAD, it's safe to close queues
-        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, 
-                sockets_files.q_to_csv, sockets_files.q_to_norm):
+        for q in (serial_backend.q_to_process, serial_backend.q_to_graph, 
+                serial_backend.q_to_csv, serial_backend.q_to_norm):
             try:
                 # Setting cancel_join_thread prevents the GUI from hanging 
                 # if there's still unread data in the buffer

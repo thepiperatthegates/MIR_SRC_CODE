@@ -3,8 +3,8 @@ from PyQt5 import QtGui
 from PyQt5.QtCore import QFileInfo
 from PyQt5.QtWidgets import *
 
-from .analyse_Window import Ui_analyse_Window
-import packet_transmission
+from .analyse_window_backend import Ui_analyse_Window
+import socket_GUI.device_state as device_state
 
 from scipy.signal import savgol_filter
 import pandas
@@ -70,18 +70,18 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
         #------------------ inherited from another process ------------------
 
-        self.worker_get_fr_coefficient = packet_transmission.fRCoefficients()
+        self.worker_get_fr_coefficient = device_state.fRCoefficients()
         self.fr0 = self.worker_get_fr_coefficient.fr0
         self.fr1 = self.worker_get_fr_coefficient.fr1
 
         self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
                               f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
 
-        self.COIL_CONSTANT = packet_transmission.COIL_CONSTANT  # in T / A
-        self.DIPOLE_MOMENT = packet_transmission.DIPOLE_MOMENT  # in A m^2
+        self.COIL_CONSTANT = device_state.COIL_CONSTANT  # in T / A
+        self.DIPOLE_MOMENT = device_state.DIPOLE_MOMENT  # in A m^2
         self.CALIBRATION_FACTOR = self.worker_get_fr_coefficient.CALIBRATION_FACTOR  # torque calibration no units (K)
 
-        self.worker_get_offset = packet_transmission.TxData()
+        self.worker_get_offset = device_state.TxData()
 
         self.offset_1 = float(self.worker_get_offset.data_4)
         self.offset_2 = float(self.worker_get_offset.data_6)

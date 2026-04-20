@@ -225,11 +225,12 @@ class TxData():
         return bytes([self.__class__.FRAME_HEADER_1, self.__class__.FRAME_HEADER_INPUT]) + payload
     
     def combine_additional_data(self, data1, data2, data3, data4):
-        
-        byte_1 = struct.pack('<H', int(data1))
-        byte_2 = struct.pack('<H', int(data2))
-        byte_3 = struct.pack('<H', int(data3))
-        byte_4 = struct.pack('<H', int(data4))
+
+        #note: <I is used here even if data is uint16_t because of deserializing algorithm on MCU.
+        byte_1 = struct.pack('>I', int(data1))
+        byte_2 = struct.pack('>I', int(data2))
+        byte_3 = struct.pack('>I', int(data3))
+        byte_4 = struct.pack('>I', int(data4))
         
         payload = b''.join([byte_1, byte_2, byte_3, byte_4])
         
@@ -568,7 +569,7 @@ class kbCoefficient:
         if cls._initialized:
             return
         
-        project_root = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         
         filepath = os.path.join(project_root, "files", "k_b_coefficient.csv")
         
@@ -630,27 +631,31 @@ class VoltageNormaliseCoefficient:
     _zero_offset_voltage_2 = 0.0
     
     
+    
+    
     @classmethod 
     def _initialize(cls):
         
         if cls._initialized:
             return
 
-        project_root = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         filepath = os.path.join(project_root, "files", "normalise_voltage_constant.csv")
 
-        # If file exists → load values
+        # If file exists → load values (legacy code)
         if os.path.exists(filepath):
             data = np.genfromtxt(filepath, delimiter=';', names=True)
 
-            cls._amp_voltage_1 = float(data["voltage_amp_1_V"])
+            cls._amp_voltage_1 = float(data["min_hall_1_v"])
             # print("amp_voltage_1", cls._amp_voltage_1)
-            cls._zero_offset_voltage_1 = float(data["voltage_zero_offset_1_V"])
+            cls._zero_offset_voltage_1 = float(data["max_hall_1_v"])
             # print("amp_voltage_zero_offset_1_v", cls._zero_offset_voltage_1 )
-            cls._amp_voltage_2 = float(data["voltage_amp_2_V"])
+            cls._amp_voltage_2 = float(data["min_hall_2_v"])
             # print("amp_voltage_2", cls._amp_voltage_2)
-            cls._zero_offset_voltage_2 = float(data["voltage_zero_offset_2_V"])
+            cls._zero_offset_voltage_2 = float(data["max_hall_2_v"])
             # print("amp_voltage_zero_offset_2_v", cls._zero_offset_voltage_2 )
+            
+        
         
         print("From files amp 1: ", cls._amp_voltage_1)
         print("From _zero_offset_voltage_1: ", cls._zero_offset_voltage_1)
@@ -765,27 +770,16 @@ def get_electronics_flag():
 
 # ---------- FIRST ELECTRONIC ----------
 #first sensor coefficient version 1
-# CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 = -4.61934
-# CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 = 0.99182
-# CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 =  -4.24388e-6
-# CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 =  -5.40711e-8
-
-# #second sensor coefficient version 1
-# CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 = 3.86547
-# CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 = 0.98655
-# CURRENT_COEFF_SECOND_SENSOR_C_VERSION1= 3.02401e-6
-# CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 = -3.98871e-8
-
-CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 = 0   
-CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 = 1
-CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 =  0
-CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 =  0
+CURRENT_COEFF_FIRST_SENSOR_A_VERSION1 = -4.61934
+CURRENT_COEFF_FIRST_SENSOR_B_VERSION1 = 0.99182
+CURRENT_COEFF_FIRST_SENSOR_C_VERSION1 =  -4.24388e-6
+CURRENT_COEFF_FIRST_SENSOR_D_VERSION1 =  -5.40711e-8
 
 #second sensor coefficient version 1
-CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 = 0
-CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 = 1
-CURRENT_COEFF_SECOND_SENSOR_C_VERSION1= 0
-CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 = 0
+CURRENT_COEFF_SECOND_SENSOR_A_VERSION1 = 3.86547
+CURRENT_COEFF_SECOND_SENSOR_B_VERSION1 = 0.98655
+CURRENT_COEFF_SECOND_SENSOR_C_VERSION1= 3.02401e-6
+CURRENT_COEFF_SECOND_SENSOR_D_VERSION1 = -3.98871e-8
 #----------------------------------------
 
 # ---------- SECOND ELECTRONIC ----------
