@@ -22,7 +22,7 @@ import multiprocessing
 import sys
 import socket_GUI.device_state as device_state
 import socket_GUI
-from main_window_gui import Ui_MainWindow # pyright: ignore[reportAttributeAccessIssue]
+from backend_main.main_window_gui import Ui_MainWindow # pyright: ignore[reportAttributeAccessIssue]
 from creep_test.creep_test_window_main import TabWindowCreepTest
 from constant_shear_rate.constant_shear_rate_main import TabWindowConstSR
 from pid_controller_gui_dev.pid_output_main import TabWindowPID

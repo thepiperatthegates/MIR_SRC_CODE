@@ -1288,17 +1288,11 @@ class TabWindowConstSR(QMainWindow):
         
     def closeEvent(self, event):
         #stop all the background processes
-
+        serial_backend.drain_queue(serial_backend.q_to_process)
+        serial_backend.drain_queue(serial_backend.q_to_graph)
+        serial_backend.drain_queue(serial_backend.q_to_csv)
+        serial_backend.drain_queue(serial_backend.q_to_norm)
             
-        for q in (serial_backend.q_to_process, serial_backend.q_to_graph, serial_backend.q_to_csv):
-            q.close()
-            q.join_thread()
-
-
-        #terminate the other subprocess
-        serial_backend.p1.terminate()
-        serial_backend.p1.join()
-
         #stop all the threads
         
         self.main_window = ConstShearGUI()

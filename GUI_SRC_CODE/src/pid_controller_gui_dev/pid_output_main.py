@@ -832,17 +832,11 @@ class TabWindowPID(QMainWindow):
 
         print("Initiating Shutdown...")
 
-        # 1. SEND SIGNAL: Tell the process to stop
-        # Do NOT call q.close() here yet!
-        for q in (serial_backend.q_to_process, serial_backend.q_to_graph, 
-                serial_backend.q_to_csv, serial_backend.q_to_norm):
-            try:
-                # Clear the queue if it's full so the 'None' can get in
-                while not q.empty():
-                    q.get_nowait()
-                q.put(None)
-            except:
-                pass
+        #stop all the background processes
+        serial_backend.drain_queue(serial_backend.q_to_process)
+        serial_backend.drain_queue(serial_backend.q_to_graph)
+        serial_backend.drain_queue(serial_backend.q_to_csv)
+        serial_backend.drain_queue(serial_backend.q_to_norm)
 
         # 2. WAIT: Give the background process time to see the 'None' and exit
         p1 = getattr(serial_backend, 'p1', None)
