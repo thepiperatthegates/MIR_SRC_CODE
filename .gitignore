@@ -39,3 +39,16 @@ GUI_SRC_CODE/src/creep_test/__pycache__/analyse_window_creep_test.cpython-312.py
 GUI_SRC_CODE/src/creep_test/__pycache__/__init__.cpython-312.pyc
 GUI_SRC_CODE/src/__pycache__/packet_transmission.cpython-312.pyc
 GUI_SRC_CODE/src/__pycache__/main_window_gui.cpython-312.pyc
+GUI_SRC_CODE/src/analyse_window/__pycache__/__init__.cpython-313.pyc
+.gitignore
+GUI_SRC_CODE/src/analyse_window/__pycache__/analyse_window_main.cpython-313.pyc
+.gitignore
+GUI_SRC_CODE/src/backend_main/__pycache__/__init__.cpython-313.pyc
+GUI_SRC_CODE/src/analyse_window/__pycache__/analyse_window_backend.cpython-313.pyc
+.gitignore
+GUI_SRC_CODE/src/backend_main/__pycache__/main_window_gui.cpython-313.pyc
+.gitignore
+GUI_SRC_CODE/src/analyse_window/__pycache__/analyse_window_main.cpython-312.pyc
+GUI_SRC_CODE/src/backend_main/__pycache__/__init__.cpython-312.pyc
+GUI_SRC_CODE/src/backend_main/__pycache__/main_window_gui.cpython-312.pyc
+.gitignore
