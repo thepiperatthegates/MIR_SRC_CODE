@@ -176,14 +176,14 @@ class DataUpdate(QThread):
 
                 #----- calibration for  hall sensors -----
                 #TODO: Calibration has to be done in MCU too.
-                self.v1_slice = device_state.calibrated_hall_sensors1(self.worker_kb_property.k_b_norm_1,
-                                                                            self.v1_slice, 
-                                                                            self.i1_slice * self.inverted_thousand
-                                                                            )
-                self.v2_slice = device_state.calibrated_hall_sensors2(self.worker_kb_property.k_b_norm_2,
-                                                                            self.v2_slice, 
-                                                                            self.i2_slice * self.inverted_thousand
-                                                                            )
+                # self.v1_slice = device_state.calibrated_hall_sensors1(self.worker_kb_property.k_b_norm_1,
+                #                                                             self.v1_slice, 
+                #                                                             self.i1_slice * self.inverted_thousand
+                #                                                             )
+                # self.v2_slice = device_state.calibrated_hall_sensors2(self.worker_kb_property.k_b_norm_2,
+                #                                                             self.v2_slice, 
+                #                                                             self.i2_slice * self.inverted_thousand
+                #                                                             )
                 
                 # Calibrate process starts
                 # measurement fR process starts
@@ -406,7 +406,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         """Initialize device_state workers."""
         self.worker_flag_run_time = device_state.RunningTimeFlag()
         self.worker_data_block = device_state.TxData()
-        self.worker_flag_send = device_state.TxFlag()
         self.worker_getter_graph = device_state.StoreArrayGraph()
         self.worker_fr_property = device_state.fRCoefficients()
         self.worker_k_b_property = device_state.kbCoefficient()
@@ -729,57 +728,32 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
     def start_coil_calibration_event(self, input_current = -400, count_recursion = 1 ):
         
-        self.worker_DataUpdate.flag_normalise_event(False)
+        #------ Map UI states to MCU constants using dictionaries. -------
+        dir_map = {"Clockwise": 2, "Anti-clockwise": 1}
         
-        print("Recursion in main func:", count_recursion)
+        # ----- Assign values to the worker data block --------
+        self.worker_data_block.data_1 = 65534
+        self.worker_data_block.data_2_CSR = float(3.2)
         
-        self.worker_k_b_property.k_b_1 = 0.0
-        self.worker_k_b_property.k_b_2 = 0.0
+        # ----- Case for ZERO frequency values (NOT ACCEPTED BY MCU) --------
         
-        if input_current == False:
-            input_current = -400
+        if self.worker_data_block.data_2_CSR == 0.0:
+            #set the frequency to be as small as possible 
+            self.worker_data_block.data_2_for_MCU = 0.00429 #Hz
         
-        print("Input current for calibration:", input_current)
-    
-        ############################# send data to setter getter ############################################################################
-        self.worker_data_block.data_1 = float(1.0) #seconds
-        self.worker_data_block.data_2_for_MCU  = str(3) # Hz
-        
-        self.worker_data_block.data_current = str(input_current), str(0), str(input_current), str(0)
+        # ------ Pack currents/offsets directly into a tuple. --------
+        self.worker_data_block.data_4 = 0.0
+        self.worker_data_block.data_6 = 0.0
+        # --------- Apply direction and filter logic --------
+        self.worker_data_block.data_7 = dir_map.get(self.comboBox_direction.currentText(), 1)
+        self.worker_data_block.data_8 = serial_backend.CSR_KB
+        self.worker_data_block.data_10 = serial_backend.CONTROL_SHEAR_RATE 
 
-        #from combobox direction
-        if self.comboBox_direction.currentText() == "Clockwise":
-            self.worker_data_block.data_7 = 2
-        elif self.comboBox_direction.currentText() == "Anti-clockwise":
-            self.worker_data_block.data_7 = 1
-            
-
-        self.worker_data_block.data_8 = serial_backend.CSR_COIL_CALIBRATION
-        self.worker_data_block.data_9 = 0
-        #for data 10
-        self.worker_data_block.data_10 = serial_backend.CONTROL_SHEAR_RATE
-        ############################################################################################################################
-
-        ##send all data to microcontroller
-        #activate flag
-        serial_backend.tx_queue.put("input") 
-
-
-        # send flag for calibration in the thread
-        self.worker_DataUpdate.flag_special_event(True, False, False)
-
-        self.status_label.setStyleSheet("color: #32a83a;")
-        self.status_label.setText("Calibrating!...............")
-        
-        QtCore.QTimer.singleShot(2000, lambda: self.after_stabilise_calibration(count_recursion))
+        # ---------- Hardware and UI triggers. ------------
+        self.button_stop.setDisabled(False)  # Enable stop button
+        serial_backend.tx_queue.put("input")  # Activate transmission flag
         
 
-    def after_stabilise_calibration(self, count_recursion):
-        self.worker_sleep = SleepTimer()
-        self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_calibrating(value, count_recursion))
-        self.worker_sleep.start()
-        
-        
     def update_time_counter_calibrating(self, val, count_recursion):
         self.lcdNumber.display(val)
 
@@ -1178,7 +1152,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
     def set_hardware_reset_event(self):
         
         self.worker_data_block.data_9 =  1
-        self.worker_flag_send =  True
         self.worker_data_block.data_9 =  0 
         self.set_software_reset_event()
         

@@ -175,14 +175,14 @@ class DataUpdate(QThread):
 
                 #----- calibration for  hall sensors -----
                 #TODO: Calibration has to be done in MCU too.
-                self.v1_slice = device_state.calibrated_hall_sensors1(self.worker_kb_property.k_b_norm_1,
-                                                                            self.v1_slice, 
-                                                                            self.i1_slice * self.inverted_thousand
-                                                                            )
-                self.v2_slice = device_state.calibrated_hall_sensors2(self.worker_kb_property.k_b_norm_2,
-                                                                            self.v2_slice, 
-                                                                            self.i2_slice * self.inverted_thousand
-                                                                            )
+                # self.v1_slice = device_state.calibrated_hall_sensors1(self.worker_kb_property.k_b_norm_1,
+                #                                                             self.v1_slice, 
+                #                                                             self.i1_slice * self.inverted_thousand
+                #                                                             )
+                # self.v2_slice = device_state.calibrated_hall_sensors2(self.worker_kb_property.k_b_norm_2,
+                #                                                             self.v2_slice, 
+                #                                                             self.i2_slice * self.inverted_thousand
+                #                                                             )
                 # Calibrate process starts
                 # measurement fR process starts
                 # measurement to determine the normalising parameters (for first time rotation)
@@ -408,12 +408,12 @@ class PIDOutput(QMainWindow, Ui_Title):
         """Initialize all setter/getter flags from device_state."""
         self.worker_flag_run_time = device_state.RunningTimeFlag()
         self.worker_data_block = device_state.TxData()
-        self.worker_flag_send = device_state.TxFlag()
         self.worker_getter_graph = device_state.StoreArrayGraph()
         self.worker_fr_property = device_state.fRCoefficients()
         self.worker_k_b_property = device_state.kbCoefficient()
         self.worker_downsample_property = device_state.DownSampleSpecificFlag()
         self.worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
+        
         
         # ----------------------- Sync downsampling local vars -----------------------
         self.tot_average = self.worker_downsample_property.tot_average
@@ -444,6 +444,7 @@ class PIDOutput(QMainWindow, Ui_Title):
         self.save_button.clicked.connect(self.save_button_event)
         self.button_rotate.clicked.connect(self.normalisation_magnet_event)
         self.button_stop.clicked.connect(self.stop_button_push_event)
+        self.button_cal_constant.clicked.connect(lambda: self.start_coil_calibration_event(-400, 1))
         
         
         self.button_start.clicked.connect(self.start_data_event)
@@ -704,6 +705,36 @@ class PIDOutput(QMainWindow, Ui_Title):
             self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
             self.worker_sleep.start()
             
+    def start_coil_calibration_event(self, input_current = -400, count_recursion = 1 ):
+        
+        #------ Map UI states to MCU constants using dictionaries. -------
+        dir_map = {"Clockwise": 2, "Anti-clockwise": 1}
+        
+        # ----- Assign values to the worker data block --------
+        self.worker_data_block.data_1 = 65534
+        self.worker_data_block.data_2_CSR = float(3.2)
+        
+        # ----- Case for ZERO frequency values (NOT ACCEPTED BY MCU) --------
+        
+        if self.worker_data_block.data_2_CSR == 0.0:
+            #set the frequency to be as small as possible 
+            self.worker_data_block.data_2_for_MCU = 0.00429 #Hz
+        
+        # ------ Pack currents/offsets directly into a tuple. --------
+        self.worker_data_block.data_4 = 0.0
+        self.worker_data_block.data_6 = 0.0
+        # --------- Apply direction and filter logic --------
+        self.worker_data_block.data_7 = dir_map.get(self.comboBox_direction.currentText(), 1)
+        self.worker_data_block.data_8 = serial_backend.CSR_KB
+        self.worker_data_block.data_10 = serial_backend.CONTROL_SHEAR_RATE 
+
+        # ---------- Hardware and UI triggers. ------------
+        self.button_stop.setDisabled(False)  # Enable stop button
+        serial_backend.tx_queue.put("input")  # Activate transmission flag
+        
+        self._update_transmission_ui(True, "Calibrating!")
+        
+            
     def update_time_counter_acquisition(self, val):
             self.lcdNumber.display(val)
             
@@ -743,7 +774,6 @@ class PIDOutput(QMainWindow, Ui_Title):
     def set_hardware_reset_event(self):
         
         self.worker_data_block.data_9 =  1
-        self.worker_flag_send =  True
         self.worker_data_block.data_9 =  0 
         self.set_software_reset_event()
         

@@ -58,3 +58,4 @@ GUI_SRC_CODE/src/analyse_window/__pycache__/analyse_window_backend.cpython-312.p
 GUI_SRC_CODE/src/analyse_window/__pycache__/__init__.cpython-312.pyc
 GUI_SRC_CODE/src/files/normalise_voltage_constant.csv
 GUI_SRC_CODE/src/files/dummy.csv
+GUI_SRC_CODE/src/files/normalise_voltage_constant.csv

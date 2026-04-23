@@ -270,6 +270,7 @@ PID_COEFF_CHANGE = 0x14
 CSR_LOOP = 0x21
 CSR_COIL_CALIBRATION = 0x22
 CSR_NORM = 0x23
+CSR_KB = 0x24
 # ----------------------------------------------------
 
 def send_thread(serial_data, mode="input", minhall_1=0, maxhall_1=0,minhall_2=0, maxhall_2=0 ) -> None:
@@ -311,6 +312,7 @@ FRAME_SIZE  = BYTES_PER_SAMPLE      # 2 header + 4+4+2+2+4 payload
 NORM_SIZE   =  HEADER_SIZE + (4 * (UINT16_SIZE))      # 2 header + 2+2+2+2 payload
 FRAME_FMT   = '<ffHHff'  # H1, H2, C1, C2, PD, TORQUE
 NORM_FMT    = '<HHHH'   # max_h1, min_h1, max_h2, min_h2
+KB_FMT = '<ff' #kb1, kb2
 
 SENSOR_H1 = 0xAA
 SENSOR_H2 = 0xAB
@@ -355,6 +357,8 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv, q_to_norm, rest
                     q_to_csv.put(batch_frames)
                 restart_event.set()
                 return
+            
+            #TODO:for kb
 
             # ----- Sensor frame -----
             if recv_buffer[index] == SENSOR_H1 and recv_buffer[index+1] == SENSOR_H2:
@@ -415,18 +419,18 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
 
     #----- calibration for  hall sensors -----
     #TODO: Calibration has to be done in MCU too.
-    norm_voltage_1 = device_state.calibrated_hall_sensors1(worker_kb_property.k_b_1,
-                                                                norm_voltage_1, 
-                                                                i1 / 1000,
-                                                                worker_normalise_properties.min_hall_1,
-                                                                worker_normalise_properties.max_hall_1
-                                                                )
-    norm_voltage_2 = device_state.calibrated_hall_sensors2(worker_kb_property.k_b_2,
-                                                                norm_voltage_2, 
-                                                                i2 / 10000,
-                                                                worker_normalise_properties.min_hall_2,
-                                                                worker_normalise_properties.max_hall_2
-                                                                )
+    # norm_voltage_1 = device_state.calibrated_hall_sensors1(worker_kb_property.k_b_1,
+    #                                                             norm_voltage_1, 
+    #                                                             i1 / 1000,
+    #                                                             worker_normalise_properties.min_hall_1,
+    #                                                             worker_normalise_properties.max_hall_1
+    #                                                             )
+    # norm_voltage_2 = device_state.calibrated_hall_sensors2(worker_kb_property.k_b_2,
+    #                                                             norm_voltage_2, 
+    #                                                             i2 / 10000,
+    #                                                             worker_normalise_properties.min_hall_2,
+    #                                                             worker_normalise_properties.max_hall_2
+    #                                                             )
     
     #Average values to reduce amount of data saved
     ####FOR CONSTANT SHEAR RATE 

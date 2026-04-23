@@ -34,7 +34,6 @@ class SendPIDCoeff(QMainWindow, Ui_Form):
         #for tx data
         self.worker_data_block = backend.TxData()
         #for transmitting thread
-        self.worker_flag_send = backend.TxFlag()
         
     def _connect_signals(self):
         self.button_coeff_send.clicked.connect(self.send_data_event)
@@ -69,7 +68,8 @@ class SendPIDCoeff(QMainWindow, Ui_Form):
         #for data 10
         self.worker_data_block.data_10 = serial_backend.PID_START 
         
-        self.worker_flag_send.flag_tx = True
+
+        serial_backend.tx_queue.put("input")
         
     def send_data_event_torque(self):
         
@@ -97,7 +97,8 @@ class SendPIDCoeff(QMainWindow, Ui_Form):
         #for data 10
         self.worker_data_block.data_10 = serial_backend.PID_START 
         
-        self.worker_flag_send.flag_tx = True
+
+        serial_backend.tx_queue.put("input")
 
     # ------- Popout window
     def popout_window(self, arg, calculate_final_fR = 0.0, k_b_1 = 0.0, k_b_2 = 0.0):

@@ -120,37 +120,37 @@ class TxData():
         
     @property 
     def data_3(self):
-        return self.__class__._data_3
+        return float(self.__class__._data_3)
     
     @data_3.setter
     def data_3(self, val):
-        self.__class__._data_3 = val
+        self.__class__._data_3 = float(val)
         
         
     @property 
     def data_4(self):
-        return self.__class__._data_4
+        return float(self.__class__._data_4)
     
     @data_4.setter
     def data_4(self, val):
-        self.__class__._data_4 = val
+        self.__class__._data_4 = float(val)
         
     @property 
     def data_5(self):
-        return self.__class__._data_5
+        return float(self.__class__._data_5)
     
     @data_5.setter
     def data_5(self, val):
-        self.__class__._data_5 = val
+        self.__class__._data_5 = float(val)
         
         
     @property 
     def data_6(self):
-        return self.__class__._data_6
+        return float(self.__class__._data_6)
     
     @data_6.setter
     def data_6(self, val):
-        self.__class__._data_6 = val
+        self.__class__._data_6 = float(val)
         
     @property 
     def data_7(self):
@@ -687,23 +687,6 @@ class kbCoefficient:
         type(self)._initialize()
         return type(self)._k_b_2
 
-    #------- The voltage span for the full normalized range [-1, 1] is:
-             #ΔV = _HALL_SCALE * (max_hall - min_hall)   # volts per 2 normalized units
-            
-            #So the conversion is:
-            #k_b_norm [norm/A] = k_b_V [V/A] * 2.0 / (_HALL_SCALE * (max_hall - min_hall))
-    #-------
-    @property
-    def k_b_norm_1(self):
-        type(self)._initialize()
-        type(self)._k_b_norm_1 = type(self)._k_b_1 * 2.0 / (_HALL_SCALE *  (type(self).voltage_normaliser_worker.max_hall_1 - type(self).voltage_normaliser_worker.min_hall_1))
- 
-    @property
-    def k_b_norm_2(self):
-        type(self)._initialize()
-        type(self)._k_b_norm_2 = type(self)._k_b_2 * 2.0 / (_HALL_SCALE *  (type(self).voltage_normaliser_worker.max_hall_2 - type(self).voltage_normaliser_worker.min_hall_2))
-
-
 def calibrated_hall_sensors1(k_b_norm_1, norm_voltage, actual_current):
     
     norm_voltage = norm_voltage - (actual_current * k_b_norm_1)
@@ -718,7 +701,7 @@ def calibrated_hall_sensors2(k_b_norm_2, norm_voltage, actual_current):
 def set_electronics_flag(flag):
     global ELECTRONICS_FLAG
     
-    ELECTRONICS_FLAG = flagx 
+    ELECTRONICS_FLAG = flag
     
     
 def get_electronics_flag():
