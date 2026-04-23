@@ -69,18 +69,6 @@ TOTAL_ONE_CYCLE_BYTES    = BYTES_PER_SAMPLE * DMA_BUFFER_SIZE
 SAMPLE_PERIOD        = 0.0001 * DMA_BUFFER_SIZE
 TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC   = int(0.1 / SAMPLE_PERIOD)
 
-# --- Protocol Headers & Formatting ---
-# Format: < (Little Endian), f (float), H (unsigned short)
-FRAME_SIZE  = BYTES_PER_SAMPLE      # 2 header + 4+4+2+2+4 payload
-NORM_SIZE   =  HEADER_SIZE + (4 * (UINT16_SIZE))      # 2 header + 2+2+2+2 payload
-FRAME_FMT   = '<ffHHff'  # H1, H2, C1, C2, PD, TORQUE
-NORM_FMT    = '<HHHH'   # max_h1, min_h1, max_h2, min_h2
-
-SENSOR_H1 = 0xAA
-SENSOR_H2 = 0xAB
-NORM_H1   = 0xBA
-NORM_H2   = 0xBB
-
 # ---------------------- for total count receiving from socket (depends if we want 0.5s, 1s or 2s) ----------------------
 TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND =   int(0.1 / SAMPLE_PERIOD)
 
@@ -173,8 +161,8 @@ def thread_start():
             worker_flag_send.flag_tx = False
             
         elif worker_flag_send.flag_init_tx:
-            thread_send = threading.Thread(target=send_thread, daemon=False, args=(ser1, "norm", worker_normalisation.amp_voltage_1, worker_normalisation.zero_offset_voltage_1, 
-                                        worker_normalisation.amp_voltage_2, worker_normalisation.zero_offset_voltage_2))
+            thread_send = threading.Thread(target=send_thread, daemon=False, args=(ser1, "norm", worker_normalisation.min_hall_1, worker_normalisation.max_hall_1, 
+                                        worker_normalisation.min_hall_2, worker_normalisation.max_hall_2))
             thread_send.start()
             #reset the flag
             worker_flag_send.flag_init_tx = False
@@ -294,7 +282,7 @@ CSR_COIL_CALIBRATION = 0x22
 CSR_NORM = 0x23
 # ----------------------------------------------------
 
-def send_thread(serial_data, mode="input", amp1=0.0, zero_off1=0.0,amp2=0.0, zero_off2=0.0 ) -> None:
+def send_thread(serial_data, mode="input", minhall_1=0, maxhall_1=0,minhall_2=0, maxhall_2=0 ) -> None:
     
     if mode == "input":
         worker_combined_send = device_state.TxData()
@@ -308,7 +296,8 @@ def send_thread(serial_data, mode="input", amp1=0.0, zero_off1=0.0,amp2=0.0, zer
 
     elif mode == "norm":
         worker_combined_send = device_state.TxData()
-        combined_send = worker_combined_send.combine_additional_data(amp1, zero_off1, amp2, zero_off2)
+        electronic_num = device_state.get_electronics_flag()
+        combined_send = worker_combined_send.combine_additional_data(minhall_1, maxhall_1, minhall_2, maxhall_2,electronic_num)
         print("norm")
         try:
             serial_data.write(combined_send)
@@ -322,6 +311,23 @@ def drain_queue(q):
             q.get_nowait()
         except:
             break
+        
+        
+# ----- Protocol Headers & Formatting ------
+
+# Format: < (Little Endian), f (float), H (unsigned short)
+FRAME_SIZE  = BYTES_PER_SAMPLE      # 2 header + 4+4+2+2+4 payload
+NORM_SIZE   =  HEADER_SIZE + (4 * (UINT16_SIZE))      # 2 header + 2+2+2+2 payload
+FRAME_FMT   = '<ffHHff'  # H1, H2, C1, C2, PD, TORQUE
+NORM_FMT    = '<HHHH'   # max_h1, min_h1, max_h2, min_h2
+
+SENSOR_H1 = 0xAA
+SENSOR_H2 = 0xAB
+NORM_H1   = 0xBA
+NORM_H2   = 0xBB
+
+# ----- Protocol Headers & Formatting ------
+
 def start_process_live_graph(q_to_process, q_to_graph, q_to_csv, q_to_norm, restart_event):
     
     leftover = b''

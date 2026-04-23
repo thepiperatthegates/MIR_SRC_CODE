@@ -124,7 +124,7 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
         """
         Enable the experiment selection combo box if a valid electronic is selected.
 
-        Sets the `ELECTRONICS_FLAG` in `packet_transmission` depending on the
+        Sets the `ELECTRONICS_FLAG` in `device_state` depending on the
         selected electronic.
 
         :param index: Current index of the electronic selection combo box.

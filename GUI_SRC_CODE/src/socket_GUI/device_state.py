@@ -224,15 +224,16 @@ class TxData():
         # sending data with input frameheader
         return bytes([self.__class__.FRAME_HEADER_1, self.__class__.FRAME_HEADER_INPUT]) + payload
     
-    def combine_additional_data(self, data1, data2, data3, data4):
+    def combine_additional_data(self, data1, data2, data3, data4, data5):
 
         #note: <I is used here even if data is uint16_t because of deserializing algorithm on MCU.
         byte_1 = struct.pack('>I', int(data1))
         byte_2 = struct.pack('>I', int(data2))
         byte_3 = struct.pack('>I', int(data3))
         byte_4 = struct.pack('>I', int(data4))
+        byte_5 = struct.pack('>I', int(data5))
         
-        payload = b''.join([byte_1, byte_2, byte_3, byte_4])
+        payload = b''.join([byte_1, byte_2, byte_3, byte_4, byte_5])
         
         return bytes([self.__class__.FRAME_HEADER_1, self.__class__.FRAME_HEADER_COMP]) + payload
     
@@ -625,13 +626,10 @@ class kbCoefficient:
 class VoltageNormaliseCoefficient:
     _initialized = False
     
-    _amp_voltage_1 = 0.0
-    _zero_offset_voltage_1 = 0.0
-    _amp_voltage_2 = 0.0
-    _zero_offset_voltage_2 = 0.0
-    
-    
-    
+    _min_hall_1 = 0.0
+    _max_hall_1 = 0.0
+    _min_hall_2= 0.0
+    _max_hall_2 = 0.0
     
     @classmethod 
     def _initialize(cls):
@@ -646,19 +644,19 @@ class VoltageNormaliseCoefficient:
         if os.path.exists(filepath):
             data = np.genfromtxt(filepath, delimiter=';', names=True)
 
-            cls._amp_voltage_1 = float(data["min_hall_1_v"])
-            # print("amp_voltage_1", cls._amp_voltage_1)
-            cls._zero_offset_voltage_1 = float(data["max_hall_1_v"])
-            # print("amp_voltage_zero_offset_1_v", cls._zero_offset_voltage_1 )
-            cls._amp_voltage_2 = float(data["min_hall_2_v"])
+            cls._min_hall_1 = float(data["min_hall_1_v"])
+            # print("amp_voltage_1", cls._min_hall_1)
+            cls._max_hall_1 = float(data["max_hall_1_v"])
+            # print("amp_voltage_zero_offset_1_v", cls._max_hall_1 )
+            cls._min_hall_2= float(data["min_hall_2_v"])
             # print("amp_voltage_2", cls._amp_voltage_2)
-            cls._zero_offset_voltage_2 = float(data["max_hall_2_v"])
-            # print("amp_voltage_zero_offset_2_v", cls._zero_offset_voltage_2 )
+            cls._max_hall_2 = float(data["max_hall_2_v"])
+            # print("amp_voltage_zero_offset_2_v", cls._max_hall_2 )
             
         
         
-        print("From files amp 1: ", cls._amp_voltage_1)
-        print("From _zero_offset_voltage_1: ", cls._zero_offset_voltage_1)
+        print("From files amp 1: ", cls._min_hall_1)
+        print("From _max_hall_1: ", cls._max_hall_1)
         cls._initialized = True
         
         
@@ -671,48 +669,48 @@ class VoltageNormaliseCoefficient:
     # ---- voltage 1 ----
         
     @property
-    def amp_voltage_1(self):
+    def min_hall_1(self):
         type(self)._initialize()    
-        return type(self)._amp_voltage_1
+        return type(self)._min_hall_1
     
-    @amp_voltage_1.setter
-    def amp_voltage_1(self, val):
+    @min_hall_1.setter
+    def min_hall_1(self, val):
         type(self)._initialize()
-        type(self)._amp_voltage_1 = float(val)
+        type(self)._min_hall_1= float(val)
         
     
     @property
-    def zero_offset_voltage_1(self):
+    def max_hall_1(self):
         type(self)._initialize()    
-        return type(self)._zero_offset_voltage_1
+        return type(self)._max_hall_1
     
-    @zero_offset_voltage_1.setter
-    def zero_offset_voltage_1(self, val):
+    @max_hall_1.setter
+    def max_hall_1(self, val):
         type(self)._initialize()
-        type(self)._zero_offset_voltage_1 = float(val)
+        type(self)._max_hall_1 = float(val)
         
     # ---- voltage 2----
         
     @property
-    def amp_voltage_2(self):
+    def min_hall_2(self):
         type(self)._initialize()    
-        return type(self)._amp_voltage_2
+        return type(self)._min_hall_2
     
-    @amp_voltage_2.setter
-    def amp_voltage_2(self, val):
+    @min_hall_2.setter
+    def min_hall_2(self, val):
         type(self)._initialize()
-        type(self)._amp_voltage_2 = float(val)
+        type(self)._min_hall_2= float(val)
         
     
     @property
-    def zero_offset_voltage_2(self):
+    def max_hall_2(self):
         type(self)._initialize()    
-        return type(self)._zero_offset_voltage_2
+        return type(self)._max_hall_2
     
-    @zero_offset_voltage_2.setter
-    def zero_offset_voltage_2(self, val):
+    @max_hall_2.setter
+    def max_hall_2(self, val):
         type(self)._initialize()
-        type(self)._zero_offset_voltage_2 = float(val)
+        type(self)._max_hall_2 = float(val)
     
 
 
@@ -746,6 +744,7 @@ def change_current_adc(digital_current_values):
 def calibrated_hall_sensors1(k_b_1, hall_voltage, actual_current):
     
     calibrated_voltage = hall_voltage - (actual_current*k_b_1)
+    
     return calibrated_voltage
 
 def calibrated_hall_sensors2(k_b_2, hall_voltage, actual_current):
