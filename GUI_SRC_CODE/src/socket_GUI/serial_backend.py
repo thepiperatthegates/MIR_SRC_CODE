@@ -11,15 +11,9 @@ import multiprocessing
 import serial
 import struct
 
+import queue
 
-baud_rate = 128000
-
-append_payload =0 
-
-offset_1 = 0
-offset_2 = 0
-
-
+tx_queue = queue.Queue()
 #--------------------------- queue init ---------------------------
 q_to_process = multiprocessing.Queue()
 q_to_graph = multiprocessing.Queue()
@@ -44,8 +38,6 @@ flag_test = None
 p1 = None
 
 worker_data_flag = device_state.RunningTimeFlag()
-
-
 restart_event = multiprocessing.Event()
 
 # -------------- Data transmission CONSTANTS -------------------------
@@ -92,6 +84,7 @@ def socket_start_connect():
     global port_name
 
     port_num = None 
+    baud_rate = 128000
     
     # Detect platform and set port
     if sys.platform == 'darwin':        # macOS
@@ -150,25 +143,19 @@ def thread_start():
     #Event for run time receiving data from Serial Porte
     thread_recv = threading.Thread(target=recv_thread, args=(ser1,worker_kb_property, worker_specific_downsampling))
     thread_recv.start()
-    
-    worker_flag_send = device_state.TxFlag()
 
     while True:
-        if worker_flag_send.flag_tx:
+        tx_type = tx_queue.get()
+        print(tx_type)
+        if tx_type == "input":
             thread_send = threading.Thread(target=send_thread, daemon=False, args=(ser1, "input"))
             thread_send.start()
-            #reset the flag
-            worker_flag_send.flag_tx = False
+
             
-        elif worker_flag_send.flag_init_tx:
+        elif tx_type == "norm":
             thread_send = threading.Thread(target=send_thread, daemon=False, args=(ser1, "norm", worker_normalisation.min_hall_1, worker_normalisation.max_hall_1, 
                                         worker_normalisation.min_hall_2, worker_normalisation.max_hall_2))
             thread_send.start()
-            #reset the flag
-            worker_flag_send.flag_init_tx = False
-        else:
-            time.sleep(1)
-
 
 def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
     
@@ -297,6 +284,7 @@ def send_thread(serial_data, mode="input", minhall_1=0, maxhall_1=0,minhall_2=0,
     elif mode == "norm":
         worker_combined_send = device_state.TxData()
         electronic_num = device_state.get_electronics_flag()
+        print("electronic_num", electronic_num)
         combined_send = worker_combined_send.combine_additional_data(minhall_1, maxhall_1, minhall_2, maxhall_2,electronic_num)
         print("norm")
         try:
@@ -396,78 +384,6 @@ def file_name_change_set(prefix, extension=".csv"):
 
 def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
                 worker_specific_downsampling, worker_normalise_properties, num_columns=6):
-    """
-    Process, calibrate, downsample, timestamp, and save measurement data to a CSV file.
-
-    This function takes a raw ADC data buffer, reshapes it into the specified number of
-    columns, converts the raw readings into calibrated physical quantities, applies
-    optional or default downsampling, generates a time column based on worker-defined
-    timing parameters, and appends the resulting data to a CSV file inside the project's
-    ``files`` directory.
-
-    Parameters
-    ----------
-    cleaned_buffer : array_like
-        Flat input buffer containing raw ADC samples. Length must be divisible by
-        ``num_columns``.
-    worker_kb_property : object
-        Object providing Hall sensor calibration constants:
-            - ``k_b_1`` : calibration coefficient for Hall sensor 1
-            - ``k_b_2`` : calibration coefficient for Hall sensor 2
-    worker_specific_downsampling : object
-        Object controlling downsampling and timing:
-            - ``flag_specific_downsample`` : whether user-specified downsampling should be used
-            - ``tot_average`` : default averaging factor
-            - ``tot_average_specified`` : user-specified averaging factor
-            - ``time_increment`` : default sample time step (s)
-            - ``time_increment_specified`` : user-specified sample time step (s)
-            - ``current_time`` : running timestamp updated after each call
-    worker_normalise_properties : object
-        Object containing:q_to_norm
-            - ``zero_offset_voltage_1`` : normalisation offset for Hall sensor 1
-            - ``zero_offset_voltage_2`` : normalisation offset for Hall sensor 2
-            - ``amplitude_voltage_1`` : normalisation amplitude for Hall sensor 1
-            - ``amplitude_voltage_2`` : normalisation amplitude for Hall sensor 2
-    num_columns : int, optional
-        Number of columns per row in the ADC buffer. Default is 4:
-            1. U1 (Hall sensor 1 / 1st Buffer)
-            2. U2 (Hall sensor 2 / 2nd Buffer)
-            3. I1 (Current coil 1 / 4th Buffer)
-            4. I2 (Current coil 2 / 3rd Buffer)
-
-    Processing Steps
-    ----------------
-    1. Reshape buffer into rows of ``num_columns``.
-    2. Convert raw ADC readings:
-        - Hall sensors using ``packet_transmission.change_adc_hall``
-        - Current coils using ``packet_transmission.change_current_adc`` and coil-specific calibration
-    3. Apply Hall sensor justification using ``k_b_1`` and ``k_b_2``.
-    4. Apply normalisation using zero-offset and amplitude-voltage parameters.
-    5. Apply downsampling:
-        - If ``flag_specific_downsample`` is True → use ``tot_average_specified``.
-        - Otherwise → use ``tot_average``.
-    6. Construct a time column using:
-        - ``current_time`` as the starting time
-        - ``time_increment`` or ``time_increment_specified`` as the step
-    7. Update ``current_time`` inside ``worker_specific_downsampling``.
-    8. Save result as semicolon-separated CSV:
-        - If file does not exist → create it.
-        - If it exists → append new rows.
-
-    Output Format
-    -------------
-    The saved CSV contains the following columns:
-        1. Time / s
-        2. Normalised Hall sensor 1 value
-        3. Normalised Hall sensor 2 value
-        4. Calibrated current coil 1 / mA
-        5. Calibrated current coil 2 / mA
-
-    File Location
-    -------------
-    The CSV file is always saved under:
-        ``<project_root>/files/<file_name>``
-    """
 
     global file_name, count_time
     
@@ -480,27 +396,35 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
     reshaped_data = np.array(data).reshape(-1, num_columns)
     
 
-    col1 = reshaped_data[:, 0]          # normalised hall 1 [no unit]
-    col2 = reshaped_data[:, 1]             #normalised hall 2 [no unit]
-    col3 = reshaped_data[:, 2]           #i1 [digital]
-    col4 = reshaped_data[:, 3]             # i2 [digital]
-    col5 = reshaped_data[:, 4]            # phase diff [rad]
-    col6 = reshaped_data[:, 5]            # actual torque [rad]
+    norm_voltage_1 = reshaped_data[:, 0]          # normalised hall 1 [no unit]
+    norm_voltage_2 = reshaped_data[:, 1]             #normalised hall 2 [no unit]
+    i1 = reshaped_data[:, 2]           #i1 [digital]
+    i2 = reshaped_data[:, 3]             # i2 [digital]
+    phase_diff = reshaped_data[:, 4]            # phase diff [rad]
+    actual_torque = reshaped_data[:, 5]            # actual torque [rad]
     
     #Current
-    col3 = -device_state.change_current_adc(col3)               #convert col1
-    col4 = device_state.change_current_adc(col4)               #convert col2
+    i1 = -device_state.change_current_adc(i1)               #convert norm_voltage_1
+    i2 = device_state.change_current_adc(i2)               #convert norm_voltage_2
 
-    col3 = device_state.calibration_input_coil_1(col3)
-    col4 = device_state.calibration_input_coil_2(col4)
+    i1 = device_state.calibration_input_coil_1(i1)
+    i2 = device_state.calibration_input_coil_2(i2)
 
-    #Justified hall sensors
-    # col1 = packet_transmission.calibrated_hall_sensors1(worker_kb_property.k_b_1, col1, col3/1000)  
-    # col2 = packet_transmission.calibrated_hall_sensors2(worker_kb_property.k_b_2, col2, col4/1000)
-
-    # col1 = (col1- worker_normalise_properties.zero_offset_voltage_1) / worker_normalise_properties.amp_voltage_1
-    # col2 = (col2 - worker_normalise_properties.zero_offset_voltage_2) / worker_normalise_properties.amp_voltage_2
-
+    #----- calibration for  hall sensors -----
+    #TODO: Calibration has to be done in MCU too.
+    norm_voltage_1 = device_state.calibrated_hall_sensors1(worker_kb_property.k_b_1,
+                                                                norm_voltage_1, 
+                                                                i1 / 1000,
+                                                                worker_normalise_properties.min_hall_1,
+                                                                worker_normalise_properties.max_hall_1
+                                                                )
+    norm_voltage_2 = device_state.calibrated_hall_sensors2(worker_kb_property.k_b_2,
+                                                                norm_voltage_2, 
+                                                                i2 / 10000,
+                                                                worker_normalise_properties.min_hall_2,
+                                                                worker_normalise_properties.max_hall_2
+                                                                )
+    
     #Average values to reduce amount of data saved
     ####FOR CONSTANT SHEAR RATE 
 
@@ -528,30 +452,38 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
     
     #check if the need for specific downsample is needed
     if worker_specific_downsampling.flag_specific_downsample:
-            col1 = average_values(col1, worker_specific_downsampling.tot_average_specified).ravel()
-            col2 = average_values(col2, worker_specific_downsampling.tot_average_specified).ravel()
-            col3 = average_values(col3, worker_specific_downsampling.tot_average_specified).ravel()
-            col4 = average_values(col4, worker_specific_downsampling.tot_average_specified).ravel()
-            col5 = average_values(col5, worker_specific_downsampling.tot_average_specified).ravel()
-            col6 = average_values(col6, worker_specific_downsampling.tot_average_specified).ravel()
+            norm_voltage_1 = average_values(norm_voltage_1, worker_specific_downsampling.tot_average_specified).ravel()
+            norm_voltage_2 = average_values(norm_voltage_2, worker_specific_downsampling.tot_average_specified).ravel()
+            i1 = average_values(i1, worker_specific_downsampling.tot_average_specified).ravel()
+            i2 = average_values(i2, worker_specific_downsampling.tot_average_specified).ravel()
+            phase_diff = average_values(phase_diff, worker_specific_downsampling.tot_average_specified).ravel()
+            actual_torque = average_values(actual_torque, worker_specific_downsampling.tot_average_specified).ravel()
     
     elif worker_specific_downsampling.flag_specific_downsample is False:
-            col1 = average_values(col1, worker_specific_downsampling.tot_average).ravel()
-            col2 = average_values(col2, worker_specific_downsampling.tot_average).ravel()
-            col3 = average_values(col3, worker_specific_downsampling.tot_average).ravel()
-            col4 = average_values(col4, worker_specific_downsampling.tot_average).ravel()
-            col5 = average_values(col5, worker_specific_downsampling.tot_average).ravel()
-            col6 = average_values(col6, worker_specific_downsampling.tot_average).ravel()
+            norm_voltage_1 = average_values(norm_voltage_1, worker_specific_downsampling.tot_average).ravel()
+            norm_voltage_2 = average_values(norm_voltage_2, worker_specific_downsampling.tot_average).ravel()
+            i1 = average_values(i1, worker_specific_downsampling.tot_average).ravel()
+            i2 = average_values(i2, worker_specific_downsampling.tot_average).ravel()
+            phase_diff = average_values(phase_diff, worker_specific_downsampling.tot_average).ravel()
+            actual_torque = average_values(actual_torque, worker_specific_downsampling.tot_average).ravel()
 
+    avg_n = (worker_specific_downsampling.tot_average_specified
+             if worker_specific_downsampling.flag_specific_downsample
+             else worker_specific_downsampling.tot_average)
+    norm_voltage_1, norm_voltage_2, i1, i2, phase_diff, actual_torque = (
+        average_values(x, avg_n).ravel()
+        for x in (norm_voltage_1, norm_voltage_2, i1, i2, phase_diff, actual_torque)
+    )
+    
     num_columns_average = 4
-    averaged_data = np.zeros((len(col1), num_columns_average))  # shape (100,4)
-    averaged_data[:, 0] = col1
-    averaged_data[:, 1] = col2
-    averaged_data[:, 2] = col3
-    averaged_data[:, 3] = col4
+    averaged_data = np.zeros((len(norm_voltage_1), num_columns_average))  # shape (100,4)
+    averaged_data[:, 0] = norm_voltage_1
+    averaged_data[:, 1] = norm_voltage_2
+    averaged_data[:, 2] = i1
+    averaged_data[:, 3] = i2
     #phase diff
-    # averaged_data[:, 4] = col5
-    # averaged_data[:, 5] = col6
+    # averaged_data[:, 4] = phase_diff
+    # averaged_data[:, 5] = actual_torque
     
     num_rows = averaged_data.shape[0] 
         
@@ -564,12 +496,8 @@ def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
 
     worker_specific_downsampling.current_time += step * num_rows
     
-
     final_data = np.hstack((time_column, averaged_data))
     
-    
-            
-
     #always save the data to file dir
     project_root =  os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     file_name_full = os.path.join(project_root, "files", file_name)

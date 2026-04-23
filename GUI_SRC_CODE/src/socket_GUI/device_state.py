@@ -741,18 +741,21 @@ def change_current_adc(digital_current_values):
     return np.multiply(_CURRENT_SCALE, digital_current_values) + _CURRENT_OFFSET
 
 
-def calibrated_hall_sensors1(k_b_1, hall_voltage, actual_current):
+def calibrated_hall_sensors1(k_b_1, norm_voltage, actual_current, min_hall, max_hall):
     
-    calibrated_voltage = hall_voltage - (actual_current*k_b_1)
-    
-    return calibrated_voltage
+    adc_raw = (norm_voltage + 1.0) * (max_hall - min_hall ) / 2.0 + min_hall
+    hall_voltage = change_adc_hall(adc_raw)
+    #---- Apply kb calibration ----
+    hall_voltage = hall_voltage - (actual_current * k_b_1)
+    return hall_voltage
 
-def calibrated_hall_sensors2(k_b_2, hall_voltage, actual_current):
+def calibrated_hall_sensors2(k_b_2, norm_voltage, actual_current, min_hall, max_hall):
     
-    
-    calibrated_voltage = hall_voltage - (actual_current*k_b_2)
-    return calibrated_voltage
-
+    adc_raw = (norm_voltage + 1.0) * (max_hall - min_hall ) / 2.0 + min_hall
+    hall_voltage = change_adc_hall(adc_raw)
+    #---- Apply kb calibration ----
+    hall_voltage = hall_voltage - (actual_current * k_b_2)
+    return hall_voltage
 
 
 def set_electronics_flag(flag):

@@ -87,11 +87,8 @@ class DataUpdate(QThread):
         self.accumulate_current_2 = 0.0
 
         # for normalise properties purposes
-        self.worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
-        self.amplitude_voltage_1 = 0.0
-        self.zero_offset_voltage_1 = 0.0
-        self.amplitude_voltage_2 = 0.0
-        self.zero_offset_voltage_2 = 0.0
+        self.worker_normalise_properties = device_state.VoltageNormaliseCoefficient() 
+        self.inverted_thousand = 1.0 / 1000.0 #multiplication is faster than division 
 
         self.flag_normalise = False
         self.flag_normalise_measurement = False
@@ -169,12 +166,6 @@ class DataUpdate(QThread):
                 self.torque_slice = reshaped_data[:, 5]         # phase diff [rad]
 
                 data_mutex.lock()
-
-                # Hall Sensors
-                
-                # self.v1_slice = device_state.change_adc_hall(self.v1_slice)  # convert col1 (in V)
-                # self.v2_slice = device_state.change_adc_hall(self.v2_slice)  # convert col2 (in V)
-
                 # Current
                 self.i1_slice = -device_state.change_current_adc(self.i1_slice)  # convert col3 (in mA)
                 self.i2_slice = device_state.change_current_adc(self.i2_slice)  # convert col4 (in mA)
@@ -183,12 +174,20 @@ class DataUpdate(QThread):
                 self.i1_slice = device_state.calibration_input_coil_1(self.i1_slice)
                 self.i2_slice = device_state.calibration_input_coil_2(self.i2_slice)
 
-
-                # # calibration for  hall sensors
-                # self.v1_slice = device_state.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
-                #                                                              self.v1_slice, self.i1_slice / 1000)
-                # self.v2_slice = device_state.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
-                #                                                              self.v2_slice, self.i2_slice / 1000)
+                #----- calibration for  hall sensors -----
+                #TODO: Calibration has to be done in MCU too.
+                self.v1_slice = device_state.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
+                                                                            self.v1_slice, 
+                                                                            self.i1_slice * self.inverted_thousand,
+                                                                            self.worker_normalise_properties.min_hall_1,
+                                                                            self.worker_normalise_properties.max_hall_1
+                                                                            )
+                self.v2_slice = device_state.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
+                                                                            self.v2_slice, 
+                                                                            self.i2_slice * self.inverted_thousand,
+                                                                            self.worker_normalise_properties.min_hall_2,
+                                                                            self.worker_normalise_properties.max_hall_2
+                                                                            )
                 
                 # Calibrate process starts
                 # measurement fR process starts
@@ -436,7 +435,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.button_cal_constant.setIcon(QtGui.QIcon(get_path("calibrate.png")))
 
         #--------- Text/Labels  ---------
-        self.button_stop.setDisabled(True)
         self.textbox_time.setPlaceholderText("Enter time in second")
         self.textbox_sample_frequency.setText("10000")
         
@@ -507,9 +505,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.change_graph()
         
     def _start_normalise_mcu(self):
-            self.worker_flag_send.flag_init_tx = True
-        
-        
+            serial_backend.tx_queue.put("norm")
+            
     def change_graph(self):
         """Sets up the plotting environment based on UI selection."""
         # -----------------------  Reset Plotting Area -----------------------
@@ -668,7 +665,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         # ---------- Hardware and UI triggers. ------------
         self.button_stop.setDisabled(False)  # Enable stop button
-        self.worker_flag_send.flag_tx = True  # Activate transmission flag
+        serial_backend.tx_queue.put("input")  # Activate transmission flag
         
         #------------ Update Status   ----------------------
         self.status_label.setStyleSheet("color: #32a83a; font-weight: bold;")
@@ -769,7 +766,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         ##send all data to microcontroller
         #activate flag
-        self.worker_flag_send.flag_tx = True
+        serial_backend.tx_queue.put("input") 
 
 
         # send flag for calibration in the thread
@@ -874,9 +871,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 #enable the button again
                 self.button_send.setDisabled(False)
                 self.button_start.setDisabled(False)
-                self.button_stop.setDisabled(False)
-                
-                
     def set_constant(self, get_accumulate_hall_1, get_accumulate_hall_2, get_accumulate_current_1, get_accumulate_current_2):
         """
         Set accumulated measurement values for Hall sensors and current sensors.
@@ -929,7 +923,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         ##send all data to microcontroller
         #activate flag
-        self.worker_flag_send.flag_tx = True
+        serial_backend.tx_queue.put("input")
         
 
         self.status_label.setStyleSheet("color: #32a83a;")
@@ -965,7 +959,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         ##send all data to microcontroller
         #activate flag
-        self.worker_flag_send.flag_tx = True
+        serial_backend.tx_queue.put("input")
         
         # send flag for calibration in the thread
         self.worker_DataUpdate.flag_special_event(False, True, False)
@@ -1130,46 +1124,26 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.button_send.setDisabled(False)
             self.button_start.setDisabled(False)
             self.button_stop.setDisabled(False)
-    
-    
-
 
     def stop_button_push_event(self):
-        
-        ########################### gives -500mA to the coil 1 and +500mA DC to completely stop the rotation of the magnet 
-        
         ############################# send data to setter getter ######################################
         self.worker_data_block.data_1 = 65534
-        self.worker_data_block.data_2_for_MCU  = self.textbox_frequency.text()
+        self.worker_data_block.data_2_for_MCU  = 2.0
         
-        self.worker_data_block.data_current = 0, -500, 0, 500
+        self.worker_data_block.data_current = 0, 0, 0, 0
 
-        #from combobox direction
-        if self.comboBox_direction.currentText() == "Clockwise":
-            self.worker_data_block.data_7 = 2
-            self.worker_data_block.data_7 = self.worker_data_block.data_7
-        elif self.comboBox_direction.currentText() == "Anti-clockwise":
-            self.worker_data_block.data_7 = 1
-            self.worker_data_block.data_7 = self.worker_data_block.data_7
-            
 
-        self.worker_data_block.data_8 = serial_backend.CSR_LOOP
-
-            
-        
+        self.worker_data_block.data_8 = serial_backend.PID_STOP
         #for data 10
-        self.worker_data_block.data_10 = serial_backend.CONTROL_SHEAR_RATE 
+        self.worker_data_block.data_10 = serial_backend.PID_START 
         ######################################################################################
 
         
-        #send all data to microcontroller
-        #activate flag
-        self.worker_flag_send.flag_tx = True
+        #---------------------  Physical Transmission ---------------------
+        # Setting the flag triggers the actual transmission thread
+        serial_backend.tx_queue.put("input")
+
         self.status_label.setText("Stop rotation!!....")
-
-
-        self.button_rotate.setDisabled(False)
-
 
     def button_normalisation_event(self):
         #Reset the normalise event state 
@@ -1188,7 +1162,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_data_block.data_10 = serial_backend.CONTROL_SHEAR_RATE  # Rotation Mode (CRITICAL)
         self.worker_data_block.data_11 = 0.0
 
-        self.worker_flag_send.flag_tx = True
+        serial_backend.tx_queue.put("input")
         self.status_label.setStyleSheet("color: #7da832;")
         self.status_label.setText("Rotation starts for normalising!!!!")
 

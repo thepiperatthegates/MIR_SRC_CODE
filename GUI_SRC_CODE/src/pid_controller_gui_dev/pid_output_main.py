@@ -86,10 +86,7 @@ class DataUpdate(QThread):
 
         # for normalise properties purposes
         self.worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
-        self.amplitude_voltage_1 = 0.0
-        self.zero_offset_voltage_1 = 0.0
-        self.amplitude_voltage_2 = 0.0
-        self.zero_offset_voltage_2 = 0.0
+        self.inverted_thousand = 1.0 / 1000.0 #multiplication is faster than division 
 
         self.flag_normalise = False
         self.flag_normalise_measurement = False
@@ -167,12 +164,6 @@ class DataUpdate(QThread):
                 self.torque_slice = reshaped_data[:, 5]         # phase diff [rad]
 
                 data_mutex.lock()
-
-                # Hall Sensors
-                
-                # self.v1_slice = device_state.change_adc_hall(self.v1_slice)  # convert col1 (in V)
-                # self.v2_slice = device_state.change_adc_hall(self.v2_slice)  # convert col2 (in V)
-
                 # Current
                 self.i1_slice = -device_state.change_current_adc(self.i1_slice)  # convert col3 (in mA)
                 self.i2_slice = device_state.change_current_adc(self.i2_slice)  # convert col4 (in mA)
@@ -182,12 +173,21 @@ class DataUpdate(QThread):
                 self.i2_slice = device_state.calibration_input_coil_2(self.i2_slice)
 
 
-                # # calibration for  hall sensors
-                # self.v1_slice = device_state.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
-                #                                                              self.v1_slice, self.i1_slice / 1000)
-                # self.v2_slice = device_state.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
-                #                                                              self.v2_slice, self.i2_slice / 1000)
-                
+                #----- calibration for  hall sensors -----
+                #TODO: Calibration has to be done in MCU too.
+                self.v1_slice = device_state.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
+                                                                            self.v1_slice, 
+                                                                            self.i1_slice * self.inverted_thousand,
+                                                                            self.worker_normalise_properties.min_hall_1,
+                                                                            self.worker_normalise_properties.max_hall_1
+                                                                            )
+                self.v2_slice = device_state.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
+                                                                            self.v2_slice, 
+                                                                            self.i2_slice * self.inverted_thousand,
+                                                                            self.worker_normalise_properties.min_hall_2,
+                                                                            self.worker_normalise_properties.max_hall_2
+                                                                            )
+                   
                 # Calibrate process starts
                 # measurement fR process starts
                 # measurement to determine the normalising parameters (for first time rotation)
@@ -604,7 +604,7 @@ class PIDOutput(QMainWindow, Ui_Title):
         data_mutex.unlock()
         
     def _start_normalise_mcu(self):
-            self.worker_flag_send.flag_init_tx = True
+            serial_backend.tx_queue.put("norm")
 
     def send_parameter_event(self):
         """
@@ -629,7 +629,7 @@ class PIDOutput(QMainWindow, Ui_Title):
 
             #---------------------  Physical Transmission ---------------------
             # Setting the flag triggers the actual transmission thread
-            self.worker_flag_send.flag_tx = True
+            serial_backend.tx_queue.put("input")  # Activate transmission flag
 
             # UI Feedback
             self._update_transmission_ui(success=True)
@@ -660,7 +660,7 @@ class PIDOutput(QMainWindow, Ui_Title):
 
             # ---------------------  Physical Transmission ---------------------
             # Setting the flag triggers the actual transmission thread
-            self.worker_flag_send.flag_tx = True
+            serial_backend.tx_queue.put("input")  # Activate transmission flag
             self._update_transmission_ui(True, "Rotating!")
 
         except ValueError:
@@ -714,10 +714,7 @@ class PIDOutput(QMainWindow, Ui_Title):
             
             print(val)
             
-    def stop_button_push_event(self):
-        
-        ########################### gives -500mA to the coil 1 and +500mA DC to completely stop the rotation of the magnet 
-        
+    def stop_button_push_event(self):   
         ############################# send data to setter getter ######################################
         self.worker_data_block.data_1 = 65534
         self.worker_data_block.data_2_for_MCU  = 2.0
@@ -733,7 +730,7 @@ class PIDOutput(QMainWindow, Ui_Title):
         
         #---------------------  Physical Transmission ---------------------
         # Setting the flag triggers the actual transmission thread
-        self.worker_flag_send.flag_tx = True
+        serial_backend.tx_queue.put("input")  # Activate transmission flag
 
         # UI Feedback
         self._update_transmission_ui(success=True)
