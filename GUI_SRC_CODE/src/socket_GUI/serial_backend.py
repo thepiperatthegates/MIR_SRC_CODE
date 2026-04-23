@@ -64,6 +64,9 @@ TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC   = int(0.1 / SAMPLE_PERIOD)
 # ---------------------- for total count receiving from socket (depends if we want 0.5s, 1s or 2s) ----------------------
 TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND =   int(0.1 / SAMPLE_PERIOD)
 
+# ---------------------- DATA COLUMNS FROM SENSORS ---------------------
+num_columns = 6
+
 
 
 def init_queues():
@@ -216,7 +219,7 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling):
                 if worker_data_flag.flag_running_time:
                     if sensor_data_recv:
                         save_sensors_data_to_csv(sensor_data_recv, worker_kb_property, worker_specific_downsampling,
-                                                  worker_normalise_properties)
+                                                  worker_normalise_properties, num_columns=num_columns)
                         sensor_data_recv = None
 
                 if worker_data_flag.flag_norm_save:
@@ -383,7 +386,7 @@ def file_name_change_set(prefix, extension=".csv"):
     
 
 def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
-                worker_specific_downsampling, worker_normalise_properties, num_columns=6):
+                worker_specific_downsampling, worker_normalise_properties, num_columns):
 
     global file_name, count_time
     

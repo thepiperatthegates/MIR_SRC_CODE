@@ -139,7 +139,7 @@ class DataUpdate(QThread):
 
         data_from_pipe = []  # creating a list here because data from pipe is a list
         
-        num_columns = 6  # v1, v2, i1, i2, phase_diff
+        num_columns = serial_backend.num_columns  # v1, v2, i1, i2, phase_diff
         
         while self.running:
             data_from_pipe = q_to_graph.get()
@@ -175,19 +175,14 @@ class DataUpdate(QThread):
 
                 #----- calibration for  hall sensors -----
                 #TODO: Calibration has to be done in MCU too.
-                self.v1_slice = device_state.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
+                self.v1_slice = device_state.calibrated_hall_sensors1(self.worker_kb_property.k_b_norm_1,
                                                                             self.v1_slice, 
-                                                                            self.i1_slice * self.inverted_thousand,
-                                                                            self.worker_normalise_properties.min_hall_1,
-                                                                            self.worker_normalise_properties.max_hall_1
+                                                                            self.i1_slice * self.inverted_thousand
                                                                             )
-                self.v2_slice = device_state.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
+                self.v2_slice = device_state.calibrated_hall_sensors2(self.worker_kb_property.k_b_norm_2,
                                                                             self.v2_slice, 
-                                                                            self.i2_slice * self.inverted_thousand,
-                                                                            self.worker_normalise_properties.min_hall_2,
-                                                                            self.worker_normalise_properties.max_hall_2
+                                                                            self.i2_slice * self.inverted_thousand
                                                                             )
-                   
                 # Calibrate process starts
                 # measurement fR process starts
                 # measurement to determine the normalising parameters (for first time rotation)

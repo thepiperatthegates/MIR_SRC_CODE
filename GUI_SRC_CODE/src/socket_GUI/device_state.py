@@ -33,8 +33,6 @@ start_flag_send = 0
 RESB_16 = 65535
 RESB_12 = 4095
 
-MIN_V_AFTER_HALL = 0.0
-
 #default coefficients
 
 COIL_CONSTANT = 3.097e-3		# in T / A
@@ -236,26 +234,6 @@ class TxData():
         payload = b''.join([byte_1, byte_2, byte_3, byte_4, byte_5])
         
         return bytes([self.__class__.FRAME_HEADER_1, self.__class__.FRAME_HEADER_COMP]) + payload
-    
-class TxFlag():
-    _flag_tx = False
-    _flag_init_tx = False
-    
-    @property
-    def flag_tx(self):
-        return self.__class__._flag_tx 
-    
-    @flag_tx.setter
-    def flag_tx(self, val):
-        self.__class__._flag_tx = bool(val)
-        
-    @property
-    def flag_init_tx(self):
-        return self.__class__._flag_init_tx 
-    
-    @flag_init_tx.setter
-    def flag_init_tx(self, val):
-        self.__class__._flag_init_tx = bool(val)
 
 class RemainingTimeForCreepTest():
     _total_time_for_file_save  = 0.0 
@@ -553,76 +531,8 @@ class fRCoefficients:
     @CALIBRATION_FACTOR.setter
     def CALIBRATION_FACTOR(self, value):
         type(self)._initialize()
-        type(self)._CALIBRATION_FACTOR = float(value)
+        type(self)._CALIBRATION_FACTOR = float(value)       
 
-
-class kbCoefficient:
-    _initialized = False
-
-    _k_b_1 = 0.0
-    _k_b_2 = 0.0
-
-    @classmethod
-    def _initialize(cls):
-        """Run once based on the global ELECTRONICS_FLAG."""
-        global ELECTRONICS_FLAG
-        
-        if cls._initialized:
-            return
-        
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        
-        filepath = os.path.join(project_root, "files", "k_b_coefficient.csv")
-        
-        user_input = ELECTRONICS_FLAG
-        
-        #Load CSV data along with headers
-        data = np.genfromtxt(filepath, delimiter=";", names=True)
-        
-        #Boolean comparison in the first column
-        index = data["ELECTRONICS_FLAG"] == user_input 
-        if not np.any(index):
-            raise ValueError(f"No matching ELECTRONICS_FLAG = {user_input} in CSV")
-        
-        row = data[index][0]
-        
-        #get the data
-        cls._k_b_1 = float(row["k_b_1"])
-        cls._k_b_2 = float(row["k_b_2"])
-
-        cls._initialized = True
-        
-        
-    # ---- reload ----
-    @classmethod
-    def reload(cls):
-        cls._initialized = False
-        cls._initialize()
-
-    # ---- k_b_1 ----
-    @property
-    def k_b_1(self):
-        type(self)._initialize()
-        return type(self)._k_b_1
-
-    @k_b_1.setter
-    def k_b_1(self, val):
-        type(self)._initialize()
-        type(self)._k_b_1 = float(val)
-
-    # ---- k_b_2 ----
-    @property
-    def k_b_2(self):
-        type(self)._initialize()
-        return type(self)._k_b_2
-
-    @k_b_2.setter
-    def k_b_2(self, val):
-        type(self)._initialize()
-        type(self)._k_b_2 = float(val)
-        
-        
-        
 class VoltageNormaliseCoefficient:
     _initialized = False
     
@@ -673,22 +583,12 @@ class VoltageNormaliseCoefficient:
         type(self)._initialize()    
         return type(self)._min_hall_1
     
-    @min_hall_1.setter
-    def min_hall_1(self, val):
-        type(self)._initialize()
-        type(self)._min_hall_1= float(val)
-        
     
     @property
     def max_hall_1(self):
         type(self)._initialize()    
         return type(self)._max_hall_1
     
-    @max_hall_1.setter
-    def max_hall_1(self, val):
-        type(self)._initialize()
-        type(self)._max_hall_1 = float(val)
-        
     # ---- voltage 2----
         
     @property
@@ -696,24 +596,10 @@ class VoltageNormaliseCoefficient:
         type(self)._initialize()    
         return type(self)._min_hall_2
     
-    @min_hall_2.setter
-    def min_hall_2(self, val):
-        type(self)._initialize()
-        type(self)._min_hall_2= float(val)
-        
-    
     @property
     def max_hall_2(self):
         type(self)._initialize()    
         return type(self)._max_hall_2
-    
-    @max_hall_2.setter
-    def max_hall_2(self, val):
-        type(self)._initialize()
-        type(self)._max_hall_2 = float(val)
-    
-
-
 
 def stop_button_event(this_stop_button_flag):
     global stop_button_flag
@@ -741,27 +627,98 @@ def change_current_adc(digital_current_values):
     return np.multiply(_CURRENT_SCALE, digital_current_values) + _CURRENT_OFFSET
 
 
-def calibrated_hall_sensors1(k_b_1, norm_voltage, actual_current, min_hall, max_hall):
-    
-    adc_raw = (norm_voltage + 1.0) * (max_hall - min_hall ) / 2.0 + min_hall
-    hall_voltage = change_adc_hall(adc_raw)
-    #---- Apply kb calibration ----
-    hall_voltage = hall_voltage - (actual_current * k_b_1)
-    return hall_voltage
+class kbCoefficient:
+    _initialized = False
 
-def calibrated_hall_sensors2(k_b_2, norm_voltage, actual_current, min_hall, max_hall):
+    _k_b_1 = 0.0
+    _k_b_2 = 0.0
+
+    _k_b_norm_1 = 0.0
+    _k_b_norm_2 = 0.0 
     
-    adc_raw = (norm_voltage + 1.0) * (max_hall - min_hall ) / 2.0 + min_hall
-    hall_voltage = change_adc_hall(adc_raw)
-    #---- Apply kb calibration ----
-    hall_voltage = hall_voltage - (actual_current * k_b_2)
-    return hall_voltage
+    voltage_normaliser_worker = VoltageNormaliseCoefficient() 
+    
+    @classmethod
+    def _initialize(cls):
+        """Run once based on the global ELECTRONICS_FLAG."""
+        global ELECTRONICS_FLAG
+        
+        if cls._initialized:
+            return
+        
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
+        filepath = os.path.join(project_root, "files", "k_b_coefficient.csv")
+        
+        user_input = ELECTRONICS_FLAG
+        
+        #Load CSV data along with headers
+        data = np.genfromtxt(filepath, delimiter=";", names=True)
+        
+        #Boolean comparison in the first column
+        index = data["ELECTRONICS_FLAG"] == user_input 
+        if not np.any(index):
+            raise ValueError(f"No matching ELECTRONICS_FLAG = {user_input} in CSV")
+        
+        row = data[index][0]
+        
+        #get the data
+        cls._k_b_1 = float(row["k_b_1"])
+        cls._k_b_2 = float(row["k_b_2"])
+
+        cls._initialized = True
+        
+        
+    # ---- reload ----
+    @classmethod
+    def reload(cls):
+        cls._initialized = False
+        cls._initialize()
+
+    # ---- k_b_1 ----
+    @property
+    def k_b_1(self):
+        type(self)._initialize()
+        return type(self)._k_b_1
+
+    # ---- k_b_2 ----
+    @property
+    def k_b_2(self):
+        type(self)._initialize()
+        return type(self)._k_b_2
+
+    #------- The voltage span for the full normalized range [-1, 1] is:
+             #ΔV = _HALL_SCALE * (max_hall - min_hall)   # volts per 2 normalized units
+            
+            #So the conversion is:
+            #k_b_norm [norm/A] = k_b_V [V/A] * 2.0 / (_HALL_SCALE * (max_hall - min_hall))
+    #-------
+    @property
+    def k_b_norm_1(self):
+        type(self)._initialize()
+        type(self)._k_b_norm_1 = type(self)._k_b_1 * 2.0 / (_HALL_SCALE *  (type(self).voltage_normaliser_worker.max_hall_1 - type(self).voltage_normaliser_worker.min_hall_1))
+ 
+    @property
+    def k_b_norm_2(self):
+        type(self)._initialize()
+        type(self)._k_b_norm_2 = type(self)._k_b_2 * 2.0 / (_HALL_SCALE *  (type(self).voltage_normaliser_worker.max_hall_2 - type(self).voltage_normaliser_worker.min_hall_2))
+
+
+def calibrated_hall_sensors1(k_b_norm_1, norm_voltage, actual_current):
+    
+    norm_voltage = norm_voltage - (actual_current * k_b_norm_1)
+    return norm_voltage
+
+def calibrated_hall_sensors2(k_b_norm_2, norm_voltage, actual_current):
+    
+    norm_voltage = norm_voltage - (actual_current * k_b_norm_2)
+    return norm_voltage
 
 
 def set_electronics_flag(flag):
     global ELECTRONICS_FLAG
     
-    ELECTRONICS_FLAG = flag 
+    ELECTRONICS_FLAG = flagx 
     
     
 def get_electronics_flag():
