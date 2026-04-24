@@ -78,20 +78,16 @@ class DataUpdate(QThread):
         super().__init__()
         self.main_window_ref = main_window_ref
         self.running = True
-        self.flag_calibrate = False
 
+        self.flag_calibrate = False
         self.flag_fR_measurement = False
+        self.flag_normalise = False
+        self.flag_normalise_measurement = False
+
         self.accumulate_hall_1 = 0.0
         self.accumulate_hall_2 = 0.0
         self.accumulate_current_1 = 0.0
         self.accumulate_current_2 = 0.0
-
-        # for normalise properties purposes
-        self.worker_normalise_properties = device_state.VoltageNormaliseCoefficient() 
-        self.inverted_thousand = 1.0 / 1000.0 #multiplication is faster than division 
-
-        self.flag_normalise = False
-        self.flag_normalise_measurement = False
 
         self.total_hall_1 = None
         self.total_hall_2 = None
@@ -104,15 +100,16 @@ class DataUpdate(QThread):
         self.i2_slice = np.array([], dtype=np.uint16)
         self.phase_diff_slice = np.array([], dtype=np.float32)
         self.actual_torque = np.array([], dtype=np.float32)
-
-        self.bytes_to_process = np.array([], dtype=np.uint16)  # Empty NumPy array for incoming data
+        self.bytes_to_process = np.array([], dtype=np.uint16)
 
         self.angle_permanent_magnet_val = np.array([], dtype=np.float32)
         self.angle_magnetic_field_val = np.array([], dtype=np.float32)
         self.phase_difference_val = np.array([], dtype=np.float32)
 
+        self.worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
         self.worker_array_setter = device_state.StoreArrayGraph()
         self.worker_kb_property = device_state.kbCoefficient()
+        self.inverted_thousand = 1.0 / 1000.0
 
     def run(self):
 
@@ -249,7 +246,6 @@ class DataUpdate(QThread):
     def stop(self):
         self.running = False
 
-
 class SleepTimer(QObject):
     """
     A countdown timer that emits time updates at fixed intervals using PyQt signals.
@@ -291,7 +287,7 @@ class SleepTimer(QObject):
     def __init__(self):
         super().__init__()
         self.worker_remaining = device_state.TxData()
-        self.remaining = float(self.worker_remaining.data_1) # get local_data_1 from global
+        self.remaining = float(self.worker_remaining.time_acquisition) # get local_data_1 from global
         self.worker_flag_run_time = device_state.RunningTimeFlag()
         self.worker_reset_current_time = device_state.DownSampleSpecificFlag()
         self.timer = QTimer(self)
@@ -313,6 +309,7 @@ class SleepTimer(QObject):
             self.timer.stop()
             self.worker_flag_run_time.flag_running_time = False
 
+
 class SocketThread(QThread):
     
     def __init__(self, parent=None):
@@ -326,7 +323,7 @@ class SocketThread(QThread):
 
     def stop(self):
         self.running = False
-    
+
 
 
 class ConstShearGUI(QMainWindow, Ui_Title):
@@ -334,37 +331,47 @@ class ConstShearGUI(QMainWindow, Ui_Title):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        
-        # -------- System & Paths --------------------
-        self._init_system_settings()
-        
-        # -------- State & Data Variables --------------
-        self._init_state_variables()
-        self._init_measurement_variables()
-        
-        # --------  Hardware/Worker Interfaces.  -------------
+
+        #----------------------- High DPI and Pathing -----------------------
+        self._configure_display()
+        self._init_paths()
+
+        #----------------------- Variable Initialization -----------------------
+        self._init_plot_variables()
+        self._init_data_placeholders()
         self._init_workers()
-        
-        # --------  UI Polish & Logic ---------------
-        self._setup_ui_elements()
-        self._setup_validators()
+        self._init_physics_constants()
+
+        #----------------------- UI and Hardware Setup -----------------------
+        self._setup_initial_ui_state()
+        self._start_backend_threads()
         self._connect_signals()
-
-        # --------  Start Background Services. ------------
+        self._setup_ui_elements()
         self._start_normalise_mcu()
-        self._start_services()
 
-    def _init_system_settings(self):
-        """Handle DPI and Pathing."""
+    def _configure_display(self):
+        """Handle High DPI scaling settings."""
         if hasattr(QtCore.Qt, 'AA_EnableHighDpiScaling'):
             QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
         if hasattr(QtCore.Qt, 'AA_UseHighDpiPixmaps'):
             QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)
-            
+
+    def _init_paths(self):
+        """Construct absolute paths and load button icons."""
         self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-    def _init_state_variables(self):
-        """Initialize flags and process references."""
+        icons = {
+            self.save_button: "save_icon.ico",
+            self.button_fr_constant: "friction_icon.png",
+            self.button_cal_constant: "calibrate.png"
+        }
+
+        for button, filename in icons.items():
+            path = os.path.join(self.project_root, "pics", filename)
+            button.setIcon(QtGui.QIcon(path))
+
+    def _init_plot_variables(self):
+        """Initialize references for plotting and time axes."""
         self.p_window_data = None
         self.p_analyse = None
         self.worker_sleep = None
@@ -379,8 +386,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.curve_v1 = self.curve_v2 = self.curve_i1 = self.curve_i2 = None
         self.curve_sigma_b = self.curve_sigma_m = None
 
-    def _init_measurement_variables(self):
-        """Initialize all calculation variables (Preserving original names)."""
+    def _init_data_placeholders(self):
+        """Pre-allocate arrays for torque, phase, and hall sensors."""
         # Accumulators
         self.accumulate_hall_1 = self.accumulate_hall_2 = None
         self.accumulate_current_1 = self.accumulate_current_2 = None
@@ -403,7 +410,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.calculate_final_fR = 0
 
     def _init_workers(self):
-        """Initialize device_state workers."""
+        """Initialize all setter/getter flags from device_state."""
         self.worker_flag_run_time = device_state.RunningTimeFlag()
         self.worker_data_block = device_state.TxData()
         self.worker_getter_graph = device_state.StoreArrayGraph()
@@ -411,36 +418,33 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_k_b_property = device_state.kbCoefficient()
         self.worker_downsample_property = device_state.DownSampleSpecificFlag()
         self.worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
-        
-        #--------- Constants ---------
+
+        #--------- Sync downsampling local vars ---------
         self.tot_average = self.worker_downsample_property.tot_average
         self.time_increment = self.worker_downsample_property.current_time
+
+    def _init_physics_constants(self):
+        """Load static physics constants and coefficients."""
         self.COIL_CONSTANT = device_state.COIL_CONSTANT
         self.DIPOLE_MOMENT = device_state.DIPOLE_MOMENT
-        
-        #--------- Global sync ---------
         device_state.CALIBRATION_FACTOR = self.worker_fr_property.CALIBRATION_FACTOR
 
-    def _setup_ui_elements(self):
-        """Set icons, placeholders, and labels."""
-        #--------- Icons. ------------------
-        get_path = lambda x: os.path.join(self.project_root, "pics", x)
-        self.save_button.setIcon(QtGui.QIcon(get_path("save_icon.ico")))
-        self.button_fr_constant.setIcon(QtGui.QIcon(get_path("friction_icon.png")))
-        self.button_cal_constant.setIcon(QtGui.QIcon(get_path("calibrate.png")))
-
-        #--------- Text/Labels  ---------
+    def _setup_initial_ui_state(self):
+        """Configure default textbox states."""
         self.textbox_time.setPlaceholderText("Enter time in second")
         self.textbox_sample_frequency.setText("10000")
-        
+
+    def _setup_ui_elements(self):
+        """Set labels and plot object."""
         self.k_b_label.setText(
             f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
             f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
             f"K = {device_state.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
             f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
         )
-        
+
         self.plot_object = PlotWindow()
+        self._setup_validators()
 
     def _setup_validators(self):
         """Input validation logic."""
@@ -479,25 +483,23 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.save_button.clicked.connect(self.save_button_event)
         self.button_rotate.clicked.connect(self.button_normalisation_event)
 
-    def _start_services(self):
-        """Launch background threads."""
+        self.change_graph()
+
+    def _start_backend_threads(self):
+        """Launch serial communication and data update threads."""
         self.worker_socket = SocketThread()
         self.worker_socket.start()
-        
+
         self.worker_DataUpdate = DataUpdate(self)
-        
+
         normalise_filepath = os.path.join(self.project_root, "files", "normalise_voltage_constant.csv")
-    
-        # If file exists, then load values from csv
+
         if os.path.exists(normalise_filepath):
             self.worker_DataUpdate.flag_normalise_event(True)
         else:
             self.worker_DataUpdate.flag_normalise_event(False)
-            
+
         self.worker_DataUpdate.start()
-        
-        #----------------- start change_graph service ---------------
-        self.change_graph()
         
     def _start_normalise_mcu(self):
             serial_backend.tx_queue.put("norm")
@@ -691,7 +693,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         #   --------- Assignment (Success Path).  ------------------
         # --------- Mapping textbox data to worker block ---------
-        self.worker_data_block.data_1 = self.textbox_time.text()
+        self.worker_data_block.time_acquisition = float(self.textbox_time.text())
         self.worker_data_block.data_2_CSR = self.textbox_frequency.text()
         self.worker_data_block.data_current = (
             self.textbox_amplitude1.text(), self.textbox_offset1.text(),
@@ -732,7 +734,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         dir_map = {"Clockwise": 2, "Anti-clockwise": 1}
         
         # ----- Assign values to the worker data block --------
-        self.worker_data_block.data_1 = 65534
+        self.worker_data_block.data_1 = 65534 
         self.worker_data_block.data_2_CSR = float(3.2)
         
         # ----- Case for ZERO frequency values (NOT ACCEPTED BY MCU) --------
@@ -877,7 +879,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_DataUpdate.flag_normalise_event(False)
             
         ############################# send data to setter getter ############################################################################
-        self.worker_data_block.data_1 = str(5) #mA
+        self.worker_data_block.time_acquisition = str(5) #mA
         self.worker_data_block.data_2_for_MCU  = str(running_frequency) # Hz
         
         self.worker_data_block.data_current = str(200), self.textbox_offset1.text(), str(200), self.textbox_offset2.text()
@@ -907,7 +909,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
     def start_friction_coeff_event(self, input_current, running_frequency = 1,  rotation_direction =  1, count_recursion = 0) -> None:
         
         ############################# send data to setter getter ######################################
-        self.worker_data_block.data_1 = float(10)
+        self.worker_data_block.time_acquisition = float(10)
         self.worker_data_block.data_2_for_MCU  = str(running_frequency) # Hz
 
         self.worker_data_block.data_current = input_current, self.textbox_offset1.text(), input_current, self.textbox_offset2.text()

@@ -76,20 +76,16 @@ class DataUpdate(QThread):
         super().__init__()
         self.main_window_ref = main_window_ref
         self.running = True
-        self.flag_calibrate = False
 
+        self.flag_calibrate = False
         self.flag_fR_measurement = False
+        self.flag_normalise = False
+        self.flag_normalise_measurement = False
+
         self.accumulate_hall_1 = 0.0
         self.accumulate_hall_2 = 0.0
         self.accumulate_current_1 = 0.0
         self.accumulate_current_2 = 0.0
-
-        # for normalise properties purposes
-        self.worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
-        self.inverted_thousand = 1.0 / 1000.0 #multiplication is faster than division 
-
-        self.flag_normalise = False
-        self.flag_normalise_measurement = False
 
         self.total_hall_1 = None
         self.total_hall_2 = None
@@ -102,16 +98,17 @@ class DataUpdate(QThread):
         self.i2_slice = np.array([], dtype=np.uint16)
         self.phase_diff_slice = np.array([], dtype=np.float32)
         self.actual_torque = np.array([], dtype=np.float32)
-
-        self.bytes_to_process = np.array([], dtype=np.uint16)  # Empty NumPy array for incoming data
+        self.bytes_to_process = np.array([], dtype=np.uint16)
 
         self.angle_permanent_magnet_val = np.array([], dtype=np.float32)
         self.angle_magnetic_field_val = np.array([], dtype=np.float32)
         self.phase_difference_val = np.array([], dtype=np.float32)
 
+        self.worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
         self.worker_array_setter = device_state.StoreArrayGraph()
         self.worker_kb_property = device_state.kbCoefficient()
-
+        self.inverted_thousand = 1.0 / 1000.0
+        
     def run(self):
 
         """
