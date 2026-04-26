@@ -10,8 +10,6 @@ from PyQt5.QtGui import QRegularExpressionValidator, QDoubleValidator
 
 # #fix cache problem with MATHPLOTLIB
 os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
-import multiprocessing
-import sys
 
 import socket_GUI.serial_backend as serial_backend
 from socket_GUI.serial_backend import q_to_graph

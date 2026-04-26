@@ -9,6 +9,7 @@
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+from pyqtgraph import GraphicsLayoutWidget
 
 
 class Ui_Title(object):
@@ -411,4 +412,3 @@ class Ui_Title(object):
         self.menuRestart.setTitle(_translate("Title", "Restart"))
         self.actionHardware_reset.setText(_translate("Title", "Hardware reset"))
         self.actionSoftware_restart.setText(_translate("Title", "Software restart"))
-from pyqtgraph import GraphicsLayoutWidget

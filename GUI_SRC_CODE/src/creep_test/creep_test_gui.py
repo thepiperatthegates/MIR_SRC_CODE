@@ -9,6 +9,7 @@
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+from pyqtgraph import GraphicsLayoutWidget
 
 
 class Ui_CreepTestGUI(object):
@@ -693,4 +694,3 @@ class Ui_CreepTestGUI(object):
         self.menuRestart.setTitle(_translate("CreepTestGUI", "Restart"))
         self.actionHardware_reset.setText(_translate("CreepTestGUI", "Hardware reset"))
         self.actionSoftware_restart.setText(_translate("CreepTestGUI", "Software restart"))
-from pyqtgraph import GraphicsLayoutWidget

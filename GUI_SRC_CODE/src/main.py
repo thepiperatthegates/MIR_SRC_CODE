@@ -7,19 +7,17 @@ Responsibilities:
 #. Provide USB transmission functionality.
 
 """
-from PyQt5 import QtGui
-from PyQt5 import *
-from PyQt5.QtWidgets import *
 import sys
 import os
+import multiprocessing
 from pathlib import Path
 
-
-# #fix cache problem with MATHPLOTLIB
 from PyQt5 import QtCore, QtGui
-os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
-import multiprocessing
-import sys
+from PyQt5.QtWidgets import QApplication, QMainWindow
+
+# fix cache problem with matplotlib
+os.environ['MPLCONFIGDIR'] = str(Path.home()) + "/.matplotlib/"
+
 import socket_GUI.device_state as device_state
 import socket_GUI
 from backend_main.main_window_gui import Ui_MainWindow # pyright: ignore[reportAttributeAccessIssue]
@@ -27,56 +25,30 @@ from creep_test.creep_test_window_main import TabWindowCreepTest
 from constant_shear_rate.constant_shear_rate_main import TabWindowConstSR
 from pid_controller_gui_dev.pid_output_main import TabWindowPID
 
-# Source - https://stackoverflow.com/a
-# Posted by DamonJW, modified by community. See post 'Timeline' for change history
-# Retrieved 2025-12-05, License - CC BY-SA 4.0
-
 if sys.platform == "win32":
     import ctypes
-    myappid = 'mycompany.myproduct.subproduct.version' # arbitrary string
+    myappid = 'fzj.mir.rheometer.1'
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
 
 
-class FirstGUI(QMainWindow, Ui_MainWindow): 
-    """
-    Main graphical user interface for the Mini-Rheometer (MIR) application.
+class FirstGUI(QMainWindow, Ui_MainWindow):
+    """Main window for the Mini-Rheometer (MIR) application."""
 
-    Inherits from `QMainWindow` and `Ui_MainWindow` to set up the main window
-    and connect UI signals to their respective slots.
-
-    :param QMainWindow: Base Qt main window class.
-    :type QMainWindow: class
-    :param Ui_MainWindow: Generated UI class from Qt Designer.
-    :type Ui_MainWindow: class
-    """   
     def __init__(self):
-        
-        """
-        Initialize the MainGUI window.
-
-        - Sets up the UI.
-        - Disables the experiment selection combo box initially.
-        - Declares experiment windows without showing them.
-        - Connects signals for electronic and experiment selection combo boxes.`
-        """
+        """Set up the UI, disable combo boxes, and connect signals."""
         
         super().__init__()
         self.setupUi(self)
         
-        ################for banner purposes
-        # get absolute path of project root (folder containing 'src' and 'pics')
         self.project_root = os.path.dirname(os.path.abspath(__file__))
-        
         banner_path = os.path.join(self.project_root, "pics", "logo_fzj.png")
-        self.photo_label.setPixmap(QtGui.QPixmap(banner_path))
         pixmap = QtGui.QPixmap(banner_path)
         self.photo_label.setPixmap(
-            pixmap.scaled(self.photo_label.size(), 
-                        QtCore.Qt.KeepAspectRatio,  # type: ignore
-                        QtCore.Qt.SmoothTransformation) # type: ignore
+            pixmap.scaled(self.photo_label.size(),
+                          QtCore.Qt.KeepAspectRatio,       # type: ignore
+                          QtCore.Qt.SmoothTransformation)  # type: ignore
         )
-        ####################################
         # disable experiment combobox initially
         self.choose_experiment_comboBox.setEnabled(False)
         self.choose_electronic_comboBox.setEnabled(False)
@@ -90,25 +62,7 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
         self.choose_com_comboBox.activated.connect(self.choose_com_port)
         
     def choose_com_port(self):
-        """
-        Handles user selection of the virtual COM port from the combo box.
-
-        This method retrieves the currently selected COM port name from 
-        `choose_com_comboBox` and updates the system configuration accordingly. 
-        If the default placeholder option ("Pick Virtual COM Port for USB") is 
-        selected, the electronic selection combo box is disabled. Otherwise, 
-        the electronic selection is enabled, and the selected COM port name 
-        is passed to `sockets_files.port_name_setter()` for further configuration.
-
-        Notes
-        -----
-        - The combo box `choose_com_comboBox` must contain at least one valid 
-          COM port entry.
-        - The combo box `choose_electronic_comboBox` is enabled only when a 
-          valid COM port is selected.
-        - `sockets_files.port_name_setter` : Function used to store or configure 
-        the selected COM port name.
-        """
+        """Enable electronics selection when a valid COM port is chosen, disable it otherwise."""
         
         choose_com_text = str(self.choose_com_comboBox.currentText())
         
@@ -121,15 +75,7 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
 
     
     def enable_choose_experiment(self, index):
-        """
-        Enable the experiment selection combo box if a valid electronic is selected.
-
-        Sets the `ELECTRONICS_FLAG` in `device_state` depending on the
-        selected electronic.
-
-        :param index: Current index of the electronic selection combo box.
-        :type index: int
-        """
+        """Enable experiment selection and set the electronics flag when a valid electronic is chosen."""
         current_text = self.choose_electronic_comboBox.currentText()
         
         # If placeholder or empty, disable experiment combobox
@@ -141,22 +87,12 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
                 device_state.set_electronics_flag(1)
             elif current_text == "Electronic 2":
                 device_state.set_electronics_flag(2)
-                print("Elecrtonics flag", device_state.ELECTRONICS_FLAG)
         else:
             self.choose_experiment_comboBox.setEnabled(False)
             self.choose_experiment_comboBox.setCurrentIndex(0)
 
     def choose_window(self, index):
-        """
-        Open the appropriate experiment window based on experiment selection.
-
-        - Puts the selected mode into the shared queue `q_get_mir_mode`.
-        - Opens the corresponding experiment window.
-        - Closes the main window after opening the experiment window.
-
-        :param index: Current index of the experiment selection combo box.
-        :type index: int
-        """
+        """Open the selected experiment window and close the main window."""
         mode = self.choose_experiment_comboBox.currentText()
         
         if mode == "Control shear rate":
@@ -180,14 +116,7 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
 
 #TODO: f_R and k_b, K need to match the electronics used. 
 def main():
-    """
-    Entry point for the application.
-
-    Initializes the Qt application, sets the window icon depending on the platform,
-    creates and shows the main GUI window, and starts the Qt event loop.
-
-    :return: None
-    """
+    """Initialize the Qt application, show the main window, and start the event loop."""
     app_main_window = QApplication(sys.argv)
     
     # get absolute path of project root (folder containing 'src' and 'pics')
@@ -206,6 +135,5 @@ def main():
 
 if __name__ == '__main__':
     multiprocessing.freeze_support()
-    
     main()
     

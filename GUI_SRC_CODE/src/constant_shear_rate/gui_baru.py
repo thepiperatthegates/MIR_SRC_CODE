@@ -9,6 +9,7 @@
 
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+from pyqtgraph import GraphicsLayoutWidget
 
 
 class Ui_Title(object):
@@ -522,4 +523,3 @@ class Ui_Title(object):
         self.actionHardware_reset.setText(_translate("Title", "Hardware reset"))
         self.actionSoftware_restart.setText(_translate("Title", "Software restart"))
         self.actionFlash_STM32.setText(_translate("Title", "Flash STM32"))
-from pyqtgraph import GraphicsLayoutWidget
