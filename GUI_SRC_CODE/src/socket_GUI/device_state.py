@@ -1,50 +1,41 @@
-#3rd party lazy modules
+"""
+Shared device state for the MIR rheometer GUI.
 
-from math import  pi
+Responsibilities:
+#. Hold module-level event/state flags shared across the GUI and backend.
+#. Define singleton-style data classes for sensor readings and control parameters.
+#. Provide conversion and calibration utilities for Hall sensors and coil currents.
+"""
+from math import pi
 import os
 import struct
 import numpy as np
 
 
-
-#for button event flag 
-flag_send = 0
+# ── Event / state flags ───────────────────────────────────────────
+flag_send         = 0
 running_time_flag = 0
+run_time_gui      = 0
+file_name_flag    = 0
+clean_up_flag     = 0
+stop_button_flag  = 1
+start_flag_rx     = 0
+start_flag_send   = 0
 
-#for run time flag
-run_time_gui = 0 
-
-#for file name flag
-file_name_flag = 0
-
-#for clean up raw data flag
-clean_up_flag = 0
-
-
-#stop button flag
-stop_button_flag = 1
-
-#for start event
-start_flag_rx = 0
-start_flag_send = 0
-
-
-#b
+# ── ADC resolution constants ──────────────────────────────────────
 RESB_16 = 65535
 RESB_12 = 4095
 
-#default coefficients
+# ── Physical constants ────────────────────────────────────────────
+COIL_CONSTANT = 3.097e-3   # T / A
+DIPOLE_MOMENT = 8.594e-3   # A m^2
 
-COIL_CONSTANT = 3.097e-3		# in T / A
-DIPOLE_MOMENT = 8.594e-3		# in A m^2
-
-
-
-#flag for electronics type
+# ── Electronics selection ─────────────────────────────────────────
 ELECTRONICS_FLAG = 0
 
 
 class TxData():
+    """Shared class-level storage for all outgoing MCU transmission parameters."""
 
     _data_1 = _data_2 = _data_3 = _data_4 = _data_5 = _data_6 = _data_7 = _data_8 = _data_9 = _data_10 = _data_11 = _data_offset_creep_1 = _data_offset_creep_2 = 0
     _time_acquisition = 0
@@ -198,10 +189,8 @@ class TxData():
         return self.__class__._data_4, self.__class__._data_6
     
     def combine_input_data(self):
-        #ARM Microcontroller is Little Endian, for integer we will be shifting the 
-        #bits ourselves but for float, we need to send it little endian preemptively
-        
-        ## TODO: CHANGE BYTE_SEND TO FLOAT 
+        """Pack all data fields into a little-endian byte payload and return the framed input packet."""
+        ## TODO: CHANGE BYTE_SEND TO FLOAT
         print("Frequency of DAC", self.__class__._data_2)
        
         byte_send1 = struct.pack('<f', float(self.__class__._data_1))       
@@ -223,8 +212,8 @@ class TxData():
         return bytes([self.__class__.FRAME_HEADER_1, self.__class__.FRAME_HEADER_INPUT]) + payload
     
     def combine_additional_data(self, data1, data2, data3, data4, data5):
-
-        #note: <I is used here even if data is uint16_t because of deserializing algorithm on MCU.
+        """Pack five compensation values into a big-endian byte payload and return the framed compensation packet."""
+        # <I used even for uint16_t to match the MCU deserializer
         byte_1 = struct.pack('>I', int(data1))
         byte_2 = struct.pack('>I', int(data2))
         byte_3 = struct.pack('>I', int(data3))
@@ -236,16 +225,15 @@ class TxData():
         return bytes([self.__class__.FRAME_HEADER_1, self.__class__.FRAME_HEADER_COMP]) + payload
 
 class RemainingTimeForCreepTest():
+    """Tracks timing windows for the creep test file-save cycle."""
+
     _total_time_for_file_save  = 0.0 
     _input_sampling_time = 0.0
     _ime_for_resetting_time = 0.0
     
-    
     _start_vector_time = 0.0
     _end_vector_time = 0.0
      
-    
-    
     @property
     def total_time_for_file_save(self):
         return self.__class__._total_time_for_file_save
@@ -295,6 +283,8 @@ class RemainingTimeForCreepTest():
     
 
 class ProcessUnpackingFlag():
+    """Singleton flag indicating whether the live-graph process has been started."""
+
     _flag_process = False
     
     @property
@@ -306,6 +296,8 @@ class ProcessUnpackingFlag():
         self.__class__._flag_process = bool(val)
 
 class RunningTimeFlag:
+    """Singleton flags controlling data acquisition and normalisation-save state."""
+
     _flag_running_time = False
     _flag_norm_save = False
     
@@ -328,7 +320,8 @@ class RunningTimeFlag:
         
         
 class DownSampleSpecificFlag():
-    
+    """Singleton holding all downsampling parameters (window size, time step, cursor)."""
+
     _flag_specific_downsample = False
     
     _tot_average = 1
@@ -393,6 +386,8 @@ class DownSampleSpecificFlag():
         
 
 class StoreArrayGraph():
+    """Singleton accumulator for the most-recent sensor arrays sent to the live graph."""
+
     _v1_slice = _v2_slice = _i1_slice = _i2_slice = np.array([], dtype=np.uint16)
     
     _angle_permanent_magnet_val = np.array([], dtype=np.float32)
@@ -467,12 +462,12 @@ class StoreArrayGraph():
 
 
 class fRCoefficients:
-    _initialized = False
+    """Lazy-initialised coefficients for the friction-torque (fR) calculation, keyed by ELECTRONICS_FLAG."""
 
-    # class-level shared variables (defaults)
-    _fr1 = None
-    _fr0 = None
-    _CALIBRATION_FACTOR = None
+    _initialized = False
+    _fr1: float = 0.0
+    _fr0: float = 0.0
+    _CALIBRATION_FACTOR: float = 0.0
 
     @classmethod
     def _initialize(cls):
@@ -495,14 +490,12 @@ class fRCoefficients:
         cls._initialized = True
         
     
-    # ----- Reload ---------
     @classmethod
     def reload(cls):
+        """Force re-initialisation on the next property access."""
         cls._initialized = False
         cls._initialize()
-        
-        
-    # ---------- Properties ----------
+
     @property
     def fr1(self):
         type(self)._initialize()
@@ -534,16 +527,18 @@ class fRCoefficients:
         type(self)._CALIBRATION_FACTOR = float(value)       
 
 class VoltageNormaliseCoefficient:
+    """Lazy-loaded min/max Hall voltage bounds read from the normalisation CSV."""
+
     _initialized = False
-    
+
     _min_hall_1 = 0.0
     _max_hall_1 = 0.0
     _min_hall_2= 0.0
     _max_hall_2 = 0.0
     
-    @classmethod 
+    @classmethod
     def _initialize(cls):
-        
+        """Load Hall voltage bounds from CSV on first access."""
         if cls._initialized:
             return
 
@@ -570,13 +565,11 @@ class VoltageNormaliseCoefficient:
         cls._initialized = True
         
         
-    # ---- reload ----
     @classmethod
     def reload(cls):
+        """Force re-load of Hall voltage bounds on next access."""
         cls._initialized = False
         cls._initialize()
-        
-    # ---- voltage 1 ----
         
     @property
     def min_hall_1(self):
@@ -602,11 +595,12 @@ class VoltageNormaliseCoefficient:
         return type(self)._max_hall_2
 
 def stop_button_event(this_stop_button_flag):
+    """Set the global stop-button flag."""
     global stop_button_flag
-    
     stop_button_flag = this_stop_button_flag
-    
+
 def stop_button_getter():
+    """Return the current stop-button flag value."""
     return stop_button_flag
 
 
@@ -628,6 +622,8 @@ def change_current_adc(digital_current_values):
 
 
 class kbCoefficient:
+    """Lazy-loaded back-EMF (k_b) coefficients read from CSV, keyed by ELECTRONICS_FLAG."""
+
     _initialized = False
 
     _k_b_1 = 0.0
@@ -669,45 +665,42 @@ class kbCoefficient:
         cls._initialized = True
         
         
-    # ---- reload ----
     @classmethod
     def reload(cls):
+        """Force re-load of k_b coefficients on next access."""
         cls._initialized = False
         cls._initialize()
 
-    # ---- k_b_1 ----
     @property
     def k_b_1(self):
         type(self)._initialize()
         return type(self)._k_b_1
 
-    # ---- k_b_2 ----
     @property
     def k_b_2(self):
         type(self)._initialize()
         return type(self)._k_b_2
 
 def calibrated_hall_sensors1(k_b_norm_1, norm_voltage, actual_current):
-    
+    """Remove the current-induced offset from Hall sensor 1's normalised voltage."""
     norm_voltage = norm_voltage - (actual_current * k_b_norm_1)
     return norm_voltage
 
 def calibrated_hall_sensors2(k_b_norm_2, norm_voltage, actual_current):
-    
+    """Remove the current-induced offset from Hall sensor 2's normalised voltage."""
     norm_voltage = norm_voltage - (actual_current * k_b_norm_2)
     return norm_voltage
 
 
 def set_electronics_flag(flag):
+    """Set the global ELECTRONICS_FLAG and trigger coefficient re-load on next access."""
     global ELECTRONICS_FLAG
-    
     ELECTRONICS_FLAG = flag
-    
-    
+
+
 def get_electronics_flag():
-    
+    """Return the current ELECTRONICS_FLAG value."""
     global ELECTRONICS_FLAG
-    
     return ELECTRONICS_FLAG
 
 # ---------- FIRST ELECTRONIC ----------
@@ -737,7 +730,7 @@ CURRENT_COEFF_SECOND_SENSOR_B_VERSION2  = 0.97735
 
 
 def calibration_input_coil_1(input):
-    
+    """Apply the polynomial calibration curve to coil-1 current, dispatched by ELECTRONICS_FLAG."""
     global ELECTRONICS_FLAG
     
     
@@ -750,6 +743,7 @@ def calibration_input_coil_1(input):
 
 
 def calibration_input_coil_2(input):
+    """Apply the polynomial calibration curve to coil-2 current, dispatched by ELECTRONICS_FLAG."""
     global ELECTRONICS_FLAG
     
     if ELECTRONICS_FLAG == 1:
@@ -761,64 +755,42 @@ def calibration_input_coil_2(input):
 
 
                 
-def calculate_torque_fR( current_1, current_2, hall_1, hall_2, data_4, data_6):
-        """
-        Calculate the torque based on Hall sensor and current measurements.
+def calculate_torque_fR(current_1, current_2, hall_1, hall_2, data_4, data_6):
+    """Compute torque and phase difference from coil currents and Hall sensor readings."""
+    global DIPOLE_MOMENT, COIL_CONSTANT
 
-        This method computes the applied torque using the phase difference between
-        the magnetic field (from the current coils) and the magnet (from
-        the Hall sensors). It applies calibration factors, coil constants,
-        and the dipole moment to convert the measured currents to torque.
+    current_1 = np.array(current_1, dtype=float)
+    current_2 = np.array(current_2, dtype=float)
+    hall_1    = np.array(hall_1, dtype=float)
+    hall_2    = np.array(hall_2, dtype=float)
 
-        :param current_1: First component of the current measurement.
-        :type current_1: float or np.ndarray
-        :param current_2:ray(hall_2, dtype=float)
-        
-        print("current_2:", current_2)
-        global data_4,  Second component of the current measurement.
-        :type current_2: float or np.ndarray
-        :param hall_1: First Hall sensor reading.
-        :type hall_1: float or np.ndarray
-        :param hall_2: Second Hall sensor reading.
-        :type hall_2: float or np.ndarray
+    offset_1 = float(data_4)
+    offset_2 = float(data_6)
 
-        :return: Calculated torque.
-        :rtype: float or np.ndarray
-        """
-        
-        global DIPOLE_MOMENT, COIL_CONSTANT
-        
-        current_1 = np.array(current_1, dtype=float)
-        current_2 = np.array(current_2, dtype=float)
-        hall_1    = np.array(hall_1, dtype=float)
-        hall_2    = np.array(hall_2, dtype=float)
-        
-        offset_1 =  float(data_4)
-        offset_2 =  float(data_6)
-        
-        #magnetic field angle - magnet angle
-        phase_difference = np.arctan2(current_2, current_1) - np.arctan2(hall_2, hall_1)
-        
-        power_of_2 = np.power((current_1 - offset_1), 2) + np.power((current_2 - offset_2), 2)
-        
-        magnitude_current = np.sqrt(power_of_2)
-        
-        worker_cal = fRCoefficients()
-        
-        total_torque = worker_cal.CALIBRATION_FACTOR * ( DIPOLE_MOMENT
-        * COIL_CONSTANT                    # [T/A]
-        * magnitude_current / 1000         # mA; -> A, [A]
-        * np.sin(phase_difference)   # dimensionless
-        )
-        
-        return total_torque, phase_difference
+    phase_difference = np.arctan2(current_2, current_1) - np.arctan2(hall_2, hall_1)
+
+    magnitude_current = np.sqrt(
+        np.power((current_1 - offset_1), 2) + np.power((current_2 - offset_2), 2)
+    )
+
+    worker_cal = fRCoefficients()
+
+    total_torque = worker_cal.CALIBRATION_FACTOR * (
+        DIPOLE_MOMENT
+        * COIL_CONSTANT              # [T/A]
+        * magnitude_current / 1000   # mA -> A
+        * np.sin(phase_difference)
+    )
+
+    return total_torque, phase_difference
     
 def calculate_radial_frequency(running_frequency):
+    """Convert a frequency in Hz to radians per second."""
     return float(2 * np.pi * running_frequency)
 
 
-def set_popout_text(arg,calculate_final_fR = 0.0, k_b_1 = 0.0, k_b_2 = 0.0):
-    
+def set_popout_text(arg, calculate_final_fR=0.0, k_b_1=0.0, k_b_2=0.0):
+    """Return the status message string for the given result code."""
     text = None
     
     if arg == 1:
@@ -835,11 +807,6 @@ def set_popout_text(arg,calculate_final_fR = 0.0, k_b_1 = 0.0, k_b_2 = 0.0):
         text = "Normalise parameters completed!"
         
     return text
-
-class DownsampleEvent():
-    def __init__(self, parent=None):
-        super().__init__()
-
 
 if __name__ == "__main___":
     calculate_radial_frequency(4)
