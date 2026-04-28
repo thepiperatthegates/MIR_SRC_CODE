@@ -143,6 +143,7 @@ def thread_start():
     worker_kb_property = device_state.kbCoefficient()
     worker_specific_downsampling = device_state.DownSampleSpecificFlag()
     worker_normalisation  = device_state.VoltageNormaliseCoefficient()
+    
     #Event for run time receiving data from Serial Porte
     thread_recv = threading.Thread(target=recv_thread, args=(ser1,worker_kb_property, worker_specific_downsampling))
     thread_recv.start()
@@ -310,6 +311,7 @@ def drain_queue(q):
 # Format: < (Little Endian), f (float), H (unsigned short)
 FRAME_SIZE  = BYTES_PER_SAMPLE      # 2 header + 4+4+2+2+4 payload
 NORM_SIZE   =  HEADER_SIZE + (4 * (UINT16_SIZE))      # 2 header + 2+2+2+2 payload
+KB_SIZE = HEADER_SIZE + (2 * (FLOAT32_SIZE))
 FRAME_FMT   = '<ffHHff'  # H1, H2, C1, C2, PD, TORQUE
 NORM_FMT    = '<HHHH'   # max_h1, min_h1, max_h2, min_h2
 KB_FMT = '<ff' #kb1, kb2
@@ -318,6 +320,9 @@ SENSOR_H1 = 0xAA
 SENSOR_H2 = 0xAB
 NORM_H1   = 0xBA
 NORM_H2   = 0xBB
+
+KB_HEADER_1 = 0xBC
+KB_HEADER_2 = 0xBD
 
 # ----- Protocol Headers & Formatting ------
 
@@ -359,7 +364,18 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv, q_to_norm, rest
                 return
             
             #TODO:for kb
-
+            if recv_buffer[index] == KB_HEADER_1 and recv_buffer[index+1] == KB_HEADER_2:
+                end = index + KB_SIZE
+                if end > buf_len:
+                    leftover = recv_buffer[index:]
+                    break
+                kb_data = struct.unpack(KB_FMT, recv_buffer[index+2 : end])
+                
+                print(f"[kb] Received: {kb_data}")
+                save_kb_to_csv(kb_data)
+                restart_event.set()
+                return
+                
             # ----- Sensor frame -----
             if recv_buffer[index] == SENSOR_H1 and recv_buffer[index+1] == SENSOR_H2:
                 end = index + FRAME_SIZE
@@ -551,7 +567,7 @@ def average_values (col, N):
            [5.5]])
     """
 
-    average_val = col.reshape(-1, N).mean(axis=1).reshape(-1, 1)
+    average_val = col.reshape(-1, N).mean(axis=1)
     return average_val
 
 
@@ -572,6 +588,51 @@ def save_norm_data_to_csv(packed_norm_data, filename="normalise_voltage_constant
     np.savetxt(file_name_full, data, delimiter=";",fmt='%i', header=headers_name, comments="")
     
     print("Norm vars stored in csv")
+    
+def save_kb_to_csv(packed_kb_data, filename="k_b_coefficient.csv"):    
+
+            #File path for saving
+        header_text = "ELECTRONICS_FLAG;k_b_1;k_b_2"
+        project_root =  os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        file_name_full = os.path.join(project_root, "files", filename)
+            
+        if os.path.exists(file_name_full):
+            data = np.genfromtxt(file_name_full, delimiter=";", names=True)
+        else:
+            #create empty template file if no file exist prior
+            data = np.array([], dtype = [
+                ("ELECTRONICS_FLAG", "i8"),
+                ("k_b_1", "f8"),
+                ("k_b_2", "f8")
+            ])
+
+        #---- get the current used eletronic flags ----
+        electronic_flags = device_state.get_electronics_flag()
+        index = data["ELECTRONICS_FLAG"] == (electronic_flags + 1)
+        
+        if np.any(index):
+            data["k_b_1"][index] = packed_kb_data[0]
+            data["k_b_2"][index] = packed_kb_data[1]
+        else:
+            new_row = np.array(
+                [(electronic_flags, packed_kb_data[0], packed_kb_data[1])],
+                dtype=data.dtype
+            )
+            data = np.concatenate((data, new_row))
+
+        #---- Save the file again ----
+        np.savetxt(
+            file_name_full,
+            data,
+            delimiter=";",
+            fmt=["%d", "%.17g", "%.17g"],
+            header=header_text,
+            comments=""
+        )
+        
+        #---- reload the file ----
+        device_state.kbCoefficient.reload()
+        
     
 if __name__ == "__main__":
     socket_start_connect()
