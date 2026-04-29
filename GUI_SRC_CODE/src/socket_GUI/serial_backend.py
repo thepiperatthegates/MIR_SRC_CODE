@@ -27,7 +27,6 @@ port_name = None
 
 current_time = None
 status_connection = None
-file_name = ' '
 
 
 count_time = 0
@@ -150,12 +149,9 @@ def thread_start():
 
     while True:
         tx_type = tx_queue.get()
-        print(tx_type)
         if tx_type == "input":
             thread_send = threading.Thread(target=send_thread, daemon=False, args=(ser1, "input"))
             thread_send.start()
-
-            
         elif tx_type == "norm":
             thread_send = threading.Thread(target=send_thread, daemon=False, args=(ser1, "norm", worker_normalisation.min_hall_1, worker_normalisation.max_hall_1, 
                                         worker_normalisation.min_hall_2, worker_normalisation.max_hall_2))
@@ -373,6 +369,11 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv, q_to_norm, rest
                 
                 print(f"[kb] Received: {kb_data}")
                 save_kb_to_csv(kb_data)
+                
+                if batch_frames:
+                    q_to_graph.put(batch_frames)
+                    q_to_csv.put(batch_frames)
+                    
                 restart_event.set()
                 return
                 
@@ -395,22 +396,15 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv, q_to_norm, rest
             q_to_graph.put(batch_frames)
             q_to_csv.put(batch_frames)
             
-            
-# ---------------------- write to dummy csv  ----------------------
-def file_name_change_set(prefix, extension=".csv"):
-    
-    global file_name
-    
-    
-    file_name = f"{prefix}{extension}"
     
 
 def save_sensors_data_to_csv(cleaned_buffer, worker_kb_property,
                 worker_specific_downsampling, worker_normalise_properties, num_columns):
 
-    global file_name, count_time
-    
+    global count_time
     count_time = count_time + 1
+    
+    file_name = 'dummy.csv'
     
     #------- turn the tuples into numpy arrays -------
     data = np.array(cleaned_buffer)
