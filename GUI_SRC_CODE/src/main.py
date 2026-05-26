@@ -5,7 +5,6 @@ Responsibilities:
 #. Manage GUI-related classes and functions.
 #. Handle live data plotting.
 #. Provide USB transmission functionality.
-
 """
 import sys
 import os

@@ -52,7 +52,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.refresh_Button.setIcon(QtGui.QIcon(refresh_icon_path))
        
         
-        self.header = "time[s];voltage_1[V];voltage_2[V];current_1[mA];current_2[mA];phase_field[deg];phase_magnet[deg];phase_diff[deg];angular_vel[rad/s];torque[N/m];shear_rate[1/s];shear_stress[Pa];Viscosity[Pa*s];offset_1[mA];offset_2[mA];fr0[Nm];fr1[Nm *s/rad]"
+        self.header = "time[s];voltage_1[V];voltage_2[V];current_1[mA];current_2[mA];phase_field[deg];phase_magnet[deg];phase_diff[deg];angular_vel[rad/s];raw_torque[N/m];total_torque[N/m];shear_rate[1/s];shear_stress[Pa];Viscosity[Pa*s];offset_1[mA];offset_2[mA];fr0[Nm];fr1[Nm *s/rad]"
 
         #------------------ init variables for this class ------------------
         self.data = np.array([])
@@ -62,6 +62,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.num_rows = None
         self.num_column = None
         self.total_torque = None
+        self.raw_torque = None
         
 
         #------------------ calculation constant ------------------
@@ -114,12 +115,14 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.fr1on_moment = np.empty(0)
         self.magnitude_current = np.empty(0)
         self.shear_rate = np.empty(0)
+        self.raw_torque = np.empty(0)
         self.total_torque = np.empty(0)
         self.shear_stress = np.empty(0)
         self.viscosity = np.empty(0)
 
         self.phase_difference_degree_mean = 0.0
         self.angular_velocity_mean = 0.0
+        self.raw_torque_mean = 0.0
         self.total_torque_mean = 0.0
         self.shear_rate_mean = 0.0
         self.shear_stress_mean = 0.0
@@ -143,8 +146,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.table_Widget.setColumnWidth(10, 200)
         self.table_Widget.setColumnWidth(11, 200)
         self.table_Widget.setColumnWidth(12, 200)
-
-        self.table_Widget.setColumnCount(13)
+        self.table_Widget.setColumnWidth(13, 200)
+        self.table_Widget.setColumnCount(14)
 
         self.canvas = MatplotlibCanvas(self)
         self.mlp_layout.addWidget(self.canvas)
@@ -215,7 +218,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             "Phase diagram" : self.draw_phase_diagram,
             "Phase difference diagram" : self.draw_phase_difference_diagram,
             "Angular velocity diagram" :  self.draw_angular_velocity_diagram,
-            "Torque diagram" :          self.draw_torque_diagram,
+            "Raw torque diagram"       : self.draw_raw_torque_diagram,
+            "Total torque diagram" :          self.draw_torque_diagram,
             "Shear rate diagram":       self.draw_shear_rate_diagram,
             "Shear stress diagram":     self.draw_shear_stress_diagram,
             "Viscosity diagram":   self.draw_viscosity_diagram,
@@ -252,7 +256,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             self.take_Button.setDisabled(False)
             self.save_Button.setDisabled(False)
 
-        elif self.num_column == 17:
+        elif self.num_column == 18:
 
             # take all the data up to column 13
             self.final_data_to_show = self.data[:, :-4]
@@ -295,6 +299,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         values = [
             self.phase_difference_degree_mean,
             self.angular_velocity_mean,
+            self.raw_torque_mean,
             self.total_torque_mean,
             self.shear_rate_mean,
             self.shear_stress_mean,
@@ -327,6 +332,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.angular_velocity = np.zeros((self.num_rows, 1))
         self.shear_rate = np.zeros((self.num_rows, 1))
         self.fr1on_moment = np.zeros((self.num_rows, 1))
+        self.raw_torque = np.zeros((self.num_rows, 1))
         self.total_torque = np.zeros((self.num_rows, 1))
         self.magnitude_current = np.zeros((self.num_rows, 1))
         ###############################################################################
@@ -361,6 +367,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         amag = self.angle_magnet_degree.reshape(-1, 1)
         pd = self.phase_difference_degree.reshape(-1, 1)
         angv = self.angular_velocity.reshape(-1, 1)
+        rawtrq = self.raw_torque.reshape(-1, 1)
         trq = self.total_torque.reshape(-1, 1)
         sr1 = self.shear_rate.reshape(-1, 1)
         ss2 = self.shear_stress.reshape(-1, 1)
@@ -394,6 +401,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
             amag,
             pd,
             angv,
+            rawtrq,
             trq,
             sr1,
             ss2,
@@ -417,10 +425,11 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.angle_magnet         = d[:, 6]
         self.phase_difference     = d[:, 7]
         self.angular_velocity     = d[:, 8]
-        self.total_torque         = d[:, 9]
-        self.shear_rate           = d[:, 10]
-        self.shear_stress         = d[:, 11]
-        self.viscosity            = d[:, 12]
+        self.raw_torque           = d[:, 9]
+        self.total_torque         = d[:, 10]
+        self.shear_rate           = d[:, 11]
+        self.shear_stress         = d[:, 12]
+        self.viscosity            = d[:, 13]
         
         self.offset_1 = self.coefficient_saved[0, 0]
         self.offset_2 = self.coefficient_saved[0, 1]
@@ -469,20 +478,14 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.save_Button.setEnabled(True)
 
     def calculate_angle(self):
+        """Compute magnet and magnetic field angles and their phase difference from raw Hall sensor data.
+
+        Magnet angle: arctan2(voltage_2, voltage_1) — cols 1 & 2.
+        Field angle:  arctan2(current_2, current_1) — cols 3 & 4.
+        Both are unwrapped to remove 2π discontinuities.
+        Phase difference = field angle - magnet angle [rad].
         """
-        Calculate magnet and magnetic field angles and their phase difference.
-
-        This method computes the angles for the magnet and the magnetic field
-        from the Hall voltage data stored in `self.data`.
-
-        - The magnet angle is calculated using columns 2 and 3 (`self.data[:, 1]` and `self.data[:, 2]`).
-        - The magnetic field angle is calculated using columns 4 and 5 (`self.data[:, 3]` and `self.data[:, 4]`).
-        - Angles are unwrapped along axis 0 to remove discontinuities.
-        - The phase difference between the magnetic field and the magnet is stored
-        in `self.phase_difference`.
-
-        :return: None
-        """
+        
         for row in range(self.num_rows):
             # angle from 2nd and 3rd columns (index 1 and 2)
             self.angle_magnet[row, 0] = np.arctan2(self.data[row, 2], self.data[row, 1])
@@ -547,14 +550,14 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
 
     def calculate_shear_stress(self):
         """Compute total torque (magnetic - friction) and convert to shear stress [Pa]."""
-        self.total_torque = (
+        self.raw_torque = (
                 self.CALIBRATION_FACTOR  # dimensionless
                 * self.DIPOLE_MOMENT  # [A·m²]
                 * self.COIL_CONSTANT  # [T/A]
                 * (self.magnitude_current / 1000)  # mA → A
                 * np.sin(self.phase_difference[:, 0])  # dimensionless
-                - self.friction_moment  # [Nm]
         )
+        self.total_torque = self.raw_torque - self.friction_moment  # [Nm]
         self.shear_stress = self.total_torque * self.C_SS  # [Pa]
 
     def calculate_viscosity(self):
@@ -566,6 +569,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.phase_difference_degree_mean = np.mean(self.phase_difference_degree)
         print(self.phase_difference_degree_mean)
         self.angular_velocity_mean = np.mean(self.angular_velocity)
+        self.raw_torque_mean = np.mean(self.raw_torque)
         self.total_torque_mean = np.mean(self.total_torque)
         self.shear_rate_mean = np.mean(self.shear_rate)
         self.shear_stress_mean = np.mean(self.shear_stress)
@@ -575,10 +579,11 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         """Compute time-averaged values from an already-saved 17-column dataset."""
         self.phase_difference_degree_mean = np.mean(self.data[:, 7])
         self.angular_velocity_mean = np.mean(self.data[:, 8])
-        self.total_torque_mean = np.mean(self.data[:, 9])
-        self.shear_rate_mean = np.mean(self.data[:, 10])
-        self.shear_stress_mean = np.mean(self.data[:, 11])
-        self.viscosity_mean = np.mean(self.data[:, 12])
+        self.raw_torque_mean = np.mean(self.data[:, 9])
+        self.total_torque_mean = np.mean(self.data[:, 10])
+        self.shear_rate_mean = np.mean(self.data[:, 11])
+        self.shear_stress_mean = np.mean(self.data[:, 12])
+        self.viscosity_mean = np.mean(self.data[:, 13])
         
     def determine_offsets_option(self):
         """Set offset_1/offset_2 from the live tab or from the textbox fields, based on the toggle state."""
@@ -678,10 +683,21 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         ]
 
         self.template_draw_diagram(title, ylabel, lines)
+        
+    def draw_raw_torque_diagram(self):
+        """Plot raw torque T vs time."""
+        title = "Raw torque diagram"
+        ylabel = r"Torque $T$ / Nm"
+        lines = [
+            {"y": self.raw_torque, "color": "red"},
+        ]
+
+        self.template_draw_diagram(title, ylabel, lines)
 
     def draw_torque_diagram(self):
         """Plot net torque T vs time."""
-        title = "Torque diagram"
+        title = "Total torque diagram"
+        print("Im in draw")
         ylabel = r"Torque $T$ / Nm"
         lines = [
             {"y": self.total_torque, "color": "red"},

@@ -114,7 +114,12 @@
            </item>
            <item>
             <property name="text">
-             <string>Torque diagram</string>
+             <string>Raw torque diagram</string>
+            </property>
+           </item>
+           <item>
+            <property name="text">
+             <string>Total torque diagram</string>
             </property>
            </item>
            <item>
@@ -284,6 +289,11 @@
           </column>
           <column>
            <property name="text">
+            <string>Raw torque / Nm</string>
+           </property>
+          </column>
+          <column>
+           <property name="text">
             <string>Torque / Nm </string>
            </property>
           </column>
@@ -316,7 +326,7 @@
      <x>0</x>
      <y>0</y>
      <width>1524</width>
-     <height>22</height>
+     <height>33</height>
     </rect>
    </property>
   </widget>

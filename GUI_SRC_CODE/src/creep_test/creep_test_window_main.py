@@ -773,7 +773,6 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             #start specific 
             self.worker_downsample_property.flag_specific_downsample = True
             
-            serial_backend.file_name_change_set("dummy")        #set file name from gui
             print("check is", check3)
 
 

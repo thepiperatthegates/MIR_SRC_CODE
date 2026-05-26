@@ -616,8 +616,6 @@ class PIDOutput(QMainWindow, Ui_Title):
             self.worker_downsample_property.tot_average = tot_avg
             self.worker_downsample_property.current_time = 0.0
             self.worker_flag_run_time.flag_running_time = True
-            
-            serial_backend.file_name_change_set("dummy")
 
             #--------- UI and Timer Execution.  ------------------
             self._update_transmission_ui(True, "Saving!..")
