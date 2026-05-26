@@ -75,14 +75,15 @@ if ($PythonExe -and (Test-Path $ReqFile)) {
 Write-Host "[INFO] Checking GitHub for new commits..." -ForegroundColor Cyan
 
 # ======================= Fetch the latest metadata from GitHub without downloading files yet ====================
-git fetch origin main -q 2>$null
+$CurrentBranch = git rev-parse --abbrev-ref HEAD
+git fetch origin $CurrentBranch -q 2>$null
 
 
 # Check the last exit code with $LASTEXITCODE
 if ($LASTEXITCODE -eq 0) {
 
     # Get list of changed files between local and remote
-    $ChangedFiles = git diff --name-only HEAD origin/main
+    $ChangedFiles = git diff --name-only HEAD origin/$CurrentBranch
 
     # Define files to ignore
     $IgnoreList = @(
