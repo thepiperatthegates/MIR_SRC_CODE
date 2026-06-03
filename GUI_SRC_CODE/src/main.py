@@ -14,6 +14,8 @@ from pathlib import Path
 from PyQt5 import QtCore, QtGui
 from PyQt5.QtWidgets import QApplication, QMainWindow
 
+from theme import LIGHT_THEME
+
 # fix cache problem with matplotlib
 os.environ['MPLCONFIGDIR'] = str(Path.home()) + "/.matplotlib/"
 
@@ -50,26 +52,13 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
         )
         # disable experiment combobox initially
         self.choose_experiment_comboBox.setEnabled(False)
-        self.choose_electronic_comboBox.setEnabled(False)
+        self.choose_electronic_comboBox.setEnabled(True)
 
         # connect electronic combobox signal at init
         self.choose_electronic_comboBox.currentIndexChanged.connect(self.enable_choose_experiment)
 
         # connect experiment combobox signal at init
         self.choose_experiment_comboBox.activated.connect(self.choose_window)
-        
-        self.choose_com_comboBox.activated.connect(self.choose_com_port)
-        
-    def choose_com_port(self):
-        """Enable electronics selection when a valid COM port is chosen, disable it otherwise."""
-        
-        choose_com_text = str(self.choose_com_comboBox.currentText())
-        
-        if choose_com_text == "Pick Virtual COM Port for USB":
-            self.choose_electronic_comboBox.setEnabled(False)
-        else:
-            self.choose_electronic_comboBox.setEnabled(True)
-            socket_GUI.serial_backend.port_name_setter(choose_com_text)
         
 
     
@@ -117,7 +106,8 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
 def main():
     """Initialize the Qt application, show the main window, and start the event loop."""
     app_main_window = QApplication(sys.argv)
-    
+    app_main_window.setStyleSheet(LIGHT_THEME)
+
     # get absolute path of project root (folder containing 'src' and 'pics')
     project_root = os.path.dirname(os.path.abspath(__file__))
 

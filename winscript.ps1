@@ -132,16 +132,23 @@ else {
 # --------------------------------------------
 # Run MIR-GUI
 # --------------------------------------------
+$SrcDir = Join-Path $ProjectRoot "src"
+
 if ($PythonExe) {
     Write-Host "[INFO] Environment ready. Python: $PythonExe" -ForegroundColor Green
     Write-Host "[INFO] Running MiR-GUI... DO NOT CLOSE THIS WINDOW!" -ForegroundColor Yellow
-	 
-    $confirmation = & $PythonExe -u $MainScriptPath
 
-	if ($LASTEXITCODE -ne 0 -or -!$?){
-	Write-Host "[INFO] Running global Python because of ADMIN rights" -ForegroundColor Yellow
-		Python	-u $MainScriptPath
-	}
+    Push-Location $SrcDir
+    & $PythonExe -u $MainScriptPath
+    $exitCode = $LASTEXITCODE
+    Pop-Location
+
+    if ($exitCode -ne 0) {
+        Write-Host "[INFO] Running global Python because of ADMIN rights" -ForegroundColor Yellow
+        Push-Location $SrcDir
+        Python -u $MainScriptPath
+        Pop-Location
+    }
 } else {
     Write-Host "[ERROR] Python environment could not be initialized." -ForegroundColor Red
 }

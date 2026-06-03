@@ -7,10 +7,10 @@ import os
 import sys
 import threading
 import time
-import multiprocessing
 import serial
+import serial.tools.list_ports
 import struct
-
+import multiprocessing
 import queue
 
 tx_queue = queue.Queue()
@@ -21,10 +21,6 @@ q_to_csv = multiprocessing.Queue()
 
 q_to_norm = multiprocessing.Queue()
 #-------------------------------------------------------------------
-
-#---------------------- setter for port_name ----------------------
-port_name = None 
-
 current_time = None
 status_connection = None
 
@@ -76,41 +72,35 @@ def init_queues():
     print("Multiprocessing queues initialized.")
 
 
-def port_name_setter(this_port_name):
-    global port_name 
-    
-    port_name = this_port_name
+def find_port(PID=22336, VID=1155):
+
+    for ports_info in serial.tools.list_ports.comports():
+        if ports_info.pid == PID and ports_info.vid == VID:
+            return ports_info.device
+        
+    return None
 
 #---------------------- start socket connection for USB ----------------------
-def socket_start_connect():
-    global port_name
-
-    port_num = None 
+def socket_start_connect(retries=10, delay=2):
     baud_rate = 128000
     
-    # Detect platform and set port
-    if sys.platform == 'darwin':        # macOS
-        port_num = '/dev/tty.usbmodem3776345D32331'
-    elif sys.platform == 'win32':       # Windows
-        port_num = port_name  # must be defined elsewhere
-    elif sys.platform == 'linux':       # Linux
-        for options in ['/dev/ttyACM1', '/dev/ttyACM2', '/dev/ttyACM3']:
-            if os.path.exists(options):
-                port_num = options
-                break
-    try:
-        ser = serial.Serial(port=port_num, baudrate=baud_rate,timeout=None)
-        print("Connecting to the board")
-        print("Successful connection")
+    for attempt in range(retries):
+        port_num = find_port()
         
-        status_connection = True
-    except Exception as e:
-        print("Cannot connect with USB serial port!:", e)
-        print(port_name)
-        socket_start_connect()  #RECURSIVE TO TRY AGAIN
-        status_connection = False
+        if port_num == None:
+            print(f"Device cannot detect the USB COM Port, trying to reconnect ({attempt + 1}/{retries}) !........")
+            time.sleep(delay)
+            continue
         
-    return ser
+        try:
+            ser = serial.Serial(port_num, 128000)
+            print(f"Succesfully connected on {port_num}!")
+            return ser
+        except Exception as e:
+            print(f"Connection failed: {e}, retrying... ({attempt + 1}/{retries})")
+            time.sleep(delay)
+
+    raise RuntimeError("Could not connect to device after several attempts")
 
 # ---------------------- start creating two separate thread ----------------------
 def thread_start():

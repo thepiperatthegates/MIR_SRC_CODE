@@ -34,7 +34,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.setupUi(self)
 
         #----------------------- High DPI and Pathing -----------------------
-        self._configure_display()
         self._init_paths()
 
         #----------------------- Variable Initialization -----------------------
@@ -50,12 +49,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self._setup_ui_elements()
         self._start_normalise_mcu()
 
-    def _configure_display(self):
-        """Handle High DPI scaling settings."""
-        if hasattr(QtCore.Qt, 'AA_EnableHighDpiScaling'):
-            QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
-        if hasattr(QtCore.Qt, 'AA_UseHighDpiPixmaps'):
-            QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)
 
     def _init_paths(self):
         """Construct absolute paths and load button icons."""
