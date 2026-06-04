@@ -25,6 +25,9 @@ from main_window_gui import Ui_MainWindow # pyright: ignore[reportAttributeAcces
 from creep_test.creep_test_window_main import TabWindowCreepTest
 from constant_shear_rate.constant_shear_rate_main import TabWindowConstSR
 
+
+from theme import LIGHT_THEME
+ 
 # Source - https://stackoverflow.com/a
 # Posted by DamonJW, modified by community. See post 'Timeline' for change history
 # Retrieved 2025-12-05, License - CC BY-SA 4.0
@@ -183,6 +186,7 @@ def main():
     :return: None
     """
     app_main_window = QApplication(sys.argv)
+    app_main_window.setStyleSheet(LIGHT_THEME)
     
     # get absolute path of project root (folder containing 'src' and 'pics')
     project_root = os.path.dirname(os.path.abspath(__file__))
