@@ -176,6 +176,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.analyse_filename = QFileDialog.getOpenFileName(filter="csv (*.csv)")[0]
         self.label_file.setText(QFileInfo(self.analyse_filename).fileName())
         self.data_show_comboBox.setDisabled(False)
+        self.data_show_comboBox.setCurrentText("Data table")
+        self.choose_option()
         self.data_show_comboBox.activated.connect(self.choose_option)
 
     def choose_option(self):
