@@ -646,7 +646,7 @@ class kbCoefficient:
         
         filepath = os.path.join(project_root, "files", "k_b_coefficient.csv")
         
-        user_input = ELECTRONICS_FLAG + 1
+        user_input = ELECTRONICS_FLAG 
 
         #Load CSV data along with headers
         data = np.genfromtxt(filepath, delimiter=";", names=True)

@@ -1,10 +1,7 @@
 matplotlib==3.10.3
 opencv-python-headless
 numpy==2.3.1
-PyQt5
-PyQt5_sip
 pyqtgraph==0.13.7
 pyserial==3.5
-serial.tools.list_ports
 scipy==1.16.0
 pandas
