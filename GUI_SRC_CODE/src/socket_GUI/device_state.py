@@ -211,14 +211,16 @@ class TxData():
         # sending data with input frameheader
         return bytes([self.__class__.FRAME_HEADER_1, self.__class__.FRAME_HEADER_INPUT]) + payload
     
-    def combine_additional_data(self, data1, data2, data3, data4, data5):
+    def combine_additional_data(self, minhall_1, maxhall_1, minhall_2, maxhall_2, data5):
         """Pack five compensation values into a big-endian byte payload and return the framed compensation packet."""
         # <I used even for uint16_t to match the MCU deserializer
-        byte_1 = struct.pack('>I', int(data1))
-        byte_2 = struct.pack('>I', int(data2))
-        byte_3 = struct.pack('>I', int(data3))
-        byte_4 = struct.pack('>I', int(data4))
+        byte_1 = struct.pack('<f', float(minhall_1))
+        byte_2 = struct.pack('<f', float(maxhall_1))
+        byte_3 = struct.pack('<f', float(minhall_2))
+        byte_4 = struct.pack('<f', float(maxhall_2))
         byte_5 = struct.pack('>I', int(data5))
+        
+        print(data5)
         
         payload = b''.join([byte_1, byte_2, byte_3, byte_4, byte_5])
         

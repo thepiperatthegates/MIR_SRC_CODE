@@ -46,7 +46,7 @@ FLOAT32_SIZE = 4
 # Frame structure: [Header (2 bytes)] + [Payload]
 DMA_BUFFER_SIZE      = 2
 HEADER_SIZE          = 2 * UINT8_SIZE
-PAYLOAD_DATA_SIZE    = (2 * UINT16_SIZE) + (4 * FLOAT32_SIZE)
+PAYLOAD_DATA_SIZE    = (6 * FLOAT32_SIZE)
 BYTES_PER_SAMPLE     = HEADER_SIZE + PAYLOAD_DATA_SIZE
 TOTAL_ONE_CYCLE_BYTES    = BYTES_PER_SAMPLE * DMA_BUFFER_SIZE
 
@@ -81,7 +81,7 @@ def find_port(PID=22336, VID=1155):
     return None
 
 #---------------------- start socket connection for USB ----------------------
-def socket_start_connect(retries=10, delay=2):
+def socket_start_connect(retries=10, delay=0.5):
     baud_rate = 128000
     
     for attempt in range(retries):
@@ -260,7 +260,7 @@ CSR_NORM = 0x23
 CSR_KB = 0x24
 # ----------------------------------------------------
 
-def send_thread(serial_data, mode="input", minhall_1=0, maxhall_1=0,minhall_2=0, maxhall_2=0 ) -> None:
+def send_thread(serial_data, mode="input", minhall_1=0.0, maxhall_1=0.0,minhall_2=0.0, maxhall_2=0.0) -> None:
     
     if mode == "input":
         worker_combined_send = device_state.TxData()
@@ -296,10 +296,10 @@ def drain_queue(q):
 
 # Format: < (Little Endian), f (float), H (unsigned short)
 FRAME_SIZE  = BYTES_PER_SAMPLE      # 2 header + 4+4+2+2+4 payload
-NORM_SIZE   =  HEADER_SIZE + (4 * (UINT16_SIZE))      # 2 header + 2+2+2+2 payload
+NORM_SIZE   =  HEADER_SIZE + (4 * (FLOAT32_SIZE))      # 2 header + 2+2+2+2 payload
 KB_SIZE = HEADER_SIZE + (2 * (FLOAT32_SIZE))
-FRAME_FMT   = '<ffHHff'  # H1, H2, C1, C2, PD, TORQUE
-NORM_FMT    = '<HHHH'   # max_h1, min_h1, max_h2, min_h2
+FRAME_FMT   = '<ffffff'  # H1, H2, C1, C2, PD, TORQUE
+NORM_FMT    = '<ffff'   # max_h1, min_h1, max_h2, min_h2
 KB_FMT = '<ff' #kb1, kb2
 
 SENSOR_H1 = 0xAA
@@ -569,7 +569,7 @@ def save_norm_data_to_csv(packed_norm_data, filename="normalise_voltage_constant
     file_name_full = os.path.join(project_root, "files", filename)
     
     #-------------- save normalisation variables in csv ----------------
-    np.savetxt(file_name_full, data, delimiter=";",fmt='%i', header=headers_name, comments="")
+    np.savetxt(file_name_full, data, delimiter=";",fmt='%.17g', header=headers_name, comments="")
     
     print("Norm vars stored in csv")
     

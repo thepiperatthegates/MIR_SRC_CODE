@@ -49,10 +49,10 @@ class DataUpdate(QThread):
         self.total_current_1 = None
         self.total_current_2 = None
 
-        self.v1_slice = np.array([], dtype=np.uint16)
-        self.v2_slice = np.array([], dtype=np.uint16)
-        self.i1_slice = np.array([], dtype=np.uint16)
-        self.i2_slice = np.array([], dtype=np.uint16)
+        self.v1_slice = np.array([], dtype=np.float32)
+        self.v2_slice = np.array([], dtype=np.float32)
+        self.i1_slice = np.array([], dtype=np.float32)
+        self.i2_slice = np.array([], dtype=np.float32)
         self.phase_diff_slice = np.array([], dtype=np.float32)
         self.actual_torque = np.array([], dtype=np.float32)
         self.bytes_to_process = np.array([], dtype=np.uint16)
@@ -110,10 +110,6 @@ class DataUpdate(QThread):
                 self.torque_slice = reshaped_data[:, 5]         # phase diff [rad]
 
                 data_mutex.lock()
-                # Current
-                self.i1_slice = -device_state.change_current_adc(self.i1_slice)  # convert col3 (in mA)
-                self.i2_slice = device_state.change_current_adc(self.i2_slice)  # convert col4 (in mA)
-
                 # Calibration for current sensor
                 self.i1_slice = device_state.calibration_input_coil_1(self.i1_slice)
                 self.i2_slice = device_state.calibration_input_coil_2(self.i2_slice)
