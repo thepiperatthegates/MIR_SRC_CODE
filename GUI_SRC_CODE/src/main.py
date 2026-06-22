@@ -81,15 +81,13 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
         ####################################
         # disable experiment combobox initially
         self.choose_experiment_comboBox.setEnabled(False)
-        self.choose_electronic_comboBox.setEnabled(False)
+        self.choose_electronic_comboBox.setEnabled(True)
 
         # connect electronic combobox signal at init
         self.choose_electronic_comboBox.currentIndexChanged.connect(self.enable_choose_experiment)
 
         # connect experiment combobox signal at init
         self.choose_experiment_comboBox.activated.connect(self.choose_window)
-        
-        self.choose_com_comboBox.activated.connect(self.choose_com_port)
         
     def choose_com_port(self):
         """
@@ -114,11 +112,9 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
         
         choose_com_text = str(self.choose_com_comboBox.currentText())
         
-        if choose_com_text == "Pick Virtual COM Port for USB":
-            self.choose_electronic_comboBox.setEnabled(False)
-        else:
-            self.choose_electronic_comboBox.setEnabled(True)
-            socket_GUI.sockets_files.port_name_setter(choose_com_text)
+  
+        self.choose_electronic_comboBox.setEnabled(True)
+        socket_GUI.sockets_files.port_name_setter(choose_com_text)
         
 
     
