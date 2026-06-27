@@ -1,6 +1,6 @@
 #functions for socket
 
-import packet_transmission as packet_transmission
+from . import device_state as packet_transmission
 
 import numpy as np
 import os
@@ -47,6 +47,7 @@ tot_count_accumulate_recv = 250
 
 
 def init_queues():
+    """Re-initialize all multiprocessing queues (call before restarting the pipeline)."""
     global q_to_process, q_to_graph, q_to_csv
     q_to_process = multiprocessing.Queue()
     q_to_graph = multiprocessing.Queue()
@@ -54,8 +55,8 @@ def init_queues():
     print("Multiprocessing queues initialized.")
 
 
-def find_port(PID=0x0100 , VID=0x03FD):
-
+def find_port(PID=0x0100, VID=0x03FD):
+    """Return the COM port name matching the given USB PID/VID, or None if not found."""
     for ports_info in serial.tools.list_ports.comports():
         if ports_info.pid == PID and ports_info.vid == VID:
             return ports_info.device
@@ -64,6 +65,7 @@ def find_port(PID=0x0100 , VID=0x03FD):
 
 #---------------------- start socket connection for USB ----------------------
 def socket_start_connect(retries=10, delay=0.5):
+    """Open a serial connection to the device, retrying up to `retries` times."""
     baud_rate = 128000
     
     for attempt in range(retries):
@@ -87,6 +89,7 @@ def socket_start_connect(retries=10, delay=0.5):
 #start creating two separate thread
 ##########################################################################
 def thread_start():
+    """Connect to the device, start the receive thread, and poll for outgoing transmissions."""
     ser1 = socket_start_connect()
     worker_kb_property = packet_transmission.kbCoefficient()
     worker_specific_downsampling = packet_transmission.DownSampleSpecificFlag()
@@ -126,7 +129,7 @@ TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC   = int(0.1 / SAMPLE_PERIOD)
 TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND =   int(0.1 / SAMPLE_PERIOD)
 
 def recv_thread(ser1, worker_kb_property, worker_specific_downsampling, worker_normalise_properties):
-    
+    """Continuously read serial data, forward frames for live plotting, and save to CSV when recording."""
     global flag_for_process, p1, tot_count_accumulate_recv, flag_for_downsampling
     num_columns = 4
     worker_data_flag = packet_transmission.RunningTimeFlag()
@@ -167,8 +170,8 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling, worker_n
                 # ---- Saving data function -------
                 if worker_data_flag.flag_running_time:
                     if sensor_data_recv:
-                        save_sensors_data_to_csv(sensor_data_recv, worker_kb_property, worker_specific_downsampling,
-                                                  worker_normalise_properties, num_columns=num_columns)
+                        save_to_csv(sensor_data_recv, worker_kb_property, worker_specific_downsampling,
+                                    worker_normalise_properties, num_columns=num_columns)
                         sensor_data_recv = None
 
                                    
@@ -185,6 +188,7 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling, worker_n
 #thread for TCP Tx
 ##########################################################################
 def send_thread(ser1):
+    """Pack and transmit the current command data over the serial port."""
     worker_combined_send = packet_transmission.TxData()
     #combined everything
     combined_send = worker_combined_send.combine_data()
@@ -214,7 +218,7 @@ KB_HEADER_2 = 0xBD
 
 # ----- Protocol Headers & Formatting ------
 def start_process_live_graph(q_to_process, q_to_graph, q_to_csv):
-    
+    """Parse raw serial bytes into sensor frames and distribute them to the graph and CSV queues."""
     leftover = b''
 
     while True:
@@ -254,7 +258,7 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv):
 #write to dummy csv 
 ##########################################################################     
 def file_name_change_set(prefix, extension=".csv"):
-    
+    """Set the global output file name used by save_to_csv."""
     global file_name
     
     
@@ -262,78 +266,7 @@ def file_name_change_set(prefix, extension=".csv"):
     
 
 def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling, worker_normalise_properties, num_columns=4):
-    """
-    Process, calibrate, downsample, timestamp, and save measurement data to a CSV file.
-
-    This function takes a raw ADC data buffer, reshapes it into the specified number of
-    columns, converts the raw readings into calibrated physical quantities, applies
-    optional or default downsampling, generates a time column based on worker-defined
-    timing parameters, and appends the resulting data to a CSV file inside the project's
-    ``files`` directory.
-
-    Parameters
-    ----------
-    cleaned_buffer : array_like
-        Flat input buffer containing raw ADC samples. Length must be divisible by
-        ``num_columns``.
-    worker_kb_property : object
-        Object providing Hall sensor calibration constants:
-            - ``k_b_1`` : calibration coefficient for Hall sensor 1
-            - ``k_b_2`` : calibration coefficient for Hall sensor 2
-    worker_specific_downsampling : object
-        Object controlling downsampling and timing:
-            - ``flag_specific_downsample`` : whether user-specified downsampling should be used
-            - ``tot_average`` : default averaging factor
-            - ``tot_average_specified`` : user-specified averaging factor
-            - ``time_increment`` : default sample time step (s)
-            - ``time_increment_specified`` : user-specified sample time step (s)
-            - ``current_time`` : running timestamp updated after each call
-    worker_normalise_properties : object
-        Object containing:
-            - ``zero_offset_voltage_1`` : normalisation offset for Hall sensor 1
-            - ``zero_offset_voltage_2`` : normalisation offset for Hall sensor 2
-            - ``amplitude_voltage_1`` : normalisation amplitude for Hall sensor 1
-            - ``amplitude_voltage_2`` : normalisation amplitude for Hall sensor 2
-    num_columns : int, optional
-        Number of columns per row in the ADC buffer. Default is 4:
-            1. U1 (Hall sensor 1 / 1st Buffer)
-            2. U2 (Hall sensor 2 / 2nd Buffer)
-            3. I1 (Current coil 1 / 4th Buffer)
-            4. I2 (Current coil 2 / 3rd Buffer)
-
-    Processing Steps
-    ----------------
-    1. Reshape buffer into rows of ``num_columns``.
-    2. Convert raw ADC readings:
-        - Hall sensors using ``packet_transmission.change_adc_hall``
-        - Current coils using ``packet_transmission.change_current_adc`` and coil-specific calibration
-    3. Apply Hall sensor justification using ``k_b_1`` and ``k_b_2``.
-    4. Apply normalisation using zero-offset and amplitude-voltage parameters.
-    5. Apply downsampling:
-        - If ``flag_specific_downsample`` is True → use ``tot_average_specified``.
-        - Otherwise → use ``tot_average``.
-    6. Construct a time column using:
-        - ``current_time`` as the starting time
-        - ``time_increment`` or ``time_increment_specified`` as the step
-    7. Update ``current_time`` inside ``worker_specific_downsampling``.
-    8. Save result as semicolon-separated CSV:
-        - If file does not exist → create it.
-        - If it exists → append new rows.
-
-    Output Format
-    -------------
-    The saved CSV contains the following columns:
-        1. Time / s
-        2. Normalised Hall sensor 1 value
-        3. Normalised Hall sensor 2 value
-        4. Calibrated current coil 1 / mA
-        5. Calibrated current coil 2 / mA
-
-    File Location
-    -------------
-    The CSV file is always saved under:
-        ``<project_root>/files/<file_name>``
-    """
+    """Calibrate, downsample, and append a batch of ADC samples to the CSV file."""
 
     global file_name, count_time
     
@@ -450,8 +383,8 @@ def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling
     except Exception as e:
         print(f"The fuck?: {e}")
 
-def downsampling_values (col1, col2, col3, col4, tot_average):
-        
+def downsampling_values(col1, col2, col3, col4, tot_average):
+    """Downsample all four sensor columns by averaging every tot_average consecutive samples."""
     col1_after_average = average_values(col1, tot_average).ravel()
     col2_after_average = average_values(col2, tot_average).ravel()
     col3_after_average = average_values(col3, tot_average).ravel()
@@ -461,36 +394,8 @@ def downsampling_values (col1, col2, col3, col4, tot_average):
     
     
 #for decreasing data size for csv purposes 
-def average_values (col, N):
-    """
-    Compute the average of every N consecutive elements in a 1D array.
-
-    This function reduces the number of data points by averaging groups of N samples
-    from the input array. It is typically used to downsample high-frequency data while
-    preserving the overall signal trend.
-
-    Parameters
-    ----------
-    col : array_like
-        1D array of numeric values to be averaged.
-        The length of `col` must be a multiple of `N`.
-    N : int
-        Number of consecutive samples to average together.
-
-    Returns
-    -------
-    numpy.ndarray
-        A 2D column vector (shape: `(len(col) // N, 1)`) containing the averaged values.
-
-    Examples
-    --------
-    >>> import numpy as np
-    >>> col = np.array([1, 2, 3, 4, 5, 6])
-    >>> average_values(col, 2)
-    array([[1.5],
-           [3.5],
-           [5.5]])
-    """
+def average_values(col, N):
+    """Downsample col by averaging every N consecutive elements. Returns a column vector."""
 
     average_val = col.reshape(-1, N).mean(axis=1).reshape(-1, 1)
     return average_val

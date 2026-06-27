@@ -16,10 +16,10 @@ import multiprocessing
 import sys
 from .gui_baru import Ui_Title
 
-import socket_GUI.sockets_files as sockets_files
-from socket_GUI.sockets_files import q_to_graph
+import serial_comm.serial_backend as sockets_files
+from serial_comm.serial_backend import q_to_graph
 
-import packet_transmission as packet_transmission
+from serial_comm import device_state as packet_transmission
 from .analyse_window_const_sr import AnalyseWindow
 from .graph_fr import PlotWindow
 

@@ -528,8 +528,8 @@ class kbCoefficient:
         if cls._initialized:
             return
         
-        project_root = os.path.dirname(os.path.abspath(__file__))
-        
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
         filepath = os.path.join(project_root, "files", "k_b_coefficient.csv")
         
         user_input = ELECTRONICS_FLAG
@@ -596,7 +596,7 @@ class VoltageNormaliseCoefficient:
         if cls._initialized:
             return
 
-        project_root = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         filepath = os.path.join(project_root, "files", "normalise_voltage_constant.csv")
 
         # If file exists → load values

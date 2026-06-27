@@ -8,14 +8,14 @@ import os
 from pathlib import Path
 
 
-import packet_transmission
+from serial_comm import device_state as packet_transmission
 
 # #fix cache problem with MATHPLOTLIB
 os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
 import sys
 
-from socket_GUI import sockets_files
-from socket_GUI.sockets_files import q_to_graph
+from serial_comm import serial_backend as sockets_files
+from serial_comm.serial_backend import q_to_graph
 
 from .creep_test_gui import Ui_CreepTestGUI
 from .analyse_window_creep_test import AnalyseWindow

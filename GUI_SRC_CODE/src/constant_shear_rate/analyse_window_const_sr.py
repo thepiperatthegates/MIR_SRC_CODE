@@ -4,7 +4,7 @@ from PyQt5.QtCore import QFileInfo
 from PyQt5.QtWidgets import *
 
 from .analyse_Window import Ui_analyse_Window
-import packet_transmission
+from serial_comm import device_state as packet_transmission
 
 from scipy.signal import savgol_filter
 import pandas

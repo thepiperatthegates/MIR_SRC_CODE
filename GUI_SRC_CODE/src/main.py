@@ -1,12 +1,4 @@
-"""
-Main entry point for GUI_SRC_CODE.
-
-Responsibilities:
-#. Manage GUI-related classes and functions.
-#. Handle live data plotting.
-#. Provide USB transmission functionality.
-
-"""
+"""Main entry point for the MiR (Mini-Rheometer) GUI application."""
 from PyQt5 import QtGui
 from PyQt5 import *
 from PyQt5.QtWidgets import *
@@ -19,8 +11,7 @@ from pathlib import Path
 os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
 import multiprocessing
 import sys
-import packet_transmission as packet_transmission
-import socket_GUI
+from serial_comm import device_state as packet_transmission
 from main_window_gui import Ui_MainWindow # pyright: ignore[reportAttributeAccessIssue]
 from creep_test.creep_test_window_main import TabWindowCreepTest
 from constant_shear_rate.constant_shear_rate_main import TabWindowConstSR
@@ -40,28 +31,10 @@ if sys.platform == "win32":
 
 from PyQt5 import QtCore, QtGui
 
-class FirstGUI(QMainWindow, Ui_MainWindow): 
-    """
-    Main graphical user interface for the Mini-Rheometer (MIR) application.
+class FirstGUI(QMainWindow, Ui_MainWindow):
+    """Launcher window for selecting the electronics board and experiment type."""
 
-    Inherits from `QMainWindow` and `Ui_MainWindow` to set up the main window
-    and connect UI signals to their respective slots.
-
-    :param QMainWindow: Base Qt main window class.
-    :type QMainWindow: class
-    :param Ui_MainWindow: Generated UI class from Qt Designer.
-    :type Ui_MainWindow: class
-    """   
     def __init__(self):
-        
-        """
-        Initialize the MainGUI window.
-
-        - Sets up the UI.
-        - Disables the experiment selection combo box initially.
-        - Declares experiment windows without showing them.
-        - Connects signals for electronic and experiment selection combo boxes.`
-        """
         
         super().__init__()
         self.setupUi(self)
@@ -93,15 +66,7 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
 
     
     def enable_choose_experiment(self, index):
-        """
-        Enable the experiment selection combo box if a valid electronic is selected.
-
-        Sets the `ELECTRONICS_FLAG` in `packet_transmission` depending on the
-        selected electronic.
-
-        :param index: Current index of the electronic selection combo box.
-        :type index: int
-        """
+        """Enable the experiment combo box and set the electronics flag when a board is selected."""
         current_text = self.choose_electronic_comboBox.currentText()
         
         # If placeholder or empty, disable experiment combobox
@@ -119,16 +84,7 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
             self.choose_experiment_comboBox.setCurrentIndex(0)
 
     def choose_window(self, index):
-        """
-        Open the appropriate experiment window based on experiment selection.
-
-        - Puts the selected mode into the shared queue `q_get_mir_mode`.
-        - Opens the corresponding experiment window.
-        - Closes the main window after opening the experiment window.
-
-        :param index: Current index of the experiment selection combo box.
-        :type index: int
-        """
+        """Open the selected experiment window and close the launcher."""
         mode = self.choose_experiment_comboBox.currentText()
         
         if mode == "Control shear rate":
@@ -147,14 +103,7 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
 
 #TODO: f_R and k_b, K need to match the electronics used. 
 def main():
-    """
-    Entry point for the application.
-
-    Initializes the Qt application, sets the window icon depending on the platform,
-    creates and shows the main GUI window, and starts the Qt event loop.
-
-    :return: None
-    """
+    """Initialize the Qt application, show the launcher window, and start the event loop."""
     app_main_window = QApplication(sys.argv)
     app_main_window.setStyleSheet(LIGHT_THEME)
     
