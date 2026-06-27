@@ -9,6 +9,7 @@ import threading
 import time
 import multiprocessing
 import serial
+import serial.tools.list_ports
 import struct
 
 
@@ -53,74 +54,39 @@ def init_queues():
     print("Multiprocessing queues initialized.")
 
 
-def port_name_setter(this_port_name):
-    global port_name 
+def find_port(PID=0x0100 , VID=0x03FD):
+
+    for ports_info in serial.tools.list_ports.comports():
+        if ports_info.pid == PID and ports_info.vid == VID:
+            return ports_info.device
+        
+    return None
+
+#---------------------- start socket connection for USB ----------------------
+def socket_start_connect(retries=10, delay=0.5):
+    baud_rate = 128000
     
-    port_name = this_port_name
-
-
-##########################################################################
-#start socket connection for USB 
-##########################################################################
-def socket_start_connect():
-    global port_name
-
-    port_num = None 
-    
-    # Detect platform and set port
-    if sys.platform == 'darwin':        # macOS
-        port_num = '/dev/tty.usbmodem3776345D32331'
-    elif sys.platform == 'win32':       # Windows
-        port_num = port_name  # must be defined elsewhere
-    elif sys.platform == 'linux':       # Linux
-        for options in ['/dev/ttyACM1', '/dev/ttyACM2', '/dev/ttyACM3']:
-            if os.path.exists(options):
-                port_num = options
-                break
-    try:
-        ser = serial.Serial(port=port_num, baudrate=baud_rate,timeout=None)
-        print(ser)
-        print("Connecting to the board")
-        print("Successful connection")
+    for attempt in range(retries):
+        port_num = find_port()
         
-        status_connection = True
-    except Exception as e:
-        print("Cannot connect with USB serial port!:", e)
-        print(port_name)
-        socket_start_connect()  #RECURSIVE TO TRY AGAIN
+        if port_num == None:
+            print(f"Device cannot detect the USB COM Port, trying to reconnect ({attempt + 1}/{retries}) !........")
+            time.sleep(delay)
+            continue
         
-        status_connection = False
-        
-    return ser
+        try:
+            ser = serial.Serial(port_num, 128000)
+            print(f"Succesfully connected on {port_num}!")
+            return ser
+        except Exception as e:
+            print(f"Connection failed: {e}, retrying... ({attempt + 1}/{retries})")
+            time.sleep(delay)
 
+    raise RuntimeError("Could not connect to device after several attempts")
 ##########################################################################
 #start creating two separate thread
 ##########################################################################
 def thread_start():
-    """
-    Start the main communication threads for serial data transmission.
-
-    This function establishes a socket/serial connection and manages two
-    separate threads for monitoring and sending data:
-
-    - `recv_thread`: Runs in a background thread to continuously monitor 
-      incoming data from the serial port.
-    - `send_thread`: Spawned whenever the `start_flag_send` is set. It handles
-      sending packets over the established connection.
-
-    Workflow:
-        1. Connect to the serial/socket using `socket_start_connect()`.
-        2. Start a receiving thread (`recv_thread`) to listen for incoming data.
-        3. In a continuous loop:
-            - Check if `start_flag_send` is set.
-            - If set, reset it and start a sending thread (`send_thread`).
-            - Sleep briefly to prevent busy-waiting.
-    
-    Notes:
-        - The receiving thread is persistent and always active.
-        - The sending thread is created on demand when the send flag is raised.
-        - A small delay (`time.sleep(0.001)`) is used to reduce CPU usage.
-    """
     ser1 = socket_start_connect()
     worker_kb_property = packet_transmission.kbCoefficient()
     worker_specific_downsampling = packet_transmission.DownSampleSpecificFlag()
@@ -140,92 +106,74 @@ def thread_start():
         else:
             time.sleep(1)
 
+# --- Data Type Sizes (in Byte) ---
+UINT8_SIZE   = 1
+UINT16_SIZE  = 2
+FLOAT32_SIZE = 4
+
+# --- Frame Configuration ---
+# Frame structure: [Header (2 bytes)] + [Payload]
+DMA_BUFFER_SIZE      = 2
+HEADER_SIZE          = 2 * UINT8_SIZE
+# go back to normal raw data receiving
+PAYLOAD_DATA_SIZE    = 4 * UINT16_SIZE
+BYTES_PER_SAMPLE     = HEADER_SIZE + PAYLOAD_DATA_SIZE
+TOTAL_ONE_CYCLE_BYTES    = BYTES_PER_SAMPLE * DMA_BUFFER_SIZE
             
+SAMPLE_PERIOD        = 0.0001 * DMA_BUFFER_SIZE
+TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC   = int(0.1 / SAMPLE_PERIOD)
+# ---------------------- for total count receiving from socket (depends if we want 0.5s, 1s or 2s) ----------------------
+TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND =   int(0.1 / SAMPLE_PERIOD)
 
 def recv_thread(ser1, worker_kb_property, worker_specific_downsampling, worker_normalise_properties):
-    """
-    Continuously read incoming data from a serial connection and 
-    forward it for live plotting and CSV logging.
-
-    This function runs in an infinite loop, reading fixed-size chunks
-    of data from a serial port (`ser1`). The accumulated data is passed
-    to a processing pipeline for live visualization and optional saving
-    to a CSV file. A separate process is spawned to handle plotting 
-    when the first batch of data arrives.
-
-    Args:
-        ser1 (serial.Serial):
-            An open serial connection object used for reading data.
-
-    Globals:
-        flag_for_process (bool):
-            Indicates whether the plotting process has been started.
-        p1 (multiprocessing.Process):
-            Process object for the live plotting subprocess.
-        tot_count_accumulate_recv (int):
-            Number of read iterations to accumulate into one buffer.
-
-    Workflow:
-        1. Initialize an empty buffer (`received_data`).
-        2. Accumulate data from the serial port in fixed-size chunks (48 bytes)
-           until the count reaches `tot_count_accumulate_recv`.
-        3. Once a batch is ready:
-            - If the plotting process has not been started yet, spawn it.
-            - Forward the raw data to `q_to_process` for unpacking.
-        4. Retrieve processed data from `q_to_csv`.
-        5. If the runtime flag (`packet_transmission.running_time_flag_getter()`) 
-           is set, save the processed data to CSV.
-
-    Error Handling:
-        - Any exceptions during serial read or processing are caught and printed.
-        - On error, the loop sleeps briefly (0.1s) before retrying.
-
-    Notes:
-        - The function is designed to run indefinitely as a background thread.
-        - Data is handled in two layers:
-            - Raw byte accumulation (`q_to_process` for unpacking).
-            - Post-processed integers (`q_to_csv` for logging).
-        - The plotting process (`plot_live`) is started only once.
-
-    """
     
     global flag_for_process, p1, tot_count_accumulate_recv, flag_for_downsampling
-
+    num_columns = 4
     worker_data_flag = packet_transmission.RunningTimeFlag()
     worker_process_flag = packet_transmission.ProcessUnpackingFlag()
-    # worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
+    worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
     
     #start count with zero
     count = 0
     while True:
         try:
-            received_data = b'' #initilaised buffer
-            try:
-                while count < tot_count_accumulate_recv:
-                    count +=1 
-                    chunk =  ser1.read(48)
-                    received_data += chunk
-                count = 0
-                
-                ## run only once when the program starts
-                if not worker_process_flag.flag_process and received_data:
-                    p1 = multiprocessing.Process(target=plot_live, args=(q_to_process, q_to_graph, q_to_csv ))
-                    p1.start()
-                
+            received_data = b''
 
+            try:
+                while count < TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC:
+                    count += 1
+                    chunk = b''
+                    while len(chunk) < TOTAL_ONE_CYCLE_BYTES:
+                        chunk += ser1.read(TOTAL_ONE_CYCLE_BYTES - len(chunk))
+                    received_data += chunk
+
+                count = 0
+
+                
+                # -----  Start live graph process for the first time --------
+                if not worker_process_flag.flag_process and received_data:
+                    p1 = multiprocessing.Process(target=start_process_live_graph,
+                                                  args=(q_to_process, q_to_graph, q_to_csv))
+                    p1.start()
                     worker_process_flag.flag_process = True
-                
-                q_to_process.put(obj=received_data) #send to subprocess to be unpacked
-                data_send = q_to_csv.get()
-                
-                # worker_data_flag = packet_transmission.running_time_flag_getter()
+                # ---- Non-blocking get with timeout to avoid freeze ----
+                sensor_data_recv = None
+                try:
+                    # Non blocking queue get (since it might takes a while for firmware to react)
+                    sensor_data_recv = q_to_csv.get(timeout=1.0)  
+                except Exception:
+                    pass  # timeout hit, restart the process
+
+                # ---- Saving data function -------
                 if worker_data_flag.flag_running_time:
-                    
-                    #Reload the newest normalise properties
-                    
-                    if data_send:
-                        save_to_csv(data_send, worker_kb_property, worker_specific_downsampling, worker_normalise_properties)
-                        data_send = None
+                    if sensor_data_recv:
+                        save_sensors_data_to_csv(sensor_data_recv, worker_kb_property, worker_specific_downsampling,
+                                                  worker_normalise_properties, num_columns=num_columns)
+                        sensor_data_recv = None
+
+                                   
+
+                q_to_process.put(received_data)
             except Exception as e:
                 print(f"Here 1: {e}")
         except Exception as e:
@@ -246,67 +194,65 @@ def send_thread(ser1):
     except Exception as e:
         print("Cannot send data!", e)
 
-def plot_live(queue1, q_to_graph, q_to_csv): #q_to_graph to graph (main file)
-    start_process_live_graph(queue1, q_to_graph, q_to_csv)
+        
+# ----- Protocol Headers & Formatting ------
+# Format: < (Little Endian), f (float), H (unsigned short)
+FRAME_SIZE  = BYTES_PER_SAMPLE      # 2 header + 4+4+2+2+4 payload
+NORM_SIZE   =  HEADER_SIZE + (4 * (FLOAT32_SIZE))      # 2 header + 2+2+2+2 payload
+KB_SIZE = HEADER_SIZE + (2 * (FLOAT32_SIZE))
+FRAME_FMT   = '<HHHH'  # H1, H2, C1, C2 (uint16_t)
+NORM_FMT    = '<ffff'   # max_h1, min_h1, max_h2, min_h2
+KB_FMT = '<ff' #kb1, kb2
 
+SENSOR_H1 = 0xAA
+SENSOR_H2 = 0xAB
+NORM_H1   = 0xBA
+NORM_H2   = 0xBB
+
+KB_HEADER_1 = 0xBC
+KB_HEADER_2 = 0xBD
+
+# ----- Protocol Headers & Formatting ------
+def start_process_live_graph(q_to_process, q_to_graph, q_to_csv):
     
-
-def start_process_live_graph(queue1, q_to_graph, q_to_csv):
-    """
-    Continuously process incoming data for live graphing and CSV logging.
-
-    This function runs in an infinite loop, consuming raw byte streams 
-    from `queue1`. It parses the stream by looking for specific identifier 
-    bytes and extracting the following two bytes as a 16-bit unsigned integer. 
-    The decoded integer values are then forwarded to two queues:
-    - `q_to_graph` for live visualization
-    - `q_to_csv` for data logging
-
-    Args:
-        queue1 (multiprocessing.Queue):
-            Input queue containing raw byte streams to process.
-        q_to_graph (multiprocessing.Queue):
-            Output queue for passing decoded integer data to a graphing process.
-        q_to_csv (multiprocessing.Queue):
-            Output queue for passing decoded integer data to a CSV writer.
-
-    Processing logic:
-        - Identifiers are defined as {b'H', b'I', b'J', b'K'}.
-        - When an identifier is found in the stream:
-            - The next two bytes are extracted.
-            - Interpreted as a little-endian unsigned 16-bit integer (`<H`).
-            - Added to the list of decoded values (`tot_chunks`).
-        - After processing the full buffer, the collected integers are sent 
-          to both output queues.
-
-    """
-    
-
-    identifier_bits =  {b'H', b'I', b'J', b'K'}
+    leftover = b''
 
     while True:
-        recv_buffer = queue1.get()
-        if recv_buffer:
-            tot_chunks = []
-            i = 0 
-            while i < len(recv_buffer):
-                if bytes([recv_buffer[i]]) in identifier_bits:
-                    if i + 2 < len(recv_buffer):
-                        chunk = recv_buffer[i+1:i+3]    #take the second and third, list slicing works by setting the first and the last array(which it doesnt take)
-                        integer_value = struct.unpack('<H', chunk)[0]
-                        tot_chunks.append(integer_value)
-                    # Skip past the identifier and 2-byte chunk
-                    i+= 3
-                else:
-                    i+=1
-            q_to_graph.put(tot_chunks)
-            q_to_csv.put(tot_chunks)
+        recv_chunk = q_to_process.get()
+        if not recv_chunk:
+            continue
+
+        recv_buffer = leftover + recv_chunk
+        leftover     = b''
+        batch_frames = []
+
+        index      = 0
+        buf_len = len(recv_buffer)
+
+        while index < buf_len - 1:
+                
+            # ----- Sensor frame -----
+            if recv_buffer[index] == SENSOR_H1 and recv_buffer[index+1] == SENSOR_H2:
+                end = index + FRAME_SIZE
+                if end > buf_len:
+                    leftover = recv_buffer[index:]
+                    break
+                h1, h2, c1, c2 = struct.unpack(FRAME_FMT, recv_buffer[index+2 : end])
+                batch_frames.extend([h1, h2, c1, c2])
+                index = end
+                continue
+
+            # ── No header match: skip one byte ──
+            index += 1
+
+        if batch_frames:
+            q_to_graph.put(batch_frames)
+            q_to_csv.put(batch_frames)
             
-            
+        
 ##########################################################################
 #write to dummy csv 
 ##########################################################################     
-        
 def file_name_change_set(prefix, extension=".csv"):
     
     global file_name

@@ -81,7 +81,7 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
         ####################################
         # disable experiment combobox initially
         self.choose_experiment_comboBox.setEnabled(False)
-        self.choose_electronic_comboBox.setEnabled(False)
+        self.choose_electronic_comboBox.setEnabled(True)
 
         # connect electronic combobox signal at init
         self.choose_electronic_comboBox.currentIndexChanged.connect(self.enable_choose_experiment)
@@ -89,36 +89,6 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
         # connect experiment combobox signal at init
         self.choose_experiment_comboBox.activated.connect(self.choose_window)
         
-        self.choose_com_comboBox.activated.connect(self.choose_com_port)
-        
-    def choose_com_port(self):
-        """
-        Handles user selection of the virtual COM port from the combo box.
-
-        This method retrieves the currently selected COM port name from 
-        `choose_com_comboBox` and updates the system configuration accordingly. 
-        If the default placeholder option ("Pick Virtual COM Port for USB") is 
-        selected, the electronic selection combo box is disabled. Otherwise, 
-        the electronic selection is enabled, and the selected COM port name 
-        is passed to `sockets_files.port_name_setter()` for further configuration.
-
-        Notes
-        -----
-        - The combo box `choose_com_comboBox` must contain at least one valid 
-          COM port entry.
-        - The combo box `choose_electronic_comboBox` is enabled only when a 
-          valid COM port is selected.
-        - `sockets_files.port_name_setter` : Function used to store or configure 
-        the selected COM port name.
-        """
-        
-        choose_com_text = str(self.choose_com_comboBox.currentText())
-        
-        if choose_com_text == "Pick Virtual COM Port for USB":
-            self.choose_electronic_comboBox.setEnabled(False)
-        else:
-            self.choose_electronic_comboBox.setEnabled(True)
-            socket_GUI.sockets_files.port_name_setter(choose_com_text)
         
 
     

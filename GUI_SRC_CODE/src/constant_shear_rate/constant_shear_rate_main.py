@@ -162,32 +162,32 @@ class DataUpdate(QThread):
                 reshaped_data = np.array(self.bytes_to_process).reshape(-1, num_columns)
                 reshaped_data = reshaped_data.astype(float)
 
-                self.v1_slice = reshaped_data[:, 0]
-                self.v2_slice = reshaped_data[:, 1]
-                self.i1_slice = reshaped_data[:, 2]  # STIMMT
-                self.i2_slice = reshaped_data[:, 3]  # STIMMT
+                self.i1_slice = reshaped_data[:, 0]  # STIMMT
+                self.i2_slice = reshaped_data[:, 1]  # STIMMT
+                self.v1_slice = reshaped_data[:, 2]
+                self.v2_slice = reshaped_data[:, 3]
 
                 data_mutex.lock()
-
+                print(self.i1_slice)
                 # Hall Sensors
                 #TODO: NEW FIRMWARE ITERACTIONS MUST NOT BE NEGATIVE FOR I1!!!!!!!!!
-                self.v1_slice = -packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
+                self.v1_slice = packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
                 self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
 
                 # Current
-                self.i1_slice = -packet_transmission.change_current_adc(self.i1_slice)  # convert col3 (in mA)
+                self.i1_slice = packet_transmission.change_current_adc(self.i1_slice)  # convert col3 (in mA)
                 self.i2_slice = packet_transmission.change_current_adc(self.i2_slice)  # convert col4 (in mA)
 
-                # calibration for current sensor
-                self.i1_slice = packet_transmission.calibration_input_coil_1(self.i1_slice)
-                self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
+                # # calibration for current sensor
+                # self.i1_slice = packet_transmission.calibration_input_coil_1(self.i1_slice)
+                # self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
 
 
-                # calibration for  hall sensors
-                self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
-                                                                             self.v1_slice, self.i1_slice / 1000)
-                self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
-                                                                             self.v2_slice, self.i2_slice / 1000)
+                # # calibration for  hall sensors
+                # self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
+                #                                                              self.v1_slice, self.i1_slice / 1000)
+                # self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
+                #                                                              self.v2_slice, self.i2_slice / 1000)
                 if self.flag_normalise:
                     self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amp_voltage_1
                     self.v2_slice = (self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amp_voltage_2
@@ -506,134 +506,72 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.change_graph()
         
     def change_graph(self):
-        
-        #get string from combo box
-        mode = self.select_mode_comboBox.currentText()
-        time_interval_var_string = self.timeInterval_comboBox.currentText()
-        time_interval_var_int = int(time_interval_var_string[:-2])
-        
-        
-        #clear graph and stop every time the event is connected
+        """Sets up the plotting environment based on UI selection."""
+        # -----------------------  Reset Plotting Area -----------------------
         self.graphicsView.clear()
         if hasattr(self, 'timer'):
             self.timer.stop()
 
-    
-        if mode == "View sensors":
-            
-            #this is to make sure x-axis is configured properly 
-            if time_interval_var_int == 100:
-                sockets_files.tot_count_accumulate_recv = 250
-                self.time_axis = [i * 0.0001 for i in range(1000)]
-            elif time_interval_var_int == 500:
-                sockets_files.tot_count_accumulate_recv = 5*250
-                self.time_axis = [i * 0.0001 for i in range(5*1000)]
-            elif time_interval_var_int == 1000:
-                sockets_files.tot_count_accumulate_recv = 10*250
-                self.time_axis = [i * 0.0001 for i in range(10*1000)]
-            
-            ######################
-            self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Hall sensors")
-            self.plot1.setLabel('left', 'Voltage', units='V')
-            self.plot1.setLabel('bottom', 'Time', units= 's')
-            self.plot1.addLegend()
-            self.plot1.showGrid(x=True, y=True)
-            self.curve_v1 = self.plot1.plot(pen='r', name="Hall sensors 1")
-            self.curve_v2 = self.plot1.plot(pen='b', name="Hall sensors 2")
-
-            
-            self.plot2 = self.graphicsView.addPlot(row=1, col=0, title="Current sensors")
-            self.plot2.setLabel('left', 'Current', units='mA')
-            self.plot2.setLabel('bottom', 'Time', units= 's')
-            self.plot2.addLegend()
-            self.plot2.showGrid(x=True, y=True)
-            
-            
-            self.curve_i1 = self.plot2.plot(pen='g', name="I1")
-            self.curve_i2 = self.plot2.plot(pen='y', name="I2")
-            
-            self.plot1.enableAutoRange(axis='x', enable=False)
-            self.plot2.enableAutoRange(axis='x', enable=False)
-            self.plot1.setXRange(0, 0.5)
-            self.plot2.setXRange(0, 0.5)
+        # ----------------------- Extract and Parse Inputs -----------------------
+        mode = self.select_mode_comboBox.currentText()
+        interval_str = self.timeInterval_comboBox.currentText()
+        interval_ms = int(interval_str[:-2])
         
-            # Create a timer for sensor updates
-            self.timer = QtCore.QTimer()
-            self.timer.setInterval(time_interval_var_int)  # 0.5 seconds interval
-            self.timer.timeout.connect(self.graph_update_sensors)
-            self.timer.start()
-
-        elif mode == "View angle":
-            
-            #this is to make sure x-axis is configured properly 
-            if time_interval_var_int == 100:
-                sockets_files.tot_count_accumulate_recv = 250
-                self.time_axis = [i * 0.0001 for i in range(1000)]
-            elif time_interval_var_int == 500:
-                sockets_files.tot_count_accumulate_recv = 5*250
-                self.time_axis = [i * 0.0001 for i in range(5*1000)]
-            elif time_interval_var_int == 1000:
-                sockets_files.tot_count_accumulate_recv = 10*250
-                self.time_axis = [i * 0.0001 for i in range(10*5000)]
-                
-            self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Permanent magnet angle")
-            self.plot1.setLabel('left', 'ϕ_m', units='rad')
-            self.plot1.setLabel('bottom', 'Time', units= 's')
-            self.plot1.addLegend()
-            self.plot1.showGrid(x=True, y=True)
-            self.curve_sigma_m = self.plot1.plot(pen='r', name="Sigma")
-    
-            
-            self.plot2 = self.graphicsView.addPlot(row=1, col=0, title="Magnetic field angle")
-            self.plot2.setLabel('left', 'ϕ_B', units='rad')
-            self.plot2.setLabel('bottom', 'Time', units= 's')
-            self.plot2.addLegend()
-            self.plot2.showGrid(x=True, y=True)
-            self.curve_sigma_b = self.plot2.plot(pen='g', name="B")
-            
-            self.plot1.enableAutoRange(axis='x', enable=False)
-            self.plot2.enableAutoRange(axis='x', enable=False)
-            self.plot1.setXRange(0, 0.5)
-            self.plot2.setXRange(0, 0.5)
-            
-            self.timer = QtCore.QTimer()
-            self.timer.setInterval(time_interval_var_int)  # 0.5 seconds interval
-            self.timer.timeout.connect(self.graph_update_angle)
-            self.timer.start()
-
-
-            
-        elif mode == "View phase difference":
-            
-            
-            #this is to make sure x-axis is configured properly 
-            #this is to make sure x-axis is configured properly 
-            if time_interval_var_int == 100:
-                sockets_files.tot_count_accumulate_recv = 250
-                self.time_axis = [i * 0.0001 for i in range(1000)]
-            elif time_interval_var_int == 500:
-                sockets_files.tot_count_accumulate_recv = 5*250
-                self.time_axis = [i * 0.0001 for i in range(5*1000)]
-            elif time_interval_var_int == 1000:
-                sockets_files.tot_count_accumulate_recv = 10*250
-                self.time_axis = [i * 0.0001 for i in range(10*1000)]
-                
-            self.plot1= self.graphicsView.addPlot(row=0, col=0, title="Permanent magnet angle")
-            self.plot1.setLabel('left', 'Δϕ', units='rad')
-            self.plot1.setLabel('bottom', 'Time', units= 's')
-            self.plot1.showGrid(x=True, y=True)
-            self.curve_phase_difference = self.plot1.plot(pen='g')
-            self.plot1.addLegend()
+        #  ----------------------- Handle Scaling Logic -----------------------
+        # factor maps 100ms -> 1, 500ms -> 5, 1000ms -> 10
+        factor = interval_ms // 100
+        sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = factor * sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
         
-            self.plot1.enableAutoRange(axis='x', enable=False)
-            self.plot1.setXRange(0, 0.5)
+        #  ----------------------- Mode-specific time axis length  -----------------------
+        range_len = 50000 if (mode == "View angle" and interval_ms == 1000) else (factor * 1000)
+        self.time_axis = [i * 0.0001 for i in range(range_len)]
 
-            # Create a timer for angle updates
-            self.timer = QtCore.QTimer()
-            self.timer.setInterval(time_interval_var_int)  # 0.5 seconds interval
-            self.timer.timeout.connect(self.graph_phase_difference)
-            self.timer.start()
+        # ----------------------- Mode Configuration Map -----------------------
+        # Structure: { ModeName: (UpdateFunction, [Plot1_Setup, Plot2_Setup]) }
+        config = {
+            "View sensors": (self.graph_update_sensors, [
+                {"title": "Hall sensors", "y": "Hall Voltage", "u": "[norm]", "curves": [("r", "v1", "Hall 1"), ("b", "v2", "Hall 2")]},
+                {"title": "Current sensors", "y": "Current", "u": "mA", "curves": [("g", "i1", "I1"), ("y", "i2", "I2")]}
+            ]),
+            "View angle": (self.graph_update_angle, [
+                {"title": "Permanent magnet angle", "y": "ϕ_m", "u": "rad", "curves": [("r", "sigma_m", "Sigma")]},
+                {"title": "Magnetic field angle", "y": "ϕ_B", "u": "rad", "curves": [("g", "sigma_b", "B")]}
+            ]),
+            "View phase difference": (self.graph_phase_difference, [
+                {"title": "Phase Difference", "y": "Δϕ", "u": "rad", "curves": [("g", "phase_diff", "Delta")]}
+            ])
+        }
+
+        if mode not in config:
+            return
+
+        update_func, plots_setup = config[mode]
+
+        # ----------------------- Build the UI -----------------------
+        for row, setup in enumerate(plots_setup):
+            plot = self.graphicsView.addPlot(row=row, col=0, title=setup["title"])
+            self._apply_plot_style(plot, setup["y"], setup["u"])
             
+            for color, attr_suffix, name in setup["curves"]:
+                curve = plot.plot(pen=color, name=name)
+                # Dynamically set attribute (e.g., self.curve_v1)
+                setattr(self, f"curve_{attr_suffix}", curve)
+
+        # ----------------------- Initialize Timer -----------------------
+        self.timer = QtCore.QTimer()
+        self.timer.setInterval(interval_ms)
+        self.timer.timeout.connect(update_func)
+        self.timer.start()
+
+    def _apply_plot_style(self, plot, y_label, units):
+        """Standardizes plot appearance."""
+        plot.setLabel('left', y_label, units=units)
+        plot.setLabel('bottom', 'Time', units='s')
+        plot.addLegend()
+        plot.showGrid(x=True, y=True)
+        plot.enableAutoRange(axis='x', enable=False)
+        plot.setXRange(0, 0.5)
+
 
     def start_normalise_event(self):
         
@@ -644,17 +582,28 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 
 
     def graph_update_sensors(self):
-        global data_mutex
+    # ----------------------- Access the slices once to minimize race condition window -----------------------
+        v1 = self.worker_getter_graph.v1_slice
+        v2 = self.worker_getter_graph.v2_slice
+        i1 = self.worker_getter_graph.i1_slice
+        i2 = self.worker_getter_graph.i2_slice
 
-        # data_mutex.lock()
+        # ----------------------- Determine the shortest length available right now -----------------------
+        # We compare the time_axis and all 4 data arrays
+        min_len = min(len(self.time_axis), len(v1), len(v2), len(i1), len(i2))
 
-        self.curve_v1.setData(self.time_axis,self.worker_getter_graph.v1_slice)
-        self.curve_v2.setData(self.time_axis,self.worker_getter_graph.v2_slice)
+        # 3. Validation
+        if min_len == 0:
+            return
+
+        # 4. Slice all arrays to the same length for this frame
+        t = self.time_axis[:min_len]
         
-        self.curve_i1.setData(self.time_axis,self.worker_getter_graph.i1_slice)
-        self.curve_i2.setData(self.time_axis,self.worker_getter_graph.i2_slice)
-        
-        # data_mutex.unlock()
+        self.curve_v1.setData(t, v1[:min_len])
+        self.curve_v2.setData(t, v2[:min_len])
+        self.curve_i1.setData(t, i1[:min_len])
+        self.curve_i2.setData(t, i2[:min_len])
+            # data_mutex.unlock()
         #
         
     def auto_range_event(self):
