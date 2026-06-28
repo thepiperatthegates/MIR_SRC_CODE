@@ -98,16 +98,11 @@ def thread_start():
     thread_recv = threading.Thread(target=recv_thread, args=(ser1,worker_kb_property, worker_specific_downsampling, worker_normalise_properties))
     thread_recv.start()
     
-    worker_flag_send = packet_transmission.TxFlag()
-
     while True:
-        if worker_flag_send.flag_tx:
-            thread_send = threading.Thread(target=send_thread, daemon=False, args=(ser1,))
-            thread_send.start()
-            #reset the flag
-            worker_flag_send.flag_tx = False
-        else:
-            time.sleep(1)
+        packet_transmission.tx_event.wait()
+        packet_transmission.tx_event.clear()
+        thread_send = threading.Thread(target=send_thread, daemon=False, args=(ser1,))
+        thread_send.start()
 
 # --- Data Type Sizes (in Byte) ---
 UINT8_SIZE   = 1
@@ -116,14 +111,14 @@ FLOAT32_SIZE = 4
 
 # --- Frame Configuration ---
 # Frame structure: [Header (2 bytes)] + [Payload]
-DMA_BUFFER_SIZE      = 2
+ADC_BUFFER_SIZE      = 2
 HEADER_SIZE          = 2 * UINT8_SIZE
 # go back to normal raw data receiving
 PAYLOAD_DATA_SIZE    = 4 * UINT16_SIZE
 BYTES_PER_SAMPLE     = HEADER_SIZE + PAYLOAD_DATA_SIZE
-TOTAL_ONE_CYCLE_BYTES    = BYTES_PER_SAMPLE * DMA_BUFFER_SIZE
+TOTAL_ONE_CYCLE_BYTES    = BYTES_PER_SAMPLE * ADC_BUFFER_SIZE
             
-SAMPLE_PERIOD        = 0.0001 * DMA_BUFFER_SIZE
+SAMPLE_PERIOD        = 0.0001 * ADC_BUFFER_SIZE
 TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC   = int(0.1 / SAMPLE_PERIOD)
 # ---------------------- for total count receiving from socket (depends if we want 0.5s, 1s or 2s) ----------------------
 TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND =   int(0.1 / SAMPLE_PERIOD)
@@ -132,7 +127,6 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling, worker_n
     """Continuously read serial data, forward frames for live plotting, and save to CSV when recording."""
     global flag_for_process, p1, tot_count_accumulate_recv, flag_for_downsampling
     num_columns = 4
-    worker_data_flag = packet_transmission.RunningTimeFlag()
     worker_process_flag = packet_transmission.ProcessUnpackingFlag()
     worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
     
@@ -168,7 +162,7 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling, worker_n
                     pass  # timeout hit, restart the process
 
                 # ---- Saving data function -------
-                if worker_data_flag.flag_running_time:
+                if packet_transmission.running_time_event.is_set():
                     if sensor_data_recv:
                         save_to_csv(sensor_data_recv, worker_kb_property, worker_specific_downsampling,
                                     worker_normalise_properties, num_columns=num_columns)

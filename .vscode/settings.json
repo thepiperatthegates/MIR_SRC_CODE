@@ -1,5 +1,8 @@
 {
     "cmake.sourceDirectory": "/Users/mac/Documents/GitHub/MIR_SRC_CODE/STM_SRC_CODE/again_try",
     "python.analysis.typeCheckingMode": "standard",
-    "DockerRun.DisableDockerrc": true
+    "DockerRun.DisableDockerrc": true,
+    "cSpell.words": [
+        "normalise"
+    ]
 }

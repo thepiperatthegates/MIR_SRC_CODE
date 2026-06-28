@@ -224,10 +224,10 @@ class DataUpdate(QThread):
     def accumulate_data_function(self, store_array1_calibrate, store_array2_calibrate, store_array3_calibrate,
                                  store_array4_calibrate):
 
-        self.accumulate_hall_1 = np.append(self.total_hall_1, store_array1_calibrate)
-        self.accumulate_hall_2 = np.append(self.total_hall_2, store_array2_calibrate)
-        self.accumulate_current_1 = np.append(self.total_current_1, store_array3_calibrate)
-        self.accumulate_current_2 = np.append(self.total_current_2, store_array4_calibrate)
+        self.accumulate_hall_1 = np.append(self.total_hall_1, store_array1_calibrate)   # type: ignore
+        self.accumulate_hall_2 = np.append(self.total_hall_2, store_array2_calibrate)   # type: ignore
+        self.accumulate_current_1 = np.append(self.total_current_1, store_array3_calibrate) # type: ignore
+        self.accumulate_current_2 = np.append(self.total_current_2, store_array4_calibrate) # type: ignore
 
         self.main_window_ref.set_constant(self.accumulate_hall_1,
                                           self.accumulate_hall_2,
@@ -266,7 +266,6 @@ class SleepTimer(QObject):
         self.timer.timeout.connect(self._tick)
         
         
-        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
         self.worker_reset_current_time = packet_transmission.DownSampleSpecificFlag()
         
         
@@ -287,7 +286,7 @@ class SleepTimer(QObject):
             self.update_time_signal.emit(round(self.remaining, 1))
             
         else:
-            self.worker_flag_run_time.flag_running_time = False
+            packet_transmission.running_time_event.clear()
             self.timer.stop()
         
             
@@ -411,12 +410,8 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         
         ####### flag init ##############################################################################
         
-        #for receive thread
-        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
         #for tx data
         self.worker_data_block = packet_transmission.TxData()
-        #for transmitting thread
-        self.worker_flag_send = packet_transmission.TxFlag()
         #for data straight from graph
         self.worker_getter_graph = packet_transmission.StoreArrayGraph()
         #for downsampling purposes
@@ -662,7 +657,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
     
         ##send all data to microcontroller
         #activate flag
-        self.worker_flag_send.flag_tx = True
+        packet_transmission.tx_event.set()
         
 
         self.status_label.setStyleSheet("color: #32a83a;")
@@ -701,7 +696,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         
         ##send all data to microcontroller
         #activate flag
-        self.worker_flag_send.flag_tx = True
+        packet_transmission.tx_event.set()
         
         
         
@@ -771,7 +766,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         
         ##send all data to microcontroller
         #activate flag
-        self.worker_flag_send.flag_tx = True
+        packet_transmission.tx_event.set()
         
         ######################################################################################
         ######## get the desired sampling frequency from the textbox
@@ -805,7 +800,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         ######################################################################################
         if check1.is_integer() and check3.is_integer():
             self.worker_downsample_property.current_time = 0.0
-            self.worker_flag_run_time.flag_running_time = True
+            packet_transmission.running_time_event.set()
             #start specific 
             self.worker_downsample_property.flag_specific_downsample = True
             
@@ -901,7 +896,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             
             ##send all data to microcontroller
             #activate flag
-            self.worker_flag_send.flag_tx = True
+            packet_transmission.tx_event.set()
             
             
             
@@ -974,7 +969,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
 
         ##send all data to microcontroller
         #activate flag
-        self.worker_flag_send.flag_tx = True
+        packet_transmission.tx_event.set()
 
         self.status_label.setStyleSheet("color: #7da832;")
         self.status_label.setText("Rotation starts for normalising!!!!")

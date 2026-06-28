@@ -1,5 +1,5 @@
 """Main entry point for the MiR (Mini-Rheometer) GUI application."""
-from PyQt5 import QtGui
+from PyQt5 import QtGui, QtCore
 from PyQt5 import *
 from PyQt5.QtWidgets import *
 import sys
@@ -16,20 +16,14 @@ from main_window_gui import Ui_MainWindow # pyright: ignore[reportAttributeAcces
 from creep_test.creep_test_window_main import TabWindowCreepTest
 from constant_shear_rate.constant_shear_rate_main import TabWindowConstSR
 
-
+#import json for the GUI theme
 from theme import LIGHT_THEME
- 
-# Source - https://stackoverflow.com/a
-# Posted by DamonJW, modified by community. See post 'Timeline' for change history
-# Retrieved 2025-12-05, License - CC BY-SA 4.0
 
 if sys.platform == "win32":
     import ctypes
     myappid = 'mycompany.myproduct.subproduct.version' # arbitrary string
     ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
 
-
-from PyQt5 import QtCore, QtGui
 
 class FirstGUI(QMainWindow, Ui_MainWindow):
     """Launcher window for selecting the electronics board and experiment type."""
@@ -39,7 +33,7 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
         super().__init__()
         self.setupUi(self)
         
-        ################for banner purposes
+        ################for banner purposes################################
         # get absolute path of project root (folder containing 'src' and 'pics')
         self.project_root = os.path.dirname(os.path.abspath(__file__))
         
@@ -51,7 +45,7 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
                         QtCore.Qt.KeepAspectRatio,  # type: ignore
                         QtCore.Qt.SmoothTransformation) # type: ignore
         )
-        ####################################
+        ####################################################################
         # disable experiment combobox initially
         self.choose_experiment_comboBox.setEnabled(False)
         self.choose_electronic_comboBox.setEnabled(True)

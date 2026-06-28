@@ -3,6 +3,7 @@
 from math import  pi
 import os
 import struct
+import threading
 import numpy as np
 
 
@@ -221,16 +222,7 @@ class TxData():
 
     
 
-class TxFlag():
-    _flag_tx = False
-    
-    @property
-    def flag_tx(self):
-        return self.__class__._flag_tx 
-    
-    @flag_tx.setter
-    def flag_tx(self, val):
-        self.__class__._flag_tx = bool(val)
+tx_event = threading.Event()
 
 class RemainingTimeForCreepTest():
     _total_time_for_file_save  = 0.0 
@@ -302,17 +294,7 @@ class ProcessUnpackingFlag():
     def flag_process(self, val):
         self.__class__._flag_process = bool(val)
 
-class RunningTimeFlag:
-    _flag_running_time = False
-    
-    
-    @property
-    def flag_running_time(self):
-        return self.__class__._flag_running_time 
-    
-    @flag_running_time.setter
-    def flag_running_time(self, value):
-        self.__class__._flag_running_time = bool(value)
+running_time_event = threading.Event()
         
         
 class DownSampleSpecificFlag():

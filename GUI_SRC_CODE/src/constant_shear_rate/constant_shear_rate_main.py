@@ -31,47 +31,7 @@ data_mutex = QMutex()
 
 # function receiving data through pipe from another thread
 class DataUpdate(QThread):
-    """
-    Thread class responsible for receiving, processing, and managing ADC data streams for Hall sensors and current sensors in real-time.
-
-    This class reads incoming data packets from a queue, converts raw ADC values into meaningful voltage and current signals, 
-    applies calibration and normalization, and computes derived quantities such as magnetic field angles and phase differences.
-
-    The processed data is stored in a separate worker class (`StoreArrayGraph`) for visualization or further analysis.
-
-    Attributes
-    ----------
-    running : bool
-        Controls whether the thread continues running.
-    flag_calibrate : bool
-        Enables calibration mode when True.
-    flag_fR_measurement : bool
-        Enables frequency response measurement mode when True.
-    flag_normalise : bool
-        Enables signal normalization when True.
-    accumulate_hall_1, accumulate_hall_2 : np.ndarray or None
-        Accumulated Hall sensor data for calibration.
-    accumulate_current_1, accumulate_current_2 : np.ndarray or None
-        Accumulated current sensor data for calibration.
-    total_hall_1, total_hall_2 : np.ndarray or None
-        Total calibrated Hall sensor values.
-    total_current_1, total_current_2 : np.ndarray or None
-        Total calibrated current sensor values.
-    v1_slice, v2_slice : np.ndarray
-        Processed voltage values from Hall sensors.
-    i1_slice, i2_slice : np.ndarray
-        Processed current values from input coils.
-    bytes_to_process : np.ndarray
-        Buffer for raw incoming ADC data (uint16).
-    angle_permanent_magnet_val : np.ndarray
-        Computed angular position of the permanent magnet based on Hall sensor data.
-    angle_magnetic_field_val : np.ndarray
-        Computed angular position of the magnetic field based on current data.
-    phase_difference_val : np.ndarray
-        Phase difference between magnetic field and permanent magnet angles.
-    worker_array_setter : StoreArrayGraph
-        Object responsible for storing processed arrays for visualization.
-    """
+    """Reads ADC packets from the queue, converts to voltages/currents, computes angles and phase difference, and stores results for plotting."""
 
     def __init__(self, main_window_ref=None):
         super().__init__()
@@ -122,28 +82,7 @@ class DataUpdate(QThread):
         
     def run(self):
 
-        """
-        Main execution loop for the data update thread.
-
-        This function continuously retrieves data from the `q_to_graph` queue, processes
-        it, and updates the corresponding arrays. The data processing steps include:
-
-        1. **Reshaping and Conversion**: Raw 16-bit ADC samples are reshaped into  voltage and current columns.
-        2. **Signal Conversion**: ADC counts are converted to voltages (Hall sensors)  and currents (input coils).
-        3. **Calibration**: If enabled, calibration routines adjust sensor outputs.
-        4. **Normalization**: Optionally normalizes signal amplitude and offsets.
-        5. **Angle Computation**: Calculates angular positions using `arctan2` for both magnetic field and permanent magnet signals.
-        6. **Phase Difference Calculation**: Determines the phase difference between the two computed angles.
-        7. **Data Storage**: Updates the `worker_array_setter` with processed arrays.
-
-        The loop continues until the `running` flag is set to False.
-
-        Notes
-        -----
-        - Thread synchronization is managed using `data_mutex` to ensure data integrity.
-        - Data from the queue (`q_to_graph`) must have a multiple of 4 samples,
-          corresponding to [v1, v2, i1, i2].
-        """
+        """Main loop: dequeues raw ADC packets [i1, i2, v1, v2], converts, normalises, computes angles, and pushes to worker_array_setter."""
         num_columns = 4
 
         data_from_pipe = []  # creating a list here because data from pipe is a list
@@ -256,48 +195,13 @@ class DataUpdate(QThread):
 
 
 class SleepTimer(QObject):
-    """
-    A countdown timer that emits time updates at fixed intervals using PyQt signals.
-
-    This class implements a simple countdown timer based on `QTimer`. It periodically
-    emits the remaining time (in seconds) until the countdown reaches zero. The timer
-    is intended to be used in GUI applications where a background countdown must update
-    a display or trigger an event when completed.
-
-    Attributes
-    ----------
-    update_time_signal : pyqtSignal(float)
-        Signal emitted with the remaining time in seconds (rounded to one decimal place)
-        after each timer tick.
-    remaining : float
-        The remaining time in seconds. Initialized from the global variable `data_1`.
-    timer : QTimer
-        Internal Qt timer that triggers the `_tick` method every 100 milliseconds.
-
-    Methods
-    -------
-    start()
-        Starts the countdown timer.
-    stop()
-        Stops the countdown timer.
-    _tick()
-        Decrements the remaining time by 0.1 seconds per tick, emits updates via
-        `update_time_signal`, and calls `packet_transmission.running_time_flag_setter(0)`
-        when the countdown reaches zero.
-
-    Notes
-    -----
-    - The initial countdown value is taken from the global variable `data_1`.
-    - Each tick occurs every 100 ms (0.1 s).
-    - When the countdown completes, the timer stops automatically.
-    """
+    """Countdown timer that ticks every 100 ms and emits remaining seconds via update_time_signal until it reaches zero."""
     update_time_signal = pyqtSignal(float)  # emit float countdown values
 
     def __init__(self):
         super().__init__()
         self.worker_remaining = packet_transmission.TxData()
         self.remaining = float(self.worker_remaining.data_1) # get local_data_1 from global
-        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
         self.worker_reset_current_time = packet_transmission.DownSampleSpecificFlag()
         self.timer = QTimer(self)
         self.timer.setInterval(100)  # 100 ms per tick
@@ -316,7 +220,7 @@ class SleepTimer(QObject):
             self.update_time_signal.emit(round(self.remaining, 1))
         else:
             self.timer.stop()
-            self.worker_flag_run_time.flag_running_time = False
+            packet_transmission.running_time_event.clear()
 
 class SocketThread(QThread):
     
@@ -408,9 +312,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
     def _init_workers(self):
         """Initialize packet_transmission workers."""
-        self.worker_flag_run_time = packet_transmission.RunningTimeFlag()
         self.worker_data_block = packet_transmission.TxData()
-        self.worker_flag_send = packet_transmission.TxFlag()
         self.worker_getter_graph = packet_transmission.StoreArrayGraph()
         self.worker_fr_property = packet_transmission.fRCoefficients()
         self.worker_k_b_property = packet_transmission.kbCoefficient()
@@ -664,7 +566,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         # ---------- Hardware and UI triggers. ------------
         self.button_stop.setDisabled(False)  # Enable stop button
-        self.worker_flag_send.flag_tx = True  # Activate transmission flag
+        packet_transmission.tx_event.set()  # Activate transmission flag
         
         #------------ Update Status   ----------------------
         self.status_label.setStyleSheet("color: #32a83a; font-weight: bold;")
@@ -707,7 +609,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_downsample_property.time_increment = 1.0 / fs
         self.worker_downsample_property.tot_average = tot_avg
         self.worker_downsample_property.current_time = 0.0
-        self.worker_flag_run_time.flag_running_time = True
+        packet_transmission.running_time_event.set()
         
         sockets_files.file_name_change_set("dummy")
 
@@ -765,7 +667,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         ##send all data to microcontroller
         #activate flag
-        self.worker_flag_send.flag_tx = True
+        packet_transmission.tx_event.set()
 
 
         # send flag for calibration in the thread
@@ -874,21 +776,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 
                 
     def set_constant(self, get_accumulate_hall_1, get_accumulate_hall_2, get_accumulate_current_1, get_accumulate_current_2):
-        """
-        Set accumulated measurement values for Hall sensors and current sensors.
-
-        This method updates the internal state variables that store accumulated
-        readings for two Hall sensors and two current sensors. It is shared by
-        both ``update_time_counter_fR_measurement`` and
-        ``update_time_counter_calibrating``.
-        
-        Shared by function update_time_counter_fR_measurement and update_time_counter_calibrating
-
-        :param float get_accumulate_hall_1: Accumulated value from Hall sensor 1.
-        :param float get_accumulate_hall_2: Accumulated value from Hall sensor 2.
-        :param float get_accumulate_current_1: Accumulated value from current sensor 1.
-        :param float get_accumulate_current2: Accumulated value from current sensor 2.
-        """
+        """Store accumulated Hall/current sensor arrays; called by both calibration and fR measurement callbacks."""
         
         
         self.accumulate_hall_1 = get_accumulate_hall_1
@@ -928,7 +816,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         ##send all data to microcontroller
         #activate flag
-        self.worker_flag_send.flag_tx = True
+        packet_transmission.tx_event.set()
         
 
         self.status_label.setStyleSheet("color: #32a83a;")
@@ -965,7 +853,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         ##send all data to microcontroller
         #activate flag
-        self.worker_flag_send.flag_tx = True
+        packet_transmission.tx_event.set()
         
         # send flag for calibration in the thread
         self.worker_DataUpdate.flag_special_event(False, True, False)
@@ -984,34 +872,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
     
     def update_time_counter_fR_measurement(self, val, count_recursion, running_frequency, input_current, data_4, data_6):
-        """
-        Update the time counter and process data during friction coefficient measurement.
-
-        This method is called repeatedly during a friction coefficient experiment.
-        It performs the following operations:
-
-        1. Updates the LCD display with the current value `val`.
-        2. Enables or disables the send/start/stop buttons depending on whether the
-        measurement thread is running (`val != 0`) or stopped (`val == 0`).
-        3. Resets internal flags via `worker_DataUpdate` to ensure data integrity.
-        4. Computes the mean currents and Hall voltages from accumulated measurements.
-        5. Calculates torque and angular velocity for the current measurement step
-        and stores them in `calculated_torque` and `calculated_angular_velocity`.
-        6. Handles recursion logic:
-        - For `count_recursion < 10`: negative frequency (anticlockwise rotation)
-        - For `10 <= count_recursion < 19`: positive frequency (clockwise rotation)
-        - Increments `running_frequency` and updates `rotation_direction`.
-        7. Recursively triggers the next measurement step via 
-        `start_friction_coeff_event`.
-        8. When the last measurement (`count_recursion == 19`) is reached:
-        - Computes the final friction coefficient slope using `np.polyfit`.
-        - Re-enables the buttons for user interaction.
-
-        :param val: Current measurement value from the thread (0 if stopped, non-zero if running).
-        :type val: float or int
-        :param count_recursion: Index of the current measurement step.
-        :type count_recursion: int
-        """
+        """Timer callback for fR measurement: updates LCD, computes torque/angular velocity per step, and recurses until all 20 steps complete."""
 
         self.lcdNumber.display(val)
 
@@ -1165,7 +1026,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         #send all data to microcontroller
         #activate flag
-        self.worker_flag_send.flag_tx = True
+        packet_transmission.tx_event.set()
         self.status_label.setText("Stop rotation!!....")
 
 
@@ -1199,7 +1060,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         ##send all data to microcontroller
         #activate flag
-        self.worker_flag_send.flag_tx = True
+        packet_transmission.tx_event.set()
 
         self.status_label.setStyleSheet("color: #7da832;")
         self.status_label.setText("Rotation starts for normalising!!!!")
@@ -1213,9 +1074,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_DataUpdate.flag_special_event(False, False, True)
 
     def update_timer_rotation(self, val):
-        """
-        for rotation timer purposes
-        """
+        """Timer callback for the normalisation rotation: updates LCD and computes/saves normalisation coefficients when done."""
         self.lcdNumber.display(val)
 
         if val != 0.0:
