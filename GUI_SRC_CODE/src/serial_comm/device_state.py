@@ -205,16 +205,19 @@ class TxData():
         ## TODO: CHANGE BYTE_SEND TO FLOAT 
         print("Frequency of DAC", self.__class__._data_2)
         
-        byte_send1 = struct.pack('<f', float(self.__class__._data_1))       
+        if self.__class__._data_1 >= 255:
+            self.__class__._data_1 = 254
+            
+        byte_send1 = struct.pack('<B', int(self.__class__._data_1))       
         byte_send2 = struct.pack('<f', float(self.__class__._data_2))             #running frequency of MCU 
         byte_send3 = struct.pack('<f', float(self.__class__._data_3))              #amplitude1
         byte_send4 = struct.pack('<f', float(self.__class__._data_4))              #offset1
         byte_send5 = struct.pack('<f', float(self.__class__._data_5))              #amplitude2
         byte_send6 = struct.pack('<f', float(self.__class__._data_6))              #offset2
-        byte_send7 = struct.pack('>I', int(self.__class__._data_7))                 #if FIR filter is used or not
-        byte_send8 = struct.pack('>I', int(self.__class__._data_8))                 #Mode for dc or ac waves (calibration purposes)
-        byte_send9 = struct.pack('>I', int(self.__class__._data_9))                 #hardware reset
-        byte_send10 = struct.pack('>I', int(self.__class__._data_10))                 #mir mode
+        byte_send7 = struct.pack('<B', int(self.__class__._data_7))                 #if FIR filter is used or not
+        byte_send8 = struct.pack('<B', int(self.__class__._data_8))                 #Mode for dc or ac waves (calibration purposes)
+        byte_send9 = struct.pack('<B', int(self.__class__._data_9))                 #hardware reset
+        byte_send10 = struct.pack('<B', int(self.__class__._data_10))                 #mir mode
 
         combined_send = b''.join([byte_send1, byte_send2, byte_send3, byte_send4, byte_send5, byte_send6, byte_send7, byte_send8, byte_send9, byte_send10])
         

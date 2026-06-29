@@ -107,15 +107,15 @@ class DataUpdate(QThread):
                 self.v2_slice = reshaped_data[:, 3]
 
                 data_mutex.lock()
-                print(self.i1_slice)
+
                 # Hall Sensors
                 #TODO: NEW FIRMWARE ITERACTIONS MUST NOT BE NEGATIVE FOR I1!!!!!!!!!
                 self.v1_slice = packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
                 self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
 
                 # Current
-                self.i1_slice = packet_transmission.change_current_adc(self.i1_slice)  # convert col3 (in mA)
-                self.i2_slice = packet_transmission.change_current_adc(self.i2_slice)  # convert col4 (in mA)
+                # self.i1_slice = packet_transmission.change_current_adc(self.i1_slice)  # convert col3 (in mA)
+                # self.i2_slice = packet_transmission.change_current_adc(self.i2_slice)  # convert col4 (in mA)
 
                 # # calibration for current sensor
                 # self.i1_slice = packet_transmission.calibration_input_coil_1(self.i1_slice)
@@ -127,9 +127,9 @@ class DataUpdate(QThread):
                 #                                                              self.v1_slice, self.i1_slice / 1000)
                 # self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
                 #                                                              self.v2_slice, self.i2_slice / 1000)
-                if self.flag_normalise:
-                    self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amp_voltage_1
-                    self.v2_slice = (self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amp_voltage_2
+                # if self.flag_normalise:
+                #     self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amp_voltage_1
+                #     self.v2_slice = (self.v2_slice - self.worker_normalise_properties.zero_offset_voltage_2) / self.worker_normalise_properties.amp_voltage_2
                 
                 # Calibrate process starts
                 # measurement fR process starts

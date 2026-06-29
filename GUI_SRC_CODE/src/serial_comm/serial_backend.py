@@ -111,7 +111,7 @@ FLOAT32_SIZE = 4
 
 # --- Frame Configuration ---
 # Frame structure: [Header (2 bytes)] + [Payload]
-ADC_BUFFER_SIZE      = 2
+ADC_BUFFER_SIZE      = 4
 HEADER_SIZE          = 2 * UINT8_SIZE
 # go back to normal raw data receiving
 PAYLOAD_DATA_SIZE    = 4 * UINT16_SIZE
@@ -292,12 +292,12 @@ def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling
     col3_converted = -packet_transmission.change_current_adc(col3)               #convert col1
     col4_converted = packet_transmission.change_current_adc(col4)               #convert col2
 
-    col3_converted = packet_transmission.calibration_input_coil_1(col3_converted)
-    col4_converted = packet_transmission.calibration_input_coil_2(col4_converted)
+    # col3_converted = packet_transmission.calibration_input_coil_1(col3_converted)
+    # col4_converted = packet_transmission.calibration_input_coil_2(col4_converted)
 
-    #Justified hall sensors
-    col1_converted = packet_transmission.calibrated_hall_sensors1(worker_kb_property.k_b_1, col1_converted, col3_converted/1000)  
-    col2_converted = packet_transmission.calibrated_hall_sensors2(worker_kb_property.k_b_2, col2_converted, col4_converted/1000)
+    # #Justified hall sensors
+    # col1_converted = packet_transmission.calibrated_hall_sensors1(worker_kb_property.k_b_1, col1_converted, col3_converted/1000)  
+    # col2_converted = packet_transmission.calibrated_hall_sensors2(worker_kb_property.k_b_2, col2_converted, col4_converted/1000)
 
     col1_converted = (col1_converted- worker_normalise_properties.zero_offset_voltage_1) / worker_normalise_properties.amp_voltage_1
     col2_converted = (col2_converted - worker_normalise_properties.zero_offset_voltage_2) / worker_normalise_properties.amp_voltage_2
