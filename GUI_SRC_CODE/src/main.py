@@ -15,6 +15,7 @@ from serial_comm import device_state as packet_transmission
 from main_window_gui import Ui_MainWindow # pyright: ignore[reportAttributeAccessIssue]
 from creep_test.creep_test_window_main import TabWindowCreepTest
 from constant_shear_rate.constant_shear_rate_main import TabWindowConstSR
+from MAPHEUS.mapheus_main import TabWindowMAPHEUS
 
 #import json for the GUI theme
 from theme import LIGHT_THEME
@@ -89,7 +90,10 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
         elif mode == "Creep experiment":
             self.ct_window = TabWindowCreepTest()
             self.ct_window.showNormal()
-            
+        
+        elif mode == "MAPHEUS":
+            self.mapheus_window = TabWindowMAPHEUS()
+            self.mapheus_window.showNormal()
             
         self.close()
 

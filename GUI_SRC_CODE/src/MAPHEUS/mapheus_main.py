@@ -2,9 +2,8 @@
 import numpy as np
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5 import *
-from PyQt5.QtCore import QThread, pyqtSignal, QMutex, QRegularExpression, QObject, QTimer
+from PyQt5.QtCore import QThread, pyqtSignal, QMutex, QObject, QTimer
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QRegularExpressionValidator, QDoubleValidator
 import sys
 import os
 from pathlib import Path
@@ -14,14 +13,12 @@ from pathlib import Path
 os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
 import multiprocessing
 import sys
-from .gui_baru import Ui_Title
+from .mapheus_main_gui import Ui_Title
 
 import serial_comm.serial_backend as sockets_files
 from serial_comm.serial_backend import q_to_graph
 
 from serial_comm import device_state as packet_transmission
-from .analyse_window_const_sr import AnalyseWindow
-from .graph_fr import PlotWindow
 
 
 
@@ -67,7 +64,7 @@ class DataUpdate(QThread):
         self.v2_slice = np.array([], dtype=np.float16)
         self.i1_slice = np.array([], dtype=np.float16)
         self.i2_slice = np.array([], dtype=np.float16)
-        self.bytes_to_process = np.array([], dtype=np.float16)
+        self.bytes_to_process = np.array([], dtype=np.float32)
 
         #------------ Calculated Values ------------------------
         self.angle_permanent_magnet_val = np.array([], dtype=np.float32)
@@ -238,7 +235,7 @@ class SocketThread(QThread):
     
 
 
-class ConstShearGUI(QMainWindow, Ui_Title):
+class MAPHEUS_GUI(QMainWindow, Ui_Title):
 
     def __init__(self):
         super().__init__()
@@ -256,7 +253,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         # --------  UI Polish & Logic ---------------
         self._setup_ui_elements()
-        self._setup_validators()
         self._connect_signals()
 
         # --------  Start Background Services. ------------
@@ -333,44 +329,17 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #--------- Icons. ------------------
         get_path = lambda x: os.path.join(self.project_root, "pics", x)
         self.save_button.setIcon(QtGui.QIcon(get_path("save_icon.ico")))
-        self.button_fr_constant.setIcon(QtGui.QIcon(get_path("friction_icon.png")))
-        self.button_cal_constant.setIcon(QtGui.QIcon(get_path("calibrate.png")))
 
         #--------- Text/Labels  ---------
-        self.button_stop.setDisabled(True)
-        self.textbox_time.setPlaceholderText("Enter time in second")
-        self.textbox_sample_frequency.setText("10000")
-        
         self.k_b_label.setText(
             f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
             f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
             f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
             f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
         )
-        
-        self.plot_object = PlotWindow()
 
-    def _setup_validators(self):
-        """Input validation logic."""
-        v_time = QDoubleValidator(0.0, 1000.0, 1)
-        v_time.setNotation(QDoubleValidator.StandardNotation)
-        self.textbox_time.setValidator(v_time)
-        
     def _connect_signals(self):
         """Connect all UI signals."""
-        self.button_send.clicked.connect(self.send_parameter_event)
-        self.button_start.clicked.connect(self.start_data_event)
-        self.button_stop.clicked.connect(self.stop_button_push_event)
-        
-        #--------- Add popouts ---------
-        for btn in [self.button_send, self.button_start, self.button_stop, self.button_cal_constant]:
-            btn.clicked.connect(lambda: self.popout_window(1))
-
-        self.normalise_button.clicked.connect(self.start_normalise_event)
-        self.button_cal_constant.clicked.connect(lambda: self.start_calibration_event(-400, 1))
-        self.button_fr_constant.clicked.connect(lambda: self.start_friction_coeff_event_initiation(1, 1, 0))
-        self.button_fr_constant.clicked.connect(lambda: self.popout_window(3))
-        
         self.graph_stop_button.clicked.connect(self.graph_stop_event)
         self.actionHardware_reset.triggered.connect(self.set_hardware_reset_event)
         self.actionSoftware_restart.triggered.connect(self.set_software_reset_event)
@@ -499,14 +468,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             # data_mutex.unlock()
         #
         
-    def auto_range_event(self):
-        
-        self.plot1.enableAutoRange(axis='y', enable=True)
-        self.plot2.enableAutoRange(axis='y', enable=True)
-        # self.plot1.enableAutoRange(axis='x', enable=True)
-        # self.plot2.enableAutoRange(axis='x', enable=True)
-        
-
     def graph_update_angle(self):
         global data_mutex
         data_mutex.lock()
@@ -524,94 +485,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         data_mutex.unlock()
         
         
-    def send_parameter_event(self):
-        
-        """ 
-        Sends magnet control parameters (amplitude, offsets, frequency, rotation, FIR) 
-        to the STM32H757XI MCU backend.
-        """
-        
-        #------ Map UI states to MCU constants using dictionaries. -------
-        dir_map = {"Clockwise": 2, "Anti-clockwise": 1}
-        
-        # ----- Assign values to the worker data block --------
-        self.worker_data_block.data_1 = 65534
-        self.worker_data_block.data_2 = float(self.textbox_frequency.text())
-        
-        # ----- Case for ZERO frequency values (NOT ACCEPTED BY MCU) --------
-        
-        if self.worker_data_block.data_2 == 0.0:
-            #set the frequency to be as small as possible 
-            self.worker_data_block.data_2_for_MCU = 0.00429 #Hz
-        
-        # ------ Pack currents/offsets directly into a tuple. --------
-        self.worker_data_block.data_current = (
-            self.textbox_amplitude1.text(), self.textbox_offset1.text(),
-            self.textbox_amplitude2.text(), self.textbox_offset2.text()
-        )
-
-        # --------- Apply direction and filter logic --------
-        self.worker_data_block.data_7 = dir_map.get(self.comboBox_direction.currentText(), 1)
-        self.worker_data_block.data_8 = 0 if self.filter_checkbox.isChecked() else 2
-        self.worker_data_block.data_10 = 1 
-
-        # ---------- Hardware and UI triggers. ------------
-        self.button_stop.setDisabled(False)  # Enable stop button
-        packet_transmission.tx_event.set()  # Activate transmission flag
-        
-        #------------ Update Status   ----------------------
-        self.status_label.setStyleSheet("color: #32a83a; font-weight: bold;")
-        self.status_label.setText("Data sent!")
-        
-    def start_data_event(self):
-
-        #  --------- Cleanup old files  --------------
-        dummy_path = os.path.join(self.project_root, "files", "dummy.csv")
-        if os.path.exists(dummy_path):
-            try:
-                os.remove(dummy_path)
-            except OSError as e:
-                print(f"File cleanup failed: {e}")
-
-        #  --------- Gather Inputs & Safety Check  ------------
-        fs_text = self.textbox_sample_frequency.text()
-        if not fs_text or int(fs_text) == 0:
-            return  # Silently exit if frequency is invalid/empty
-
-        #  --------- Downsampling Logic & Validation.  ---------
-        fs = float(fs_text)
-        tot_avg = 10000 // int(fs)
-        
-        #  --------- Validation: Ensure 5000 is divisible by tot_average  ---------
-        if not (5000 / tot_avg).is_integer():
-            return self.popout_window(5)
-
-        #   --------- Assignment (Success Path).  ------------------
-        # --------- Mapping textbox data to worker block ---------
-        self.worker_data_block.data_1 = self.textbox_time.text()
-        self.worker_data_block.data_2 = self.textbox_frequency.text()
-        self.worker_data_block.data_current = (
-            self.textbox_amplitude1.text(), self.textbox_offset1.text(),
-            self.textbox_amplitude2.text(), self.textbox_offset2.text()
-        )
-        self.worker_data_block.data_10 = 1 
-
-        # --------- Setting downsample properties ---------
-        self.worker_downsample_property.time_increment = 1.0 / fs
-        self.worker_downsample_property.tot_average = tot_avg
-        self.worker_downsample_property.current_time = 0.0
-        packet_transmission.running_time_event.set()
-        
-        sockets_files.file_name_change_set("dummy")
-
-        #--------- UI and Timer Execution.  ------------------
-        self.status_label.setStyleSheet("color: #7da832;")
-        self.status_label.setText("Acquisition starts.......")
-        
-        self.worker_sleep = SleepTimer()
-        self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
-        self.worker_sleep.start()
-            
     def update_time_counter_acquisition(self, val):
         self.lcdNumber.display(val)
             
@@ -620,152 +493,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         #---------  Disable buttons during activity, enable them when finished ------------------ 
         self.button_start.setDisabled(is_active)
-        self.button_stop.setDisabled(is_active)
         self.save_button.setDisabled(is_active)
 
-    def start_calibration_event(self, input_current = -400, count_recursion = 1 ):
-        
-        self.worker_DataUpdate.flag_normalise_event(False)
-        
-        print("Recursion in main func:", count_recursion)
-        
-        self.worker_k_b_property.k_b_1 = 0.0
-        self.worker_k_b_property.k_b_2 = 0.0
-        
-        if input_current == False:
-            input_current = -400
-        
-        print("Input current for calibration:", input_current)
-    
-        ############################# send data to setter getter ############################################################################
-        self.worker_data_block.data_1 = float(1.0) #seconds
-        self.worker_data_block.data_2_for_MCU  = str(3) # Hz
-        
-        self.worker_data_block.data_current = str(input_current), str(0), str(input_current), str(0)
-
-        #from combobox direction
-        if self.comboBox_direction.currentText() == "Clockwise":
-            self.worker_data_block.data_7 = 2
-        elif self.comboBox_direction.currentText() == "Anti-clockwise":
-            self.worker_data_block.data_7 = 1
-            
-
-        self.worker_data_block.data_8 = 3
-        self.worker_data_block.data_9 = 0
-        #for data 10
-        self.worker_data_block.data_10 = 1 
-        ############################################################################################################################
-
-        ##send all data to microcontroller
-        #activate flag
-        packet_transmission.tx_event.set()
-
-
-        # send flag for calibration in the thread
-        self.worker_DataUpdate.flag_special_event(True, False, False)
-
-        self.status_label.setStyleSheet("color: #32a83a;")
-        self.status_label.setText("Calibrating!...............")
-        
-        QtCore.QTimer.singleShot(2000, lambda: self.after_stabilise_calibration(count_recursion))
-        
-
-    def after_stabilise_calibration(self, count_recursion):
-        self.worker_sleep = SleepTimer()
-        self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_calibrating(value, count_recursion))
-        self.worker_sleep.start()
-        
-        
-    def update_time_counter_calibrating(self, val, count_recursion):
-        self.lcdNumber.display(val)
-
-        if val != 0.0:
-            self.button_send.setDisabled(True)
-            self.button_start.setDisabled(True)
-            self.button_stop.setDisabled(True)
-
-        elif val == 0.0:  #when val is 0 and the thread is stops already
-            
-            #reset flags
-            self.worker_DataUpdate.flag_special_event(False, False, False)
-
-            if count_recursion == 1:
-                self.mean_hall_1_0_A = np.mean(self.accumulate_hall_1[1000:])
-                self.mean_hall_2_0_A = np.mean(self.accumulate_hall_2[1000:])
-                
-                self.mean_current_1_0_A = np.mean(self.accumulate_current_1[1000:])
-                self.mean_current_2_0_A = np.mean(self.accumulate_current_2[1000:])
-    
-                ### second recursion occurs
-                self.start_calibration_event(400, 2)
-            elif count_recursion == 2:
-                self.mean_hall_1_400_A = np.mean(self.accumulate_hall_1[1000:])
-                self.mean_hall_2_400_A = np.mean(self.accumulate_hall_2[1000:])
-                
-                
-                self.mean_current_1_400_A = np.mean(self.accumulate_current_1[1000:])
-                self.mean_current_2_400_A = np.mean(self.accumulate_current_2[1000:])
-                
-                self.worker_k_b_property.k_b_1 = float ((self.mean_hall_1_400_A - self.mean_hall_1_0_A) / ((self.mean_current_1_400_A - self.mean_current_1_0_A)/1000))
-                self.worker_k_b_property.k_b_2  = float ((self.mean_hall_2_400_A - self.mean_hall_2_0_A) / ((self.mean_current_2_400_A - self.mean_current_2_0_A)/1000))
-
-                
-                #File path for saving
-                header_text = "ELECTRONICS_FLAG;k_b_1;k_b_2"
-                path_to_save_kb = os.path.join(os.path.join(self.project_root, "files", "k_b_coefficient.csv"))
-                
-                if os.path.exists(path_to_save_kb):
-                    data = np.genfromtxt(path_to_save_kb, delimiter=";", names=True)
-                else:
-                    #create empty template file if no file exist prior
-                    data = np.array([], dtype = [
-                        ("ELECTRONICS_FLAGS", "i8"), 
-                        ("k_b_1", "f8"), 
-                        ("k_b_2", "f8")
-                    ])
-                    
-                #---- get the current used eletronic flags ----
-                
-                electronic_flags = packet_transmission.get_electronics_flag()
-                index = data["ELECTRONICS_FLAG"] == electronic_flags
-                
-                if np.any(index):
-                    data["k_b_1"][index] = self.worker_k_b_property.k_b_1
-                    data["k_b_2"][index] = self.worker_k_b_property.k_b_2
-                else:
-                    new_row = np.array(
-                        [(electronic_flags, self.worker_k_b_property.k_b_1, self.worker_k_b_property.k_b_2)],
-                        dtype=data.dtype
-                    )
-                    data = np.concatenate((data, new_row))
-
-                #---- Save the file again ----
-                np.savetxt(
-                    path_to_save_kb,
-                    data,
-                    delimiter=";",
-                    fmt=["%d", "%.17g", "%.17g"],
-                    header="ELECTRONICS_FLAG;k_b_1;k_b_2",
-                    comments=""
-                )
-                
-                self.k_b_label.setText(
-                    f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
-                    f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
-                    f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
-                    f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
-                )
-                
-                #---- reload the file ----
-                packet_transmission.kbCoefficient.reload()
-                
-                self.popout_window(4, self.calculate_final_fR, self.worker_k_b_property.k_b_1, self.worker_k_b_property.k_b_2)
-                #enable the button again
-                self.button_send.setDisabled(False)
-                self.button_start.setDisabled(False)
-                self.button_stop.setDisabled(False)
-                
-                
     def set_constant(self, get_accumulate_hall_1, get_accumulate_hall_2, get_accumulate_current_1, get_accumulate_current_2):
         """Store accumulated Hall/current sensor arrays; called by both calibration and fR measurement callbacks."""
         
@@ -776,254 +505,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.accumulate_current_2 = get_accumulate_current_2
     
     
-    #initiation!!!!!
-    def start_friction_coeff_event_initiation(self, running_frequency = 1,  rotation_direction =  1, count_recursion = 0, input_current = 40):
-
-        #reset all f_R at first 
-        if self.flag_fR == False:
-            self.flag_fR = True  
-            self.worker_fr_property.fr0 = 0.0
-            self.worker_fr_property.fr1 = 0.0
-            self.calculate_final_fR = 0
-            
-        self.worker_DataUpdate.flag_normalise_event(False)
-            
-        ############################# send data to setter getter ############################################################################
-        self.worker_data_block.data_1 = str(5) #mA
-        self.worker_data_block.data_2_for_MCU  = str(running_frequency) # Hz
-        
-        self.worker_data_block.data_current = str(200), self.textbox_offset1.text(), str(200), self.textbox_offset2.text()
-        self.worker_data_block.data_7 = rotation_direction
-            
-        if self.filter_checkbox.isChecked():
-            self.worker_data_block.data_8 = 0
-        else:
-            self.worker_data_block.data_8 = 2
-            
-        self.worker_data_block.data_9 = 0
-        #for data 10
-        self.worker_data_block.data_10 = 1 
-        ############################################################################################################################
-
-        ##send all data to microcontroller
-        #activate flag
-        packet_transmission.tx_event.set()
-        
-
-        self.status_label.setStyleSheet("color: #32a83a;")
-        self.status_label.setText("f<sub>R</sub> begins!...............")
-        
-
-        QtCore.QTimer.singleShot(
-            1000* int(self.worker_data_block.data_1),
-            lambda: self.start_friction_coeff_event(input_current, running_frequency, rotation_direction, count_recursion)
-        )
-
-    def start_friction_coeff_event(self, input_current, running_frequency = 1,  rotation_direction =  1, count_recursion = 0) -> None:
-        
-        ############################# send data to setter getter ######################################
-        self.worker_data_block.data_1 = float(10)
-        self.worker_data_block.data_2_for_MCU  = str(running_frequency) # Hz
-
-        self.worker_data_block.data_current = input_current, self.textbox_offset1.text(), input_current, self.textbox_offset2.text()
-        self.worker_data_block.data_7 = rotation_direction
-            
-        if self.filter_checkbox.isChecked():
-            self.worker_data_block.data_8 = 0
-        else:
-            self.worker_data_block.data_8 = 2
-            
-        self.worker_data_block.data_9 = 0
-        #for data 10
-        self.worker_data_block.data_10 = 1 
-        ######################################################################################
-        
-        self.status_label.setText(
-            f"Recursion {count_recursion} with direction {self.worker_data_block.data_7} and frequency of {self.worker_data_block.data_2}"
-        )
-        
-        ##send all data to microcontroller
-        #activate flag
-        packet_transmission.tx_event.set()
-        
-        # send flag for calibration in the thread
-        self.worker_DataUpdate.flag_special_event(False, True, False)
-
-        time_delay = 10 * 1000
-        QtCore.QTimer.singleShot(time_delay, 
-                                lambda: self.after_stabilise_fR_measurement(count_recursion, running_frequency, input_current, 
-                                float(self.textbox_offset1.text()), float(self.textbox_offset2.text())))
-    
-
-        
-    def after_stabilise_fR_measurement(self, count_recursion, running_frequency, input_current, data_4, data_6):
-        self.worker_sleep = SleepTimer()
-        self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_fR_measurement( value, count_recursion, running_frequency, input_current, data_4, data_6))
-        self.worker_sleep.start()
-        
-    
-    def update_time_counter_fR_measurement(self, val, count_recursion, running_frequency, input_current, data_4, data_6):
-        """Timer callback for fR measurement: updates LCD, computes torque/angular velocity per step, and recurses until all 20 steps complete."""
-
-        self.lcdNumber.display(val)
-
-        if val != 0.0:   # means val != 0 and val != 0.1
-            self.button_send.setDisabled(True)
-            self.button_start.setDisabled(True)
-            self.button_stop.setDisabled(True)
-
-        elif val == 0.0:     # means val == 0 or val == 0.1     
-            #reset flags (so that accumulate does not change here )(data integrity reason here)
-            self.worker_DataUpdate.flag_special_event(False, False, False)
-            
-            
-            self.current1_fR = self.accumulate_current_1[1000:]
-            self.current2_fR= self.accumulate_current_2[1000:]
-            self.hall1_fR = self.accumulate_hall_1[1000:]
-            self.hall2_fR= self.accumulate_hall_2[1000:]
-            
-
-            if 0 <= count_recursion < 20:
-                
-                print("recursion is", count_recursion)
-
-                # Determine sign of angular velocity
-                if count_recursion < 10:  # positive / anticlockwise sweep
-                    angular_velocity = np.mean(packet_transmission.calculate_radial_frequency(running_frequency))
-                    rotation_direction = 1
-                else:  # negative / clockwise sweep
-                    angular_velocity = -np.mean(packet_transmission.calculate_radial_frequency(running_frequency))
-                    rotation_direction = 2
-
-                # Calculate torque and phase
-                torque_values, phase_values = packet_transmission.calculate_torque_fR(
-                    self.current1_fR, self.current2_fR, self.hall1_fR, self.hall2_fR, data_4, data_6
-                )
-
-                # Store results
-                self.calculated_angular_velocity[count_recursion] = angular_velocity
-                self.calculated_torque[count_recursion] = np.mean(torque_values)
-                self.mean_phase[count_recursion] = np.mean(phase_values)
-                self.standard_torque[count_recursion] = np.std(torque_values)
-                self.standard_mean_torque[count_recursion] = np.std(torque_values) / np.sqrt(len(torque_values))
-                self.standard_phase[count_recursion] = np.std(phase_values)
-                self.standard_mean_phase[count_recursion] = np.std(phase_values) / np.sqrt(len(phase_values))
-
-                # Update running frequency and rotation direction
-                if count_recursion == 9:  # switch from positive to negative sweep
-                    running_frequency = 1
-                else:
-                    running_frequency += 1
-
-                count_recursion += 1
-                
-                                
-                #mapping for current {count_recursion:input_current}
-                current_map = {
-                    1: 50,  2: 50,  3: 60,  4: 60,  5: 70,
-                    6: 70,  7:80,  8: 90,  9: 100,
-                    10: 40, 11: 50, 12: 50, 13: 50, 14: 70,
-                    15: 70, 16: 70, 17: 80, 18: 90, 19: 90
-                }
-
-                input_current = current_map.get(count_recursion, 0)  # default 0 if not found
-                print("Input current is", input_current)
-
-                    
-                ###recursion to the main function occurs
-                print("running frquency is ", running_frequency)
-                self.start_friction_coeff_event_initiation(running_frequency, rotation_direction, count_recursion, input_current)
-            
-            ### measurement is done
-            elif count_recursion == 20:
-                # Combine the two arrays column-wise
-                data_to_save = np.column_stack(( self.calculated_angular_velocity, self.calculated_torque, self.standard_mean_torque,
-                                                self.standard_torque, self.mean_phase, self.standard_mean_phase, self.standard_phase))
-                
-                header_text = "angular_velocity  [rad/s];mean_torque [Nm];std_mean_torque [Nm];std_torque [Nm];mean_phase [rad];std_mean_phase [rad];std_phase [rad]"
-                
-                dir_fr_results = os.path.join(self.project_root, "files", "results_fr.csv")
-                # Save to CSV      
-                np.savetxt(dir_fr_results, data_to_save, delimiter=";", comments="", fmt="%.17g", header=header_text)
-                #calculate final fR
-                self.calculate_final_fR =  np.polyfit(self.calculated_angular_velocity, self.calculated_torque, 1)
-                self.popout_window(4, self.calculate_final_fR, self.worker_k_b_property.k_b_1, self.worker_k_b_property.k_b_2)
-                
-                self.worker_fr_property.fr1, self.worker_fr_property.fr0 = self.calculate_final_fR
-                
-                #change textbox in the bottom of the GUI 
-                self.k_b_label.setText(
-                    f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
-                    f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
-                    f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
-                    f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
-                )
-                
-                #refresh the graph
-                self.plot_object.refresh_graph()
-                
-                #reset the flag again
-                self.flag_fR = False
-                
-                #enable the button again
-                self.button_send.setDisabled(False)
-                self.button_start.setDisabled(False)
-                self.button_stop.setDisabled(False)
-                
-                
-                if val == 0:
-                    #enable the button again
-                    self.button_send.setDisabled(False)
-                    self.button_start.setDisabled(False)
-                    self.button_stop.setDisabled(False)
-                
-        if val == 0:
-            #enable the button again
-            self.button_send.setDisabled(False)
-            self.button_start.setDisabled(False)
-            self.button_stop.setDisabled(False)
-    
-    
-
-
-    def stop_button_push_event(self):
-        
-        ########################### gives -500mA to the coil 1 and +500mA DC to completely stop the rotation of the magnet 
-        
-        ############################# send data to setter getter ######################################
-        self.worker_data_block.data_1 = 65534
-        self.worker_data_block.data_2_for_MCU  = self.textbox_frequency.text()
-        
-        self.worker_data_block.data_current = 0, -500, 0, 500
-
-        #from combobox direction
-        if self.comboBox_direction.currentText() == "Clockwise":
-            self.worker_data_block.data_7 = 2
-            self.worker_data_block.data_7 = self.worker_data_block.data_7
-        elif self.comboBox_direction.currentText() == "Anti-clockwise":
-            self.worker_data_block.data_7 = 1
-            self.worker_data_block.data_7 = self.worker_data_block.data_7
-            
-        if self.filter_checkbox.isChecked():
-            self.worker_data_block.data_8 = 0
-        else:
-            self.worker_data_block.data_8 = 2
-            
-        
-        #for data 10
-        self.worker_data_block.data_10 = 1 
-        ######################################################################################
-
-        
-        #send all data to microcontroller
-        #activate flag
-        packet_transmission.tx_event.set()
-        self.status_label.setText("Stop rotation!!....")
-
-
-        self.button_rotate.setDisabled(False)
-
-
     def button_rotate_event(self):
         #Reset the normalise event state 
         self.worker_DataUpdate.flag_normalise_event(False)
@@ -1039,11 +520,6 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         # from combobox direction
         self.worker_data_block.data_7 = 1
-
-        if self.filter_checkbox.isChecked():
-            self.worker_data_block.data_8 = 0
-        else:
-            self.worker_data_block.data_8 = 2
 
         # for data 10
         self.worker_data_block.data_10 = 1
@@ -1071,15 +547,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         if val != 0.0:
             self.button_send.setDisabled(True)
             self.button_start.setDisabled(True)
-            self.button_stop.setDisabled(True)
             self.button_rotate.setDisabled(True)
-            self.normalise_button.setDisabled(True)
 
         elif val == 0.0:
             self.button_send.setDisabled(False)
             self.button_start.setDisabled(False)
-            self.button_stop.setDisabled(False)
-            self.normalise_button.setDisabled(False)
             self.save_button.setDisabled(False)
 
 
@@ -1192,7 +664,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
 
 #different windows with tab 
-class TabWindowConstSR(QMainWindow):
+class TabWindowMAPHEUS(QMainWindow):
     
     def __init__(self):
         super().__init__()
@@ -1204,9 +676,7 @@ class TabWindowConstSR(QMainWindow):
         tabs = QTabWidget()
 
         # Add your classes as tabs
-        tabs.addTab(ConstShearGUI(), "Main GUI")
-        tabs.addTab( AnalyseWindow(), "Data analyse")
-        tabs.addTab(PlotWindow(), "f_R Plot")
+        tabs.addTab(MAPHEUS_GUI(), "Main GUI")
 
         # Set central widget
         self.setCentralWidget(tabs)
@@ -1226,7 +696,7 @@ class TabWindowConstSR(QMainWindow):
 
         #stop all the threads
         
-        self.main_window = ConstShearGUI()
+        self.main_window = MAPHEUS_GUI()
         self.main_window.worker_socket.stop()
         self.main_window.worker_DataUpdate.stop()
         
@@ -1243,5 +713,5 @@ class TabWindowConstSR(QMainWindow):
 if __name__ == '__main__':
     multiprocessing.freeze_support()
     
-    csr_window = TabWindowConstSR()    
+    csr_window = MAPHEUS_GUI()    
     csr_window.showMaximized()

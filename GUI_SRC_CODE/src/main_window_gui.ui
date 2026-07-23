@@ -30,7 +30,7 @@
      <bool>false</bool>
     </property>
    </widget>
-   <widget class="QWidget" name="">
+   <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
       <x>80</x>
@@ -107,6 +107,11 @@
        <item>
         <property name="text">
          <string>Control shear rate</string>
+        </property>
+       </item>
+       <item>
+        <property name="text">
+         <string>MAPHEUS</string>
         </property>
        </item>
        <item>

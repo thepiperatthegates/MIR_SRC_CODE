@@ -106,7 +106,7 @@ def thread_start():
 
 # --- Data Type Sizes (in Byte) ---
 UINT8_SIZE   = 1
-UINT16_SIZE  = 2
+UINT16_SIZE  = 2 #or float16
 FLOAT32_SIZE = 4
 
 # --- Frame Configuration ---
@@ -198,7 +198,7 @@ def send_thread(ser1):
 FRAME_SIZE  = BYTES_PER_SAMPLE      # 2 header + 4+4+2+2+4 payload
 NORM_SIZE   =  HEADER_SIZE + (4 * (FLOAT32_SIZE))      # 2 header + 2+2+2+2 payload
 KB_SIZE = HEADER_SIZE + (2 * (FLOAT32_SIZE))
-FRAME_FMT   = '<HHHH'  # H1, H2, C1, C2 (uint16_t)
+FRAME_FMT   = '<eeee'  # H1, H2, C1, C2 (uint16_t)
 NORM_FMT    = '<ffff'   # max_h1, min_h1, max_h2, min_h2
 KB_FMT = '<ff' #kb1, kb2
 
@@ -235,8 +235,8 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv):
                 if end > buf_len:
                     leftover = recv_buffer[index:]
                     break
-                h1, h2, c1, c2 = struct.unpack(FRAME_FMT, recv_buffer[index+2 : end])
-                batch_frames.extend([h1, h2, c1, c2])
+                c1, c2, h1, h2 = struct.unpack(FRAME_FMT, recv_buffer[index+2 : end])
+                batch_frames.extend([c1, c2, h1, h2])
                 index = end
                 continue
 
