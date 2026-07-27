@@ -11,7 +11,7 @@ from pathlib import Path
 os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
 import multiprocessing
 import sys
-from serial_comm import device_state as packet_transmission
+from serial_comm import device_state 
 from main_window_gui import Ui_MainWindow # pyright: ignore[reportAttributeAccessIssue]
 from creep_test.creep_test_window_main import TabWindowCreepTest
 from constant_shear_rate.constant_shear_rate_main import TabWindowConstSR
@@ -70,10 +70,10 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
             
             ##set the flag for electronics
             if current_text == "Electronic 1":
-                packet_transmission.set_electronics_flag(1)
+                device_state.set_electronics_flag(1)
             elif current_text == "Electronic 2":
-                packet_transmission.set_electronics_flag(2)
-                print("Elecrtonics flag", packet_transmission.ELECTRONICS_FLAG)
+                device_state.set_electronics_flag(2)
+                print("Elecrtonics flag", device_state.ELECTRONICS_FLAG)
         else:
             self.choose_experiment_comboBox.setEnabled(False)
             self.choose_experiment_comboBox.setCurrentIndex(0)

@@ -1,11 +1,9 @@
 import numpy as np
-from PyQt5 import QtCore, QtGui
+from PyQt5 import QtGui
 from PyQt5 import *
 from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QRegularExpressionValidator, QDoubleValidator
 import sys
 import os
-import multiprocessing
 import sys
 from .popout_graph_for_fr import Ui_MainWindow
 import matplotlib

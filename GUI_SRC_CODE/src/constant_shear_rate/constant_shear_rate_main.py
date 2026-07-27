@@ -19,7 +19,7 @@ from .gui_baru import Ui_Title
 import serial_comm.serial_backend as sockets_files
 from serial_comm.serial_backend import q_to_graph
 
-from serial_comm import device_state as packet_transmission
+from serial_comm import device_state 
 from .analyse_window_const_sr import AnalyseWindow
 from .graph_fr import PlotWindow
 
@@ -75,9 +75,9 @@ class DataUpdate(QThread):
         self.phase_difference_val = np.array([], dtype=np.float32)
 
         # ------ Helper Workers --------------------------------
-        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
-        self.worker_array_setter = packet_transmission.StoreArrayGraph()
-        self.worker_kb_property = packet_transmission.kbCoefficient()
+        self.worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
+        self.worker_array_setter = device_state.StoreArrayGraph()
+        self.worker_kb_property = device_state.kbCoefficient()
         
         
     def run(self):
@@ -110,22 +110,22 @@ class DataUpdate(QThread):
 
                 # Hall Sensors
                 #TODO: NEW FIRMWARE ITERACTIONS MUST NOT BE NEGATIVE FOR I1!!!!!!!!!
-                # self.v1_slice = packet_transmission.change_adc_hall(self.v1_slice)  # convert col1 (in V)
-                # self.v2_slice = packet_transmission.change_adc_hall(self.v2_slice)  # convert col2 (in V)
+                # self.v1_slice = device_state.change_adc_hall(self.v1_slice)  # convert col1 (in V)
+                # self.v2_slice = device_state.change_adc_hall(self.v2_slice)  # convert col2 (in V)
 
                 # # Current
-                # self.i1_slice = packet_transmission.change_current_adc(self.i1_slice)  # convert col3 (in mA)
-                # self.i2_slice = packet_transmission.change_current_adc(self.i2_slice)  # convert col4 (in mA)
+                # self.i1_slice = device_state.change_current_adc(self.i1_slice)  # convert col3 (in mA)
+                # self.i2_slice = device_state.change_current_adc(self.i2_slice)  # convert col4 (in mA)
 
                 # # calibration for current sensor
-                # self.i1_slice = packet_transmission.calibration_input_coil_1(self.i1_slice)
-                # self.i2_slice = packet_transmission.calibration_input_coil_2(self.i2_slice)
+                # self.i1_slice = device_state.calibration_input_coil_1(self.i1_slice)
+                # self.i2_slice = device_state.calibration_input_coil_2(self.i2_slice)
 
 
                 # # calibration for  hall sensors
-                # self.v1_slice = packet_transmission.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
+                # self.v1_slice = device_state.calibrated_hall_sensors1(self.worker_kb_property.k_b_1,
                 #                                                              self.v1_slice, self.i1_slice / 1000)
-                # self.v2_slice = packet_transmission.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
+                # self.v2_slice = device_state.calibrated_hall_sensors2(self.worker_kb_property.k_b_2,
                 #                                                              self.v2_slice, self.i2_slice / 1000)
                 # if self.flag_normalise:
                 #     self.v1_slice = (self.v1_slice - self.worker_normalise_properties.zero_offset_voltage_1) / self.worker_normalise_properties.amp_voltage_1
@@ -200,9 +200,9 @@ class SleepTimer(QObject):
 
     def __init__(self):
         super().__init__()
-        self.worker_remaining = packet_transmission.TxData()
+        self.worker_remaining = device_state.TxData()
         self.remaining = float(self.worker_remaining.data_1) # get local_data_1 from global
-        self.worker_reset_current_time = packet_transmission.DownSampleSpecificFlag()
+        self.worker_reset_current_time = device_state.DownSampleSpecificFlag()
         self.timer = QTimer(self)
         self.timer.setInterval(100)  # 100 ms per tick
         self.timer.timeout.connect(self._tick)
@@ -220,7 +220,7 @@ class SleepTimer(QObject):
             self.update_time_signal.emit(round(self.remaining, 1))
         else:
             self.timer.stop()
-            packet_transmission.running_time_event.clear()
+            device_state.running_time_event.clear()
 
 class SocketThread(QThread):
     
@@ -311,22 +311,22 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.calculate_final_fR = 0
 
     def _init_workers(self):
-        """Initialize packet_transmission workers."""
-        self.worker_data_block = packet_transmission.TxData()
-        self.worker_getter_graph = packet_transmission.StoreArrayGraph()
-        self.worker_fr_property = packet_transmission.fRCoefficients()
-        self.worker_k_b_property = packet_transmission.kbCoefficient()
-        self.worker_downsample_property = packet_transmission.DownSampleSpecificFlag()
-        self.worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
+        """Initialize device_state workers."""
+        self.worker_data_block = device_state.TxData()
+        self.worker_getter_graph = device_state.StoreArrayGraph()
+        self.worker_fr_property = device_state.fRCoefficients()
+        self.worker_k_b_property = device_state.kbCoefficient()
+        self.worker_downsample_property = device_state.DownSampleSpecificFlag()
+        self.worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
         
         #--------- Constants ---------
         self.tot_average = self.worker_downsample_property.tot_average
         self.time_increment = self.worker_downsample_property.current_time
-        self.COIL_CONSTANT = packet_transmission.COIL_CONSTANT
-        self.DIPOLE_MOMENT = packet_transmission.DIPOLE_MOMENT
+        self.COIL_CONSTANT = device_state.COIL_CONSTANT
+        self.DIPOLE_MOMENT = device_state.DIPOLE_MOMENT
         
         #--------- Global sync ---------
-        packet_transmission.CALIBRATION_FACTOR = self.worker_fr_property.CALIBRATION_FACTOR
+        device_state.CALIBRATION_FACTOR = self.worker_fr_property.CALIBRATION_FACTOR
 
     def _setup_ui_elements(self):
         """Set icons, placeholders, and labels."""
@@ -344,7 +344,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.k_b_label.setText(
             f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
             f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
-            f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
+            f"K = {device_state.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
             f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
         )
         
@@ -557,7 +557,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         # ---------- Hardware and UI triggers. ------------
         self.button_stop.setDisabled(False)  # Enable stop button
-        packet_transmission.tx_event.set()  # Activate transmission flag
+        device_state.tx_event.set()  # Activate transmission flag
         
         #------------ Update Status   ----------------------
         self.status_label.setStyleSheet("color: #32a83a; font-weight: bold;")
@@ -600,7 +600,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_downsample_property.time_increment = 1.0 / fs
         self.worker_downsample_property.tot_average = tot_avg
         self.worker_downsample_property.current_time = 0.0
-        packet_transmission.running_time_event.set()
+        device_state.running_time_event.set()
         
         sockets_files.file_name_change_set("dummy")
 
@@ -658,7 +658,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         ##send all data to microcontroller
         #activate flag
-        packet_transmission.tx_event.set()
+        device_state.tx_event.set()
 
 
         # send flag for calibration in the thread
@@ -726,7 +726,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                     
                 #---- get the current used eletronic flags ----
                 
-                electronic_flags = packet_transmission.get_electronics_flag()
+                electronic_flags = device_state.get_electronics_flag()
                 index = data["ELECTRONICS_FLAG"] == electronic_flags
                 
                 if np.any(index):
@@ -752,12 +752,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 self.k_b_label.setText(
                     f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
                     f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
-                    f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
+                    f"K = {device_state.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
                     f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
                 )
                 
                 #---- reload the file ----
-                packet_transmission.kbCoefficient.reload()
+                device_state.kbCoefficient.reload()
                 
                 self.popout_window(4, self.calculate_final_fR, self.worker_k_b_property.k_b_1, self.worker_k_b_property.k_b_2)
                 #enable the button again
@@ -807,7 +807,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         ##send all data to microcontroller
         #activate flag
-        packet_transmission.tx_event.set()
+        device_state.tx_event.set()
         
 
         self.status_label.setStyleSheet("color: #32a83a;")
@@ -844,7 +844,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         ##send all data to microcontroller
         #activate flag
-        packet_transmission.tx_event.set()
+        device_state.tx_event.set()
         
         # send flag for calibration in the thread
         self.worker_DataUpdate.flag_special_event(False, True, False)
@@ -889,14 +889,14 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
                 # Determine sign of angular velocity
                 if count_recursion < 10:  # positive / anticlockwise sweep
-                    angular_velocity = np.mean(packet_transmission.calculate_radial_frequency(running_frequency))
+                    angular_velocity = np.mean(device_state.calculate_radial_frequency(running_frequency))
                     rotation_direction = 1
                 else:  # negative / clockwise sweep
-                    angular_velocity = -np.mean(packet_transmission.calculate_radial_frequency(running_frequency))
+                    angular_velocity = -np.mean(device_state.calculate_radial_frequency(running_frequency))
                     rotation_direction = 2
 
                 # Calculate torque and phase
-                torque_values, phase_values = packet_transmission.calculate_torque_fR(
+                torque_values, phase_values = device_state.calculate_torque_fR(
                     self.current1_fR, self.current2_fR, self.hall1_fR, self.hall2_fR, data_4, data_6
                 )
 
@@ -955,7 +955,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 self.k_b_label.setText(
                     f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
                     f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
-                    f"K = {packet_transmission.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
+                    f"K = {device_state.CALIBRATION_FACTOR}&nbsp;&nbsp;&nbsp;"
                     f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
                 )
                 
@@ -1017,7 +1017,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         #send all data to microcontroller
         #activate flag
-        packet_transmission.tx_event.set()
+        device_state.tx_event.set()
         self.status_label.setText("Stop rotation!!....")
 
 
@@ -1051,7 +1051,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         ##send all data to microcontroller
         #activate flag
-        packet_transmission.tx_event.set()
+        device_state.tx_event.set()
 
         self.status_label.setStyleSheet("color: #7da832;")
         self.status_label.setText("Rotation starts for normalising!!!!")
@@ -1110,7 +1110,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             # Save to CSV      
             np.savetxt(dir_save_normalisation, data_to_save, delimiter=";", comments="", fmt="%.17g",  header=header_text)
             
-            packet_transmission.VoltageNormaliseCoefficient.reload()
+            device_state.VoltageNormaliseCoefficient.reload()
 
             self.worker_DataUpdate.flag_normalise_event(True)
 
@@ -1180,7 +1180,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         
         msg = QMessageBox()
         
-        text = packet_transmission.set_popout_text(arg, calculate_final_fR, k_b_1, k_b_2)
+        text = device_state.set_popout_text(arg, calculate_final_fR, k_b_1, k_b_2)
         msg.setText(text)
         
         msg.setIcon(QMessageBox.Question)
