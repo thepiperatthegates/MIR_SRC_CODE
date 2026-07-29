@@ -16,7 +16,7 @@ import multiprocessing
 import sys
 from .gui_baru import Ui_Title
 
-import serial_comm.serial_backend as sockets_files
+import serial_comm.serial_backend as serial_backend
 from serial_comm.serial_backend import q_to_graph
 
 from serial_comm import device_state 
@@ -230,7 +230,7 @@ class SocketThread(QThread):
 
     def run(self):
         if self.running:
-            sockets_files.thread_start()
+            serial_backend.thread_start()
 
 
     def stop(self):
@@ -413,11 +413,11 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #  ----------------------- Handle Scaling Logic -----------------------
         # factor maps 100ms -> 1, 500ms -> 5, 1000ms -> 10
         factor = interval_ms // 100
-        sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = factor * sockets_files.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
+        serial_backend.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = factor * serial_backend.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
         
         #  ----------------------- Mode-specific time axis length  -----------------------
         range_len = 50000 if (mode == "View angle" and interval_ms == 1000) else (factor * 1000)
-        self.time_axis = [i * 0.0001 for i in range(range_len)]
+        self.time_axis = [i * serial_backend.SAMPLE_PERIOD for i in range(range_len)]
 
         # ----------------------- Mode Configuration Map -----------------------
         # Structure: { ModeName: (UpdateFunction, [Plot1_Setup, Plot2_Setup]) }
@@ -602,7 +602,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_downsample_property.current_time = 0.0
         device_state.running_time_event.set()
         
-        sockets_files.file_name_change_set("dummy")
+        serial_backend.file_name_change_set("dummy")
 
         #--------- UI and Timer Execution.  ------------------
         self.status_label.setStyleSheet("color: #7da832;")
@@ -1146,8 +1146,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.p_window_data.join()
 
         #terminate the other subprocess
-        sockets_files.p1.terminate()
-        sockets_files.p1.join()
+        serial_backend.p1.terminate()
+        serial_backend.p1.join()
 
         #stop all the threads
         self.worker_socket.stop()
@@ -1215,14 +1215,14 @@ class TabWindowConstSR(QMainWindow):
         #stop all the background processes
 
             
-        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, sockets_files.q_to_csv):
+        for q in (serial_backend.q_to_process, serial_backend.q_to_graph, serial_backend.q_to_csv):
             q.close()
             q.join_thread()
 
 
         #terminate the other subprocess
-        sockets_files.p1.terminate()
-        sockets_files.p1.join()
+        serial_backend.p1.terminate()
+        serial_backend.p1.join()
 
         #stop all the threads
         

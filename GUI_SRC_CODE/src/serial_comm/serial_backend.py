@@ -111,17 +111,21 @@ FLOAT32_SIZE = 4
 
 # --- Frame Configuration ---
 # Frame structure: [Header (2 bytes)] + [Payload]
-ADC_BUFFER_SIZE      = 4
+ADC_BUFFER_SIZE      = 20
 HEADER_SIZE          = 2 * UINT8_SIZE
 # go back to normal raw data receiving
 PAYLOAD_DATA_SIZE    = 4 * UINT16_SIZE
 BYTES_PER_SAMPLE     = HEADER_SIZE + PAYLOAD_DATA_SIZE
 TOTAL_ONE_CYCLE_BYTES    = BYTES_PER_SAMPLE * ADC_BUFFER_SIZE
-            
-SAMPLE_PERIOD        = 0.0001 * ADC_BUFFER_SIZE
-TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC   = int(0.1 / SAMPLE_PERIOD)
+
+SAMPLE_FREQ = 1000  #Hz
+SAMPLE_PERIOD = 1.0/(SAMPLE_FREQ)   #s
+SAMPLE_PERIOD_TOTAL = SAMPLE_PERIOD * ADC_BUFFER_SIZE   #s
+TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC   = int(0.1 / SAMPLE_PERIOD_TOTAL)
 # ---------------------- for total count receiving from socket (depends if we want 0.5s, 1s or 2s) ----------------------
-TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND =   int(0.1 / SAMPLE_PERIOD)
+TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND =   int(0.1 / SAMPLE_PERIOD_TOTAL)
+range_len = 50000
+
 
 def recv_thread(ser1, worker_kb_property, worker_specific_downsampling, worker_normalise_properties):
     """Continuously read serial data, forward frames for live plotting, and save to CSV when recording."""
@@ -146,7 +150,6 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling, worker_n
 
                 count = 0
 
-                
                 # -----  Start live graph process for the first time --------
                 if not worker_process_flag.flag_process and received_data:
                     p1 = multiprocessing.Process(target=start_process_live_graph,

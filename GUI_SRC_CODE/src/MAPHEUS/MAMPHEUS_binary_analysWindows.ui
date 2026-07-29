@@ -16,7 +16,7 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QGridLayout" name="gridLayout_3">
     <item row="0" column="0">
-     <layout class="QGridLayout" name="gridLayout_2" rowstretch="0,0,0,0">
+     <layout class="QGridLayout" name="gridLayout_2" rowstretch="0,0,0">
       <item row="1" column="0">
        <widget class="QLabel" name="label_file">
         <property name="font">
@@ -200,19 +200,6 @@
          </widget>
         </item>
        </layout>
-      </item>
-      <item row="3" column="0">
-       <widget class="QLabel" name="label_fr">
-        <property name="font">
-         <font>
-          <family>Arial</family>
-          <pointsize>14</pointsize>
-         </font>
-        </property>
-        <property name="text">
-         <string>fr1 =                                   fr0 = </string>
-        </property>
-       </widget>
       </item>
       <item row="2" column="0">
        <layout class="QVBoxLayout" name="mlp_layout">
