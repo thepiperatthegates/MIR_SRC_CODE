@@ -1,7 +1,7 @@
 import numpy as np
-from PyQt5 import QtGui
-from PyQt5 import *
-from PyQt5.QtWidgets import *
+from PySide6 import QtGui
+from PySide6 import *
+from PySide6.QtWidgets import *
 import sys
 import os
 import sys
@@ -13,11 +13,11 @@ plt.rcParams.update({'font.size': 14})
 
 import matplotlib as mpl
 
-mpl.use('Qt5Agg')
+mpl.use('QtAgg')
 
 
 from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 
 
 
@@ -115,7 +115,7 @@ def main_graph_popout():
     
     main_window = PlotWindow()
     main_window.show()
-    sys.exit(app_graph_popout.exec_())
+    sys.exit(app_graph_popout.exec())
         
 if __name__ == '__main__':
     main_graph_popout()

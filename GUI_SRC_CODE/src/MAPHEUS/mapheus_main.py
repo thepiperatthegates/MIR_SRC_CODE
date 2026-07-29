@@ -1,9 +1,9 @@
 
 import numpy as np
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5 import *
-from PyQt5.QtCore import QThread, pyqtSignal, QMutex, QObject, QTimer
-from PyQt5.QtWidgets import *
+from PySide6 import QtCore, QtGui
+from PySide6 import *
+from PySide6.QtCore import QThread, Signal, QMutex, QObject, QTimer
+from PySide6.QtWidgets import *
 import sys
 import os
 from pathlib import Path
@@ -193,7 +193,7 @@ class DataUpdate(QThread):
 
 class SleepTimer(QObject):
     """Countdown timer that ticks every 100 ms and emits remaining seconds via update_time_signal until it reaches zero."""
-    update_time_signal = pyqtSignal(float)  # emit float countdown values
+    update_time_signal = Signal(float)  # emit float countdown values
 
     def __init__(self):
         super().__init__()
@@ -260,11 +260,6 @@ class MAPHEUS_GUI(QMainWindow, Ui_Title):
 
     def _init_system_settings(self):
         """Handle DPI and Pathing."""
-        if hasattr(QtCore.Qt, 'AA_EnableHighDpiScaling'):
-            QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
-        if hasattr(QtCore.Qt, 'AA_UseHighDpiPixmaps'):
-            QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)
-            
         self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     def _init_state_variables(self):
@@ -655,7 +650,7 @@ class MAPHEUS_GUI(QMainWindow, Ui_Title):
         text = device_state.set_popout_text(arg, calculate_final_fR, k_b_1, k_b_2)
         msg.setText(text)
         
-        msg.setIcon(QMessageBox.Question)
+        msg.setIcon(QMessageBox.Icon.Question)
         
         msg.exec()
         

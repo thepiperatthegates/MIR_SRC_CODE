@@ -50,7 +50,7 @@ if (-not $PythonExe) {
     Write-Host "[INFO] Creating environment at $EnvDir ..." -ForegroundColor Cyan
     
     # Run creation: -y (yes), -p (prefix), -c (channel)
-    & $MambaExe create -y -p "$EnvDir" -c conda-forge python=3.12 pip matplotlib numpy pandas pyqt
+    & $MambaExe create -y -p "$EnvDir" -c conda-forge python=3.12 pip matplotlib numpy pandas pyside6
 
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[ERROR] Micromamba failed. Attempting minimal fallback (Python only)..." -ForegroundColor Yellow
@@ -62,13 +62,13 @@ if (-not $PythonExe) {
 }
 
 # --------------------------------------------
-# Ensure pyqt is installed (handles existing envs missing it)
+# Ensure pyside6 is installed (handles existing envs missing it)
 # --------------------------------------------
 if ($PythonExe) {
-    $PyQtCheck = & $PythonExe -c "import PyQt5" 2>&1
+    $PySideCheck = & $PythonExe -c "import PySide6" 2>&1
     if ($LASTEXITCODE -ne 0) {
-        Write-Host "[INFO] Installing pyqt via micromamba..." -ForegroundColor Cyan
-        & $MambaExe install -y -p "$EnvDir" -c conda-forge pyqt
+        Write-Host "[INFO] Installing pyside6 via micromamba..." -ForegroundColor Cyan
+        & $MambaExe install -y -p "$EnvDir" -c conda-forge pyside6
     }
 }
 

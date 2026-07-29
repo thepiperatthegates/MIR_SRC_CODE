@@ -1,9 +1,9 @@
 import numpy as np
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5 import *
-from PyQt5.QtCore import QThread, pyqtSignal, QMutex, QRegularExpression, QObject, QTimer, Qt
-from PyQt5.QtWidgets import *
-from PyQt5.QtGui import QRegularExpressionValidator, QDoubleValidator
+from PySide6 import QtCore, QtGui, QtWidgets
+from PySide6 import *
+from PySide6.QtCore import QThread, Signal, QMutex, QRegularExpression, QObject, QTimer, Qt
+from PySide6.QtWidgets import *
+from PySide6.QtGui import QRegularExpressionValidator, QDoubleValidator
 import os
 from pathlib import Path
 
@@ -252,7 +252,7 @@ class DataUpdate(QThread):
         self.running = False
 
 class SleepTimer(QObject):
-    update_time_signal = pyqtSignal(float)  # emit float countdown values
+    update_time_signal = Signal(float)  # emit float countdown values
 
     def __init__(self):
         super().__init__()
@@ -292,7 +292,7 @@ class SleepTimer(QObject):
             
 class SleepTimerVector(QObject):
     
-    update_time_signal_vector = pyqtSignal(float)
+    update_time_signal_vector = Signal(float)
     
     def __init__(self, time_taken):
         super().__init__()
@@ -433,7 +433,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
 
         #for k_b setter getter
         self.worker_k_b_property = packet_transmission.kbCoefficient()
-        self.k_b_label.setTextFormat(Qt.RichText)
+        self.k_b_label.setTextFormat(Qt.TextFormat.RichText)
         self.k_b_label.setText(
             f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
             f"k<sub>b2</sub> = {self.worker_k_b_property.k_b_2}&nbsp;&nbsp;&nbsp;"
@@ -1112,7 +1112,7 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         text = packet_transmission.set_popout_text(arg)
         msg.setText(text)
         
-        msg.setIcon(QMessageBox.Question)
+        msg.setIcon(QMessageBox.Icon.Question)
         
         msg.exec()
         

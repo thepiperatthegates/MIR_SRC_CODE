@@ -1,7 +1,7 @@
 import numpy as np
-from PyQt5 import QtGui
-from PyQt5.QtCore import QFileInfo
-from PyQt5.QtWidgets import *
+from PySide6 import QtGui
+from PySide6.QtCore import QFileInfo
+from PySide6.QtWidgets import *
 
 from .analyse_Window import Ui_analyse_Window
 from serial_comm import device_state
@@ -20,10 +20,10 @@ plt.rcParams.update({'font.size': 14})
 
 import matplotlib as mpl
 
-mpl.use('Qt5Agg')
+mpl.use('QtAgg')
 
 from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg, NavigationToolbar2QT
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 
 data_4 = 0.0
 data_6 = 0.0
@@ -746,7 +746,7 @@ def main_3():
     app3.setWindowIcon(QtGui.QIcon(fzj_icon_path))
     window3 = AnalyseWindow()
     window3.show()
-    app3.exec_()
+    app3.exec()
 
 
 if __name__ == '__main__':

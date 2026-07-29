@@ -1,7 +1,7 @@
 """Main entry point for the MiR (Mini-Rheometer) GUI application."""
-from PyQt5 import QtGui, QtCore
-from PyQt5 import *
-from PyQt5.QtWidgets import *
+from PySide6 import QtGui, QtCore
+from PySide6 import *
+from PySide6.QtWidgets import *
 import sys
 import os
 from pathlib import Path
@@ -116,7 +116,7 @@ def main():
     
     first_window = FirstGUI()
     first_window.show()
-    sys.exit(app_main_window.exec_())
+    sys.exit(app_main_window.exec())
 
 
 if __name__ == '__main__':
