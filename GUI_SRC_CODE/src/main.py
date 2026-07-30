@@ -19,6 +19,7 @@ from MAPHEUS.mapheus_main import TabWindowMAPHEUS
 
 #import json for the GUI theme
 from theme import LIGHT_THEME
+import console.console_widget as console_widget
 
 if sys.platform == "win32":
     import ctypes
@@ -103,6 +104,7 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
 def main():
     """Initialize the Qt application, show the launcher window, and start the event loop."""
     app_main_window = QApplication(sys.argv)
+    console_widget.install()
     app_main_window.setStyleSheet(LIGHT_THEME)
     
     # get absolute path of project root (folder containing 'src' and 'pics')

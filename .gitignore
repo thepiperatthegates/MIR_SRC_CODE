@@ -3,6 +3,12 @@
 #Nuitka build output (regeneratable, huge binaries - never commit)
 GUI_SRC_CODE/dist_build/
 
+#Compiled C build output (gcc task output, regeneratable)
+*.exe
+*.obj
+*.o
+GUI_SRC_CODE/src/MAPHEUS/unpacking/build/
+
 #Relative files according to the local system
 GUI_SRC_CODE/.venv/
 GUI_SRC_CODE/src/files/results_fr.csv

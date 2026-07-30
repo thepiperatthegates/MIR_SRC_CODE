@@ -1,0 +1,38 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "C: build active file",
+            "type": "shell",
+            "command": "gcc",
+            "args": [
+                "-Wall",
+                "-g",
+                "${file}",
+                "-I${fileDirname}",
+                "-o",
+                "${fileDirname}/${fileBasenameNoExtension}.exe"
+            ],
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "problemMatcher": ["$gcc"],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "detail": "Compiles the currently open .c file with gcc, output goes next to the source as <name>.exe."
+        },
+        {
+            "label": "C: run active file",
+            "type": "shell",
+            "command": "${fileDirname}/${fileBasenameNoExtension}.exe",
+            "options": {
+                "cwd": "${fileDirname}"
+            },
+            "dependsOn": "C: build active file",
+            "problemMatcher": [],
+            "detail": "Builds then runs the currently open .c file, with the working directory set to the source's folder (so relative file paths like the .bin input resolve correctly)."
+        }
+    ]
+}

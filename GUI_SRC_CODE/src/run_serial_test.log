@@ -1,0 +1,10 @@
+Error calling Python override of QThread::run(): Traceback (most recent call last):
+  File "C:\Users\Hijazi\MIR_SRC_CODE\GUI_SRC_CODE\src\constant_shear_rate\constant_shear_rate_gui.py", line 87, in run
+    data_from_pipe = q_to_graph.get()
+  File "C:\Users\Hijazi\AppData\Local\Programs\Python\Python313\Lib\multiprocessing\queues.py", line 98, in get
+    raise ValueError(f"Queue {self!r} is closed")
+ValueError: Queue <multiprocessing.queues.Queue object at 0x000001DCFA84A710> is closed
+Succesfully connected on COM5!
+Frequency of DAC 1.7160025131879064
+Connection failed: could not open port 'COM5': PermissionError(13, 'Access is denied.', None, 5), retrying... (1/10)
+Error deleting file: [WinError 2] The system cannot find the file specified: 'dummy.csv'
