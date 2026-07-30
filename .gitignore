@@ -1,5 +1,7 @@
 .DS_Store
 
+#Nuitka build output (regeneratable, huge binaries - never commit)
+GUI_SRC_CODE/dist_build/
 
 #Relative files according to the local system
 GUI_SRC_CODE/.venv/

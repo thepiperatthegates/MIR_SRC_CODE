@@ -1077,14 +1077,15 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             self.p_window_data.terminate()
             self.p_window_data.join()
 
-        #terminate the other subprocess
-        sockets_files.p1.terminate()
-        sockets_files.p1.join()
+        #terminate the other subprocess (may never have started if the device never connected)
+        if sockets_files.p1 is not None:
+            sockets_files.p1.terminate()
+            sockets_files.p1.join()
 
         #stop all the threads
         self.worker_socket.stop()
         self.worker_DataUpdate.stop()
-        
+
         #restart the python script
         os.execv(sys.executable, ['python'] + sys.argv)
 
@@ -1143,9 +1144,10 @@ class TabWindowCreepTest(QMainWindow):
             q.join_thread()
 
 
-        #terminate the other subprocess
-        sockets_files.p1.terminate()
-        sockets_files.p1.join()
+        #terminate the other subprocess (may never have started if the device never connected)
+        if sockets_files.p1 is not None:
+            sockets_files.p1.terminate()
+            sockets_files.p1.join()
 
         #stop all the threads
         

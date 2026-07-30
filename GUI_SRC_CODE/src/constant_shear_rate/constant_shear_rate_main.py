@@ -1140,14 +1140,15 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             self.p_window_data.terminate()
             self.p_window_data.join()
 
-        #terminate the other subprocess
-        serial_backend.p1.terminate()
-        serial_backend.p1.join()
+        #terminate the other subprocess (may never have started if the device never connected)
+        if serial_backend.p1 is not None:
+            serial_backend.p1.terminate()
+            serial_backend.p1.join()
 
         #stop all the threads
         self.worker_socket.stop()
         self.worker_DataUpdate.stop()
-        
+
         #restart the python script
         os.execv(sys.executable, ['python'] + sys.argv)
 
@@ -1215,9 +1216,10 @@ class TabWindowConstSR(QMainWindow):
             q.join_thread()
 
 
-        #terminate the other subprocess
-        serial_backend.p1.terminate()
-        serial_backend.p1.join()
+        #terminate the other subprocess (may never have started if the device never connected)
+        if serial_backend.p1 is not None:
+            serial_backend.p1.terminate()
+            serial_backend.p1.join()
 
         #stop all the threads
         
