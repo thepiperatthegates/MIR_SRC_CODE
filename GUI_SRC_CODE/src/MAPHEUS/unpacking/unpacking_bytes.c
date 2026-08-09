@@ -15,8 +15,6 @@
 #define TIME_STAMP  (float) (1.0f/SAMPLE_FREQ)
 
 
-
-
 /* max sizes for this test (8 ch in, 4 ch out, 1000 samples) */
 static uint8_t in_buf [SENSOR_HEADER_BYTES + 8 * 1000 * 2];
 static uint8_t reduced_buf[SENSOR_HEADER_BYTES + 4 * 1000 * 2];

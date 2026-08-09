@@ -219,8 +219,22 @@ class TxData():
         byte_send9 = struct.pack('<B', int(self.__class__._data_9))                 #hardware reset
         byte_send10 = struct.pack('<B', int(self.__class__._data_10))                 #mir mode
 
+        print(
+            f"[TX -> USB] "
+            f"data_1(time/s)={self.__class__._data_1}, "
+            f"data_2(freq)={self.__class__._data_2}, "
+            f"data_3(amplitude1)={self.__class__._data_3}, "
+            f"data_4(offset1)={self.__class__._data_4}, "
+            f"data_5(amplitude2)={self.__class__._data_5}, "
+            f"data_6(offset2)={self.__class__._data_6}, "
+            f"data_7(fir_filter)={self.__class__._data_7}, "
+            f"data_8(dc_ac_mode)={self.__class__._data_8}, "
+            f"data_9(hw_reset)={self.__class__._data_9}, "
+            f"data_10(mir_mode)={self.__class__._data_10}"
+        )
+
         combined_send = b''.join([byte_send1, byte_send2, byte_send3, byte_send4, byte_send5, byte_send6, byte_send7, byte_send8, byte_send9, byte_send10])
-        
+
         return combined_send
 
     
