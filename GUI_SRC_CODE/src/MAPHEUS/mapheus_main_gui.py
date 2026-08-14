@@ -53,9 +53,6 @@ class Ui_Title(object):
         font.setItalic(False)
         font.setWeight(QtGui.QFont.Weight.Normal)
         self.button_start_experiment.setFont(font)
-        self.button_start_experiment.setStyleSheet(
-            "color: rgb(255, 255, 255);\nbackground-color: rgb(45, 3, 255);"
-        )
         self.button_start_experiment.setObjectName("button_start_experiment")
         exp.addWidget(self.button_start_experiment)
 
@@ -67,9 +64,6 @@ class Ui_Title(object):
         font.setItalic(False)
         font.setWeight(QtGui.QFont.Weight.Normal)
         self.button_start_kb.setFont(font)
-        self.button_start_kb.setStyleSheet(
-            "background-color: rgb(45, 3, 255);\ncolor: rgb(255, 255, 255);"
-        )
         self.button_start_kb.setObjectName("button_start_kb")
         exp.addWidget(self.button_start_kb)
 
@@ -81,9 +75,6 @@ class Ui_Title(object):
         font.setItalic(False)
         font.setWeight(QtGui.QFont.Weight.Normal)
         self.button_rotate.setFont(font)
-        self.button_rotate.setStyleSheet(
-            "background-color: rgb(45, 3, 255);\ncolor: rgb(255, 255, 255);"
-        )
         self.button_rotate.setObjectName("button_rotate")
         exp.addWidget(self.button_rotate)
 

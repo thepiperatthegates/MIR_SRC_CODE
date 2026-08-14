@@ -213,7 +213,7 @@ class Ui_analyse_Window(object):
         analyse_Window.setWindowTitle(QCoreApplication.translate("analyse_Window", u"MainWindow", None))
         self.label_file.setText("")
         self.refresh_Button.setText("")
-        self.csv_Button.setText(QCoreApplication.translate("analyse_Window", u"Open CSV file", None))
+        self.csv_Button.setText(QCoreApplication.translate("analyse_Window", u"Open file", None))
         self.label.setText(QCoreApplication.translate("analyse_Window", u"Select", None))
         self.data_show_comboBox.setItemText(0, QCoreApplication.translate("analyse_Window", u"Data table", None))
         self.data_show_comboBox.setItemText(1, QCoreApplication.translate("analyse_Window", u"Currents diagram", None))
@@ -226,7 +226,7 @@ class Ui_analyse_Window(object):
         self.data_show_comboBox.setItemText(8, QCoreApplication.translate("analyse_Window", u"Shear stress diagram", None))
         self.data_show_comboBox.setItemText(9, QCoreApplication.translate("analyse_Window", u"Viscosity diagram", None))
 
-        self.save_Button.setText(QCoreApplication.translate("analyse_Window", u"Save CSV file", None))
+        self.save_Button.setText(QCoreApplication.translate("analyse_Window", u"Save", None))
         self.label_3.setText(QCoreApplication.translate("analyse_Window", u"Insert offset 1 (mA)", None))
 #if QT_CONFIG(tooltip)
         self.textbox_offset2.setToolTip("")
