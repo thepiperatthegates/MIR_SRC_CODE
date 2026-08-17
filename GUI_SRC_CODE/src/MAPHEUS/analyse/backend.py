@@ -219,16 +219,34 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         #find exe path (should be inside unpacking folder)
         c_exe_path = os.path.join(self.project_root, "MAPHEUS", "unpacking", "unpacking_bytes.exe")
 
+        if not os.path.isfile(c_exe_path):
+            QMessageBox.critical(
+                self,
+                "unpacking_bytes.exe not found",
+                "Could not find unpacking_bytes.exe at:\n"
+                f"{c_exe_path}\n\n"
+                "This file is not tracked in git and must be built locally.\n"
+            )
+            return False
+
         #name of the output file
         base, _ = os.path.splitext(self.analyse_filename)
         out_file_bin = base + "_unpacked.bin"
         out_file_csv = base + "_unpacked.csv"
 
         #run the c exe file from python script
-        run = subprocess.run(
-            [c_exe_path, self.analyse_filename, out_file_bin, out_file_csv],
-            capture_output=True, text=True
-        )
+        try:
+            run = subprocess.run(
+                [c_exe_path, self.analyse_filename, out_file_bin, out_file_csv],
+                capture_output=True, text=True
+            )
+        except OSError as e:
+            QMessageBox.critical(
+                self,
+                "Failed to run unpacking_bytes.exe",
+                f"Could not launch unpacking_bytes.exe:\n{e}"
+            )
+            return False
 
         if run.returncode != 0:
             print("unpacking_bytes.exe failed:", run.stderr)
@@ -249,10 +267,16 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
     def choose_option_after_unpacking(self):
         #------------------ read csv files ------------------
 
-        # Notes: the legacy codes has the files without headers, recent updates has a header for the variables
-        with open(self.analyse_filename, 'r', encoding='utf-8-sig') as check:
-            # check the first line of csv files
-            first_line = check.readline().strip()
+        # some CSVs are exported with a Windows codepage (e.g. degree/micro signs
+        # in the header) instead of UTF-8, which raises UnicodeDecodeError otherwise
+        try:
+            with open(self.analyse_filename, 'r', encoding='utf-8-sig') as check:
+                first_line = check.readline().strip()
+            csv_encoding = 'utf-8-sig'
+        except UnicodeDecodeError:
+            with open(self.analyse_filename, 'r', encoding='cp1252') as check:
+                first_line = check.readline().strip()
+            csv_encoding = 'cp1252'
 
         # check if the first line is a digit (or the first line contains digit with negative number)
         if first_line[0].isdigit() or first_line[0] == '-':
@@ -267,7 +291,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
             self.analyse_filename,
             delimiter=";",
             skip_header=skip_check,
-            encoding='utf-8-sig'
+            encoding=csv_encoding
         )
 
         mode = self.data_show_comboBox.currentText()
