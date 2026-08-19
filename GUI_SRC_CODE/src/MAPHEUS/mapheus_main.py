@@ -9,7 +9,7 @@ from .analyse.backend import AnalyseWindow
 import console.console_widget as console_widget
 from console.console_widget import ConsoleWidget
 from console.serial_terminal_widget import SerialTerminalWidget
-
+from .photo_tab.MAMPHEUS_photo_main import ConvertBinToJPG
 
 #different windows with tab
 class TabWindowMAPHEUS(QMainWindow):
@@ -26,6 +26,7 @@ class TabWindowMAPHEUS(QMainWindow):
         # Add your classes as tabs
         tabs.addTab(MAPHEUS_GUI(), "Main GUI")
         tabs.addTab(AnalyseWindow(), "Auswertung")
+        tabs.addTab(ConvertBinToJPG(), "Bin Photo")
         tabs.addTab(ConsoleWidget(console_widget.get_stdout_stream()), "Console")
         self.serial_terminal = SerialTerminalWidget()
         tabs.addTab(self.serial_terminal, "Python Terminal")

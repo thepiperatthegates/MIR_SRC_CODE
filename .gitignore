@@ -80,3 +80,5 @@ GUI_SRC_CODE/src/MAPHEUS/__pycache__/mapheus_main.cpython-313.pyc
 GUI_SRC_CODE/src/serial_comm/__pycache__/__init__.cpython-313.pyc
 GUI_SRC_CODE/src/serial_comm/__pycache__/serial_backend.cpython-313.pyc
 GUI_SRC_CODE/src/serial_comm/__pycache__/device_state.cpython-313.pyc
+*.jpg
+*.pyc
