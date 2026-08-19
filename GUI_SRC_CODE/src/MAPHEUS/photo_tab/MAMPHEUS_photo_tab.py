@@ -15,8 +15,9 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QGridLayout, QLabel, QMainWindow,
-    QPushButton, QSizePolicy, QWidget)
+from PySide6.QtWidgets import (QApplication, QGridLayout, QHBoxLayout, QLabel,
+    QMainWindow, QPushButton, QSizePolicy, QSpacerItem,
+    QWidget)
 
 class Ui_analyse_Window(object):
     def setupUi(self, analyse_Window):
@@ -27,18 +28,27 @@ class Ui_analyse_Window(object):
         self.centralwidget.setObjectName(u"centralwidget")
         self.gridLayout = QGridLayout(self.centralwidget)
         self.gridLayout.setObjectName(u"gridLayout")
+        self.buttonRowLayout = QHBoxLayout()
+        self.buttonRowLayout.setObjectName(u"buttonRowLayout")
         self.refresh_Button = QPushButton(self.centralwidget)
         self.refresh_Button.setObjectName(u"refresh_Button")
         self.refresh_Button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.refresh_Button.setStyleSheet(u"background-color: rgb(85, 170, 255);")
 
-        self.gridLayout.addWidget(self.refresh_Button, 0, 0, 1, 1)
+        self.buttonRowLayout.addWidget(self.refresh_Button)
 
         self.csv_Button = QPushButton(self.centralwidget)
         self.csv_Button.setObjectName(u"csv_Button")
         self.csv_Button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
 
-        self.gridLayout.addWidget(self.csv_Button, 0, 1, 1, 1)
+        self.buttonRowLayout.addWidget(self.csv_Button)
+
+        self.buttonRowSpacer = QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
+
+        self.buttonRowLayout.addItem(self.buttonRowSpacer)
+
+
+        self.gridLayout.addLayout(self.buttonRowLayout, 0, 0, 1, 2)
 
         self.image_Label = QLabel(self.centralwidget)
         self.image_Label.setObjectName(u"image_Label")
