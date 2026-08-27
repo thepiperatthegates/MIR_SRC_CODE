@@ -80,8 +80,6 @@ class Ui_Title(object):
 
         left.addWidget(self.group_experiment)
 
-        left.addStretch(1)
-
         # ── Acquisition buttons ──────────────────────────────────────
         self.button_send = QtWidgets.QPushButton(self.centralwidget)
         font = QtGui.QFont()
@@ -113,7 +111,7 @@ class Ui_Title(object):
         font.setItalic(False)
         self.save_button.setFont(font)
         self.save_button.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
-        self.save_button.setText("")
+        self.save_button.setText("Save data")
         self.save_button.setObjectName("save_button")
         left.addWidget(self.save_button)
 
@@ -171,6 +169,8 @@ class Ui_Title(object):
         self.graph_stop_button.setFont(font)
         self.graph_stop_button.setObjectName("graph_stop_button")
         left.addWidget(self.graph_stop_button)
+
+        left.addStretch(1)
 
         root.addLayout(left, 1)
 

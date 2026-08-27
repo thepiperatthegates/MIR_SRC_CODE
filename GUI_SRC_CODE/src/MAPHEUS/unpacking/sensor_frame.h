@@ -1,11 +1,6 @@
 #ifndef SENSOR_FRAME_H
 #define SENSOR_FRAME_H
-/* sensor_frame.h — decode / reduce the sensor frame.
- * No malloc, no stdio, endian-safe. Frame layout:
- *   [0..7]  header: two big-endian uint32 = { channel_count, samples_per_sec }
- *   [8..]   channel_count blocks, each samples_per_sec * int16 (big-endian,
- *           signed), row-major: channel 0 in full, then channel 1, ...
- */
+
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>   /* memcpy */
@@ -42,14 +37,7 @@ int sensor_frame_init(sensor_frame_t *f, const uint8_t *buf, uint32_t len);
 /* One sample as signed int16 (big-endian -> host), zero-copy. */
 int16_t sensor_sample(const sensor_frame_t *f, uint32_t ch, uint32_t i);
 
-/* Reduce the full frame to only HALL_A/B, COIL_A/B, SAME on-disk format.
- * Output = 8-byte header (channel_count=4, same samples_per_channel) + the 4
- * channel blocks copied verbatim (still big-endian). Channel order in
- * output: HALL_A, HALL_B, COIL_A, COIL_B  ->  use the R_* indices to read
- * it back.
- * Returns output length in bytes, or 0 on error.
- * 'out' must hold at least SENSOR_HEADER_BYTES + 4*samples_per_channel*2
- * bytes. */
+
 uint32_t sensor_reduce_to_4(const uint8_t *in, uint32_t in_len,
                              uint8_t *out, uint32_t out_cap);
 

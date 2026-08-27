@@ -321,7 +321,24 @@ class MAPHEUS_GUI(QMainWindow, Ui_Title):
         """Set icons, placeholders, and labels."""
         #--------- Icons. ------------------
         get_path = lambda x: os.path.join(self.project_root, "pics", x)
-        self.save_button.setIcon(QtGui.QIcon(get_path("save_icon.ico")))
+        action_button_icon = QtGui.QIcon(get_path("abspielen.png"))
+        for action_button in (
+            self.button_start_experiment,
+            self.button_start_kb,
+            self.button_rotate,
+            self.button_start,
+            self.button_send,
+            self.save_button,
+            self.graph_stop_button,
+        ):
+            action_button.setIcon(action_button_icon)
+            action_button.setIconSize(QtCore.QSize(28, 28))
+            action_button.setFlat(True)
+            action_button.setStyleSheet(
+                "QPushButton { border: none; background-color: transparent;"
+                " text-align: left; padding-left: 4px; }"
+                "QPushButton:pressed { background-color: rgba(0, 0, 0, 30); }"
+            )
 
         #--------- Text/Labels  ---------
         self.k_b_label.setText(

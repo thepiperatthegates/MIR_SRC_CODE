@@ -215,9 +215,7 @@ class Ui_Title(object):
         m2.addWidget(self.textbox_offset2)
  
         left.addWidget(self.group_motor2)
- 
-        left.addStretch(1)
- 
+
         # ── 2×2 main control buttons ─────────────────────────────────
         btn_grid = QtWidgets.QGridLayout()
         btn_grid.setSpacing(6)
@@ -283,7 +281,7 @@ class Ui_Title(object):
         font.setItalic(False)
         self.save_button.setFont(font)
         self.save_button.setCursor(QtGui.QCursor(QtCore.Qt.PointingHandCursor))
-        self.save_button.setText("")
+        self.save_button.setText("Save data")
         self.save_button.setObjectName("save_button")
         left.addWidget(self.save_button)
  
@@ -334,7 +332,13 @@ class Ui_Title(object):
  
         left.addLayout(status_grid)
  
-        # ── Extra buttons (from gui_baru_1 originals) ────────────────
+        # ── GroupBox: Graph controls ──────────────────────────────────
+        self.group_graph_controls = QtWidgets.QGroupBox("Graph", self.centralwidget)
+        self.group_graph_controls.setObjectName("group_graph_controls")
+        graph_ctl = QtWidgets.QVBoxLayout(self.group_graph_controls)
+        graph_ctl.setSpacing(4)
+        graph_ctl.setContentsMargins(8, 14, 8, 8)
+
         self.graph_stop_button = QtWidgets.QPushButton(self.centralwidget)
         font = QtGui.QFont()
         font.setPointSize(9)
@@ -343,8 +347,8 @@ class Ui_Title(object):
             "color: rgb(255, 85, 0);\nbackground-color: rgb(255, 170, 0);"
         )
         self.graph_stop_button.setObjectName("graph_stop_button")
-        left.addWidget(self.graph_stop_button)
- 
+        graph_ctl.addWidget(self.graph_stop_button)
+
         self.button_auto_range = QtWidgets.QPushButton(self.centralwidget)
         font = QtGui.QFont()
         font.setPointSize(9)
@@ -353,16 +357,25 @@ class Ui_Title(object):
             "color: rgb(255, 85, 0);\nbackground-color: rgb(255, 170, 0);"
         )
         self.button_auto_range.setObjectName("button_auto_range")
-        left.addWidget(self.button_auto_range)
- 
+        graph_ctl.addWidget(self.button_auto_range)
+
+        left.addWidget(self.group_graph_controls)
+
+        # ── GroupBox: Calibration ─────────────────────────────────────
+        self.group_calibration = QtWidgets.QGroupBox("Calibration", self.centralwidget)
+        self.group_calibration.setObjectName("group_calibration")
+        cal = QtWidgets.QVBoxLayout(self.group_calibration)
+        cal.setSpacing(4)
+        cal.setContentsMargins(8, 14, 8, 8)
+
         self.normalise_button = QtWidgets.QPushButton(self.centralwidget)
         font = QtGui.QFont()
         font.setPointSize(12)
         self.normalise_button.setFont(font)
         self.normalise_button.setStyleSheet("background-color: rgb(81, 0, 255);")
         self.normalise_button.setObjectName("normalise_button")
-        left.addWidget(self.normalise_button)
- 
+        cal.addWidget(self.normalise_button)
+
         self.button_fr_constant = QtWidgets.QPushButton(self.centralwidget)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         sizePolicy.setHorizontalStretch(0)
@@ -396,8 +409,8 @@ class Ui_Title(object):
             "color: rgb(0, 0, 0);\nbackground-color: rgb(255, 152, 222);"
         )
         self.button_fr_constant.setObjectName("button_fr_constant")
-        left.addWidget(self.button_fr_constant)
- 
+        cal.addWidget(self.button_fr_constant)
+
         self.button_cal_constant = QtWidgets.QPushButton(self.centralwidget)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         sizePolicy.setHorizontalStretch(0)
@@ -417,8 +430,12 @@ class Ui_Title(object):
             "color: rgb(0, 0, 0);\nbackground-color: rgb(255, 170, 127);"
         )
         self.button_cal_constant.setObjectName("button_cal_constant")
-        left.addWidget(self.button_cal_constant)
- 
+        cal.addWidget(self.button_cal_constant)
+
+        left.addWidget(self.group_calibration)
+
+        left.addStretch(1)
+
         root.addLayout(left, 1)
  
         # ── RIGHT PANEL: graph ───────────────────────────────────────

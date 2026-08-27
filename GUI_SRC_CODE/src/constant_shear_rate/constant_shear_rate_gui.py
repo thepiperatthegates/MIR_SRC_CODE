@@ -325,9 +325,35 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         """Set icons, placeholders, and labels."""
         #--------- Icons. ------------------
         get_path = lambda x: os.path.join(self.project_root, "pics", x)
-        self.save_button.setIcon(QtGui.QIcon(get_path("save_icon.ico")))
+        action_button_icon = QtGui.QIcon(get_path("abspielen.png"))
+        flat_button_style = (
+            "QPushButton { border: none; background-color: transparent;"
+            " text-align: left; padding-left: 4px; }"
+            "QPushButton:pressed { background-color: rgba(0, 0, 0, 30); }"
+        )
+
+        for action_button in (
+            self.button_send,
+            self.button_stop,
+            self.button_start,
+            self.button_rotate,
+            self.save_button,
+            self.graph_stop_button,
+            self.button_auto_range,
+            self.normalise_button,
+        ):
+            action_button.setIcon(action_button_icon)
+            action_button.setIconSize(QtCore.QSize(28, 28))
+            action_button.setFlat(True)
+            action_button.setStyleSheet(flat_button_style)
+
+        # these two keep their own distinct icons, just get the same flat/left-aligned chrome
         self.button_fr_constant.setIcon(QtGui.QIcon(get_path("friction_icon.png")))
         self.button_cal_constant.setIcon(QtGui.QIcon(get_path("calibrate.png")))
+        for distinct_icon_button in (self.button_fr_constant, self.button_cal_constant):
+            distinct_icon_button.setIconSize(QtCore.QSize(28, 28))
+            distinct_icon_button.setFlat(True)
+            distinct_icon_button.setStyleSheet(flat_button_style)
 
         #--------- Text/Labels  ---------
         self.button_stop.setDisabled(True)
