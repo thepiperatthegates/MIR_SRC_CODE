@@ -63,11 +63,6 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         self.refresh_Button.setIcon(QtGui.QIcon(refresh_icon_path))
 
         # ---- make the top toolbar row uniform ----
-        action_button_style = "background-color: rgb(85, 170, 255);"
-        self.refresh_Button.setStyleSheet(action_button_style)
-        self.csv_Button.setStyleSheet(action_button_style)
-        self.save_Button.setStyleSheet(action_button_style)
-
         top_row_height = 28
         for widget in (
             self.refresh_Button,
@@ -259,6 +254,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
     def show_analysed_data(self):
         """Shared by both the .bin and .csv paths: ready the combo box and display
         self.analyse_filename (which must be a CSV by this point) as a data table."""
+        
+        
         self.data_show_comboBox.setDisabled(False)
         self.data_show_comboBox.setCurrentText("Data table")
         self.choose_option_after_unpacking()
@@ -286,14 +283,16 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
             skip_check = 1
             print("New code")
 
-        # Load selected file
+        #-------------------------------  Load selected file -------------------------------
         self.data = np.genfromtxt(
             self.analyse_filename,
             delimiter=";",
             skip_header=skip_check,
             encoding=csv_encoding
         )
-
+        #-----------------------------------------------------------------------------------
+        
+        
         mode = self.data_show_comboBox.currentText()
         self.num_rows, self.num_column = self.data.shape
 

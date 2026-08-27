@@ -40,7 +40,7 @@ void sensor_frame_write_be32(uint8_t *p, uint32_t v);
 int sensor_frame_init(sensor_frame_t *f, const uint8_t *buf, uint32_t len);
 
 /* One sample as signed int16 (big-endian -> host), zero-copy. */
-uint16_t sensor_sample(const sensor_frame_t *f, uint32_t ch, uint32_t i);
+int16_t sensor_sample(const sensor_frame_t *f, uint32_t ch, uint32_t i);
 
 /* Reduce the full frame to only HALL_A/B, COIL_A/B, SAME on-disk format.
  * Output = 8-byte header (channel_count=4, same samples_per_channel) + the 4

@@ -6,7 +6,6 @@ from .creep_test_backend import CreepTestGUI
 from .analyse_window_creep_test import AnalyseWindow
 import console.console_widget as console_widget
 from console.console_widget import ConsoleWidget
-from console.serial_terminal_widget import SerialTerminalWidget
 
 
 class TabWindowCreepTest(QMainWindow):
@@ -19,11 +18,10 @@ class TabWindowCreepTest(QMainWindow):
         tabs = QTabWidget()
 
         # Add your classes as tabs
-        tabs.addTab(CreepTestGUI(), "Main GUI")
+        self.main_window = CreepTestGUI()
+        tabs.addTab(self.main_window, "Main GUI")
         tabs.addTab( AnalyseWindow(), "Data analyse")
         tabs.addTab(ConsoleWidget(console_widget.get_stdout_stream()), "Console")
-        self.serial_terminal = SerialTerminalWidget()
-        tabs.addTab(self.serial_terminal, "Serial Terminal")
 
         # Set central widget
         self.setCentralWidget(tabs)
@@ -32,9 +30,24 @@ class TabWindowCreepTest(QMainWindow):
     def closeEvent(self, event):
         #stop all the background processes
 
-        self.serial_terminal.stop_reader()
+        #stop the real background threads *before* closing the queues they
+        #read from -- q_to_graph.get() blocks with no timeout, so setting
+        #the flag alone doesn't unblock it; push a sentinel to wake it, then
+        #wait for the thread to actually exit.
+        self.main_window.worker_socket.stop()
+        self.main_window.worker_DataUpdate.stop()
+        sockets_files.q_to_graph.put(None)
+        self.main_window.worker_DataUpdate.wait()
 
-        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, sockets_files.q_to_csv):
+        #worker_socket.run() calls serial_backend.thread_start(), which
+        #blocks forever in "while True: tx_event.wait()" and never checks
+        #self.running -- .stop() above is a no-op for it, so it can't exit
+        #on its own. Force it since the process is exiting anyway; this is
+        #what was causing "QThread: Destroyed while thread is still running".
+        self.main_window.worker_socket.terminate()
+        self.main_window.worker_socket.wait()
+
+        for q in (sockets_files.q_to_process, sockets_files.q_to_graph, sockets_files.q_to_csv, sockets_files.q_to_watchdog):
             q.close()
             q.join_thread()
 
@@ -43,12 +56,6 @@ class TabWindowCreepTest(QMainWindow):
         if sockets_files.p1 is not None:
             sockets_files.p1.terminate()
             sockets_files.p1.join()
-
-        #stop all the threads
-
-        self.main_window = CreepTestGUI()
-        self.main_window.worker_socket.stop()
-        self.main_window.worker_DataUpdate.stop()
 
         #DELETE THE GODDAMN FILE
         try:

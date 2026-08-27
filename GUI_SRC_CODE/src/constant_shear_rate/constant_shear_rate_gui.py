@@ -12,13 +12,13 @@ from pathlib import Path
 
 # #fix cache problem with MATHPLOTLIB
 os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
-from .gui_baru import Ui_Title
+from .constant_shear_rate_main_gui import Ui_Title
 
 import serial_comm.serial_backend as serial_backend
 from serial_comm.serial_backend import q_to_graph
 
 from serial_comm import device_state
-from .graph_fr import PlotWindow
+from .popout_graph.graph_fr import PlotWindow
 
 
 
@@ -278,6 +278,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.before1 = self.before2 = None
         self.curve_v1 = self.curve_v2 = self.curve_i1 = self.curve_i2 = None
         self.curve_sigma_b = self.curve_sigma_m = None
+        self.curve_phase_difference = None
 
     def _init_measurement_variables(self):
         """Initialize all calculation variables (Preserving original names)."""
@@ -388,7 +389,21 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         self.worker_DataUpdate.start()
 
+        #--------- Drain the shared watchdog queue ---------
+        self.watchdog_drain_timer = QTimer(self)
+        self.watchdog_drain_timer.setInterval(1000)
+        self.watchdog_drain_timer.timeout.connect(self._drain_watchdog)
+        self.watchdog_drain_timer.start()
+
         self.change_graph()
+
+    def _drain_watchdog(self):
+        """Discard queued watchdog packets so q_to_watchdog doesn't grow unbounded."""
+        while True:
+            try:
+                serial_backend.q_to_watchdog.get_nowait()
+            except Exception:
+                break
 
     def change_graph(self):
         """Sets up the plotting environment based on UI selection."""
@@ -484,6 +499,9 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         # 4. Slice all arrays to the same length for this frame
         t = self.time_axis[:min_len]
 
+        if self.curve_v1 is None or self.curve_v2 is None or self.curve_i1 is None or self.curve_i2 is None:
+            return
+
         self.curve_v1.setData(t, v1[:min_len])
         self.curve_v2.setData(t, v2[:min_len])
         self.curve_i1.setData(t, i1[:min_len])
@@ -503,6 +521,10 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         global data_mutex
         data_mutex.lock()
 
+        if self.curve_sigma_m is None or self.curve_sigma_b is None:
+            data_mutex.unlock()
+            return
+
         self.curve_sigma_m.setData(self.time_axis, self.worker_getter_graph.angle_permanent_magnet_val)
         self.curve_sigma_b.setData(self.time_axis, self.worker_getter_graph.angle_magnetic_field_val)
 
@@ -510,6 +532,10 @@ class ConstShearGUI(QMainWindow, Ui_Title):
     def graph_phase_difference(self):
         global data_mutex
         data_mutex.lock()
+
+        if self.curve_phase_difference is None:
+            data_mutex.unlock()
+            return
 
         self.curve_phase_difference.setData(self.time_axis, self.worker_getter_graph.phase_difference_val)
 
@@ -600,6 +626,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.status_label.setStyleSheet("color: #7da832;")
         self.status_label.setText("Acquisition starts.......")
 
+        if self.worker_sleep is not None:
+            self.worker_sleep.stop()
         self.worker_sleep = SleepTimer()
         self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
         self.worker_sleep.start()
@@ -663,6 +691,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
 
     def after_stabilise_calibration(self, count_recursion):
+        if self.worker_sleep is not None:
+            self.worker_sleep.stop()
         self.worker_sleep = SleepTimer()
         self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_calibrating(value, count_recursion))
         self.worker_sleep.start()
@@ -849,6 +879,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
 
     def after_stabilise_fR_measurement(self, count_recursion, running_frequency, input_current, data_4, data_6):
+        if self.worker_sleep is not None:
+            self.worker_sleep.stop()
         self.worker_sleep = SleepTimer()
         self.worker_sleep.update_time_signal.connect(lambda value: self.update_time_counter_fR_measurement( value, count_recursion, running_frequency, input_current, data_4, data_6))
         self.worker_sleep.start()
@@ -1048,6 +1080,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.status_label.setStyleSheet("color: #7da832;")
         self.status_label.setText("Rotation starts for normalising!!!!")
 
+        if self.worker_sleep is not None:
+            self.worker_sleep.stop()
         self.worker_sleep = SleepTimer()
         self.worker_sleep.update_time_signal.connect(self.update_timer_rotation)
         self.worker_sleep.start()

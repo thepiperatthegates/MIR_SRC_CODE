@@ -8,7 +8,6 @@ from .mapheus_gui import MAPHEUS_GUI
 from .analyse.backend import AnalyseWindow
 import console.console_widget as console_widget
 from console.console_widget import ConsoleWidget
-from console.serial_terminal_widget import SerialTerminalWidget
 from .photo_tab.MAMPHEUS_photo_main import ConvertBinToJPG
 
 #different windows with tab
@@ -24,12 +23,11 @@ class TabWindowMAPHEUS(QMainWindow):
         tabs = QTabWidget()
 
         # Add your classes as tabs
-        tabs.addTab(MAPHEUS_GUI(), "Main GUI")
+        self.main_window = MAPHEUS_GUI()
+        tabs.addTab(self.main_window, "Main GUI")
         tabs.addTab(AnalyseWindow(), "Auswertung")
         tabs.addTab(ConvertBinToJPG(), "Bin Photo")
         tabs.addTab(ConsoleWidget(console_widget.get_stdout_stream()), "Console")
-        self.serial_terminal = SerialTerminalWidget()
-        tabs.addTab(self.serial_terminal, "Python Terminal")
 
         # Set central widget
         self.setCentralWidget(tabs)
@@ -37,9 +35,16 @@ class TabWindowMAPHEUS(QMainWindow):
     def closeEvent(self, event):
         #stop all the background processes
 
-        self.serial_terminal.stop_reader()
+        # STOP THE BACKGROUND THREADS BEFORE STOP THE QUEUE
+        self.main_window.worker_socket.stop()
+        self.main_window.worker_DataUpdate.stop()
+        serial_backend.q_to_graph.put(None)
+        self.main_window.worker_DataUpdate.wait()
 
-        for q in (serial_backend.q_to_process, serial_backend.q_to_graph, serial_backend.q_to_csv):
+        self.main_window.worker_socket.terminate()
+        self.main_window.worker_socket.wait()
+
+        for q in (serial_backend.q_to_process, serial_backend.q_to_graph, serial_backend.q_to_csv, serial_backend.q_to_watchdog):
             q.close()
             q.join_thread()
 
@@ -48,12 +53,6 @@ class TabWindowMAPHEUS(QMainWindow):
         if serial_backend.p1 is not None:
             serial_backend.p1.terminate()
             serial_backend.p1.join()
-
-        #stop all the threads
-
-        self.main_window = MAPHEUS_GUI()
-        self.main_window.worker_socket.stop()
-        self.main_window.worker_DataUpdate.stop()
 
         #DELETE THE GODDAMN FILE
         try:

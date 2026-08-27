@@ -91,9 +91,6 @@ class Ui_Title(object):
         font.setItalic(False)
         font.setWeight(QtGui.QFont.Weight.Normal)
         self.button_send.setFont(font)
-        self.button_send.setStyleSheet(
-            "background-color: rgb(67, 107, 255);\ncolor: rgb(0, 0, 0);"
-        )
         self.button_send.setObjectName("button_send")
         left.addWidget(self.button_send)
 
@@ -106,9 +103,6 @@ class Ui_Title(object):
         font.setWeight(QtGui.QFont.Weight.Normal)
         self.button_start.setFont(font)
         self.button_start.setFocusPolicy(QtCore.Qt.NoFocus)
-        self.button_start.setStyleSheet(
-            "background-color: rgb(0, 255, 0);\ncolor: rgb(0, 0, 0);"
-        )
         self.button_start.setObjectName("button_start")
         left.addWidget(self.button_start)
 
@@ -175,9 +169,6 @@ class Ui_Title(object):
         font = QtGui.QFont()
         font.setPointSize(9)
         self.graph_stop_button.setFont(font)
-        self.graph_stop_button.setStyleSheet(
-            "color: rgb(255, 255, 255);\nbackground-color: rgb(235, 157, 0);"
-        )
         self.graph_stop_button.setObjectName("graph_stop_button")
         left.addWidget(self.graph_stop_button)
 

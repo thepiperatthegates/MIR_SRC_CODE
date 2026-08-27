@@ -682,28 +682,16 @@ def stop_button_getter():
 
 
 def change_adc_hall(digital_hall_voltage):
+    """digital_hall_voltage is a signed int16 raw ADC code (-32768..32767);
+    physical zero is at code 0, full scale is +-2.5 V."""
 
-    analogue_hall_voltage = (3.3/RESB_16 * digital_hall_voltage) 
-    gradient_analogue  = gradient_calculate(2.5, -2.5, 3.3)
-    analogue_hall_voltage_after_impedance_matching = (analogue_hall_voltage*gradient_analogue) + 2.5
-     
-    return analogue_hall_voltage_after_impedance_matching
-    
+    return digital_hall_voltage / 32768 * 2.5
+
 def change_current_adc(digital_current_values):
-    
-    analogue_before_adjustment = 3.3/RESB_16*digital_current_values
-    gradient_analogue = gradient_calculate(5.0, -5.0 , 3.3)
-    
-    
-    analogue_voltage_after_impedance_matching = analogue_before_adjustment*gradient_analogue + 5.0
-    analogue_current_after_impedance_matching = 500/5.0 * analogue_voltage_after_impedance_matching
-    return analogue_current_after_impedance_matching
+    """digital_current_values is a signed int16 raw ADC code (-32768..32767);
+    physical zero is at code 0, full scale is +-500 mA."""
 
-
-def gradient_calculate(y_intercept, y_axis, x_axis):
-     
-    gradient =  (y_axis - y_intercept)/x_axis
-    return gradient
+    return digital_current_values / 32768 * 500
 
 def calibrated_hall_sensors1(k_b_1, hall_voltage, actual_current):
     

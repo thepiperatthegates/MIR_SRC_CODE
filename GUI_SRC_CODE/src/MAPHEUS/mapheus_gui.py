@@ -331,6 +331,12 @@ class MAPHEUS_GUI(QMainWindow, Ui_Title):
             f"f<sub>R</sub> equation = {self.worker_fr_property.fr1}x + {self.worker_fr_property.fr0}"
         )
 
+        #--------- Watchdog indicator ---------
+        self.radioButton_connected.setStyleSheet(
+            "QRadioButton::indicator:checked { background-color: #2ecc71; border-radius: 6px; }"
+        )
+        self.radioButton_connected.setChecked(False)
+
     def _connect_signals(self):
         """Connect all UI signals."""
         self.graph_stop_button.clicked.connect(self.graph_stop_event)
@@ -358,7 +364,28 @@ class MAPHEUS_GUI(QMainWindow, Ui_Title):
 
         self.worker_DataUpdate.start()
 
+        #--------- Watchdog indicator ---------
+        # Poll faster (100ms) than the firmware's 500ms watchdog interval so no packet gets missed.
+        self.watchdog_poll_timer = QTimer(self)
+        self.watchdog_poll_timer.setInterval(100)
+        self.watchdog_poll_timer.timeout.connect(self._poll_watchdog)
+        self.watchdog_poll_timer.start()
+
         self.change_graph()
+
+    def _poll_watchdog(self):
+        """Blink radioButton_connected green each time ETH_Server_Watchdog's packet arrives."""
+        got_one = False
+        while True:
+            try:
+                serial_backend.q_to_watchdog.get_nowait()
+                got_one = True
+            except Exception:
+                break
+
+        if got_one:
+            self.radioButton_connected.setChecked(True)
+            QTimer.singleShot(200, lambda: self.radioButton_connected.setChecked(False))
 
     def change_graph(self):
         """Sets up the plotting environment based on UI selection."""
@@ -525,6 +552,8 @@ class MAPHEUS_GUI(QMainWindow, Ui_Title):
         self.status_label.setStyleSheet("color: #7da832;")
         self.status_label.setText("Rotation starts for normalising!!!!")
 
+        if self.worker_sleep is not None:
+            self.worker_sleep.stop()
         self.worker_sleep = SleepTimer()
         self.worker_sleep.update_time_signal.connect(self.update_timer_rotation)
         self.worker_sleep.start()

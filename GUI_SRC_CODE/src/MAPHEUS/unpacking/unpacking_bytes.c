@@ -41,10 +41,10 @@ int sensor_frame_init(sensor_frame_t *f, const uint8_t *buf, uint32_t len) {
 }
 
 /* One sample as signed int16 (big-endian -> host), zero-copy. */
-uint16_t sensor_sample(const sensor_frame_t *f, uint32_t ch, uint32_t i) {
+int16_t sensor_sample(const sensor_frame_t *f, uint32_t ch, uint32_t i) {
     const uint8_t *p = f->base + SENSOR_HEADER_BYTES + ((size_t)ch * f->samples_per_channel + i) * BYTE_UINT16T;
     uint16_t sample_byte = (uint16_t)p[0] << 8 | p[1];
-    return sample_byte;
+    return (int16_t)sample_byte;
 }
 
 uint32_t sensor_reduce_to_4(const uint8_t *in, uint32_t in_len,
@@ -179,7 +179,7 @@ int main(int argc, char *argv[]) {
     fprintf(fptr, "i" CSV_SEP "HALL_A" CSV_SEP "HALL_B" CSV_SEP "COIL_A" CSV_SEP "COIL_B\n");
     for (uint32_t i = 0; i < r.samples_per_channel; i++){
         //Write the actual data in CSV
-        fprintf(fptr, "%f" CSV_SEP "%u" CSV_SEP "%u" CSV_SEP "%u" CSV_SEP "%u\n", time_stamp,
+        fprintf(fptr, "%f" CSV_SEP "%d" CSV_SEP "%d" CSV_SEP "%d" CSV_SEP "%d\n", time_stamp,
                 sensor_sample(&r, R_HALL_A, i), sensor_sample(&r, R_HALL_B, i),
                 sensor_sample(&r, R_COIL_A, i), sensor_sample(&r, R_COIL_B, i));
         time_stamp += TIME_STAMP;

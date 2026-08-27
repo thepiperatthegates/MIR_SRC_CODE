@@ -2,6 +2,8 @@
 
 import numpy as np
 from scipy.signal import savgol_filter
+from serial_comm.device_state import change_adc_hall 
+from serial_comm.device_state import change_current_adc
 
 
 class AnalyseCalculationMixin:
@@ -71,6 +73,13 @@ class AnalyseCalculationMixin:
         self.magnitude_current = np.zeros((self.num_rows, 1))
         ###############################################################################
 
+        #------------ Convert the digital value to analogue value first -------------
+        self.data[:, 1] = change_adc_hall(self.data[:, 1])          # Hall 1 [V]
+        self.data[:, 2] = change_adc_hall(self.data[:, 2])          # Hall 2 [V]
+        self.data[:, 3] = change_current_adc(self.data[:, 3] )
+        self.data[:, 4] = change_current_adc(self.data[:, 4] )        
+        
+        
         # declare variables to read from the files (already given)
         self.time = self.data[:, 0]
         self.voltage_1 = self.data[:, 1]
@@ -184,7 +193,6 @@ class AnalyseCalculationMixin:
 
         self.textbox_offset1.setText(str(self.offset_1))
         self.textbox_offset2.setText(str(object=self.offset_2))
-
     def calculate_angle(self):
         """
         Calculate magnet and magnetic field angles and their phase difference.

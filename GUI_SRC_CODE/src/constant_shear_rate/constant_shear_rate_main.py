@@ -6,10 +6,9 @@ import os
 import serial_comm.serial_backend as serial_backend
 from .constant_shear_rate_gui import ConstShearGUI
 from .analyse.backend import AnalyseWindow
-from .graph_fr import PlotWindow
+from .popout_graph.graph_fr import PlotWindow
 import console.console_widget as console_widget
 from console.console_widget import ConsoleWidget
-from console.serial_terminal_widget import SerialTerminalWidget
 
 
 #different windows with tab
@@ -25,12 +24,11 @@ class TabWindowConstSR(QMainWindow):
         tabs = QTabWidget()
 
         # Add your classes as tabs
-        tabs.addTab(ConstShearGUI(), "Main GUI")
+        self.main_window = ConstShearGUI()
+        tabs.addTab(self.main_window, "Main GUI")
         tabs.addTab( AnalyseWindow(), "Data analyse")
         tabs.addTab(PlotWindow(), "f_R Plot")
         tabs.addTab(ConsoleWidget(console_widget.get_stdout_stream()), "Python Console")
-        self.serial_terminal = SerialTerminalWidget()
-        tabs.addTab(self.serial_terminal, "Serial Terminal")
 
         # Set central widget
         self.setCentralWidget(tabs)
@@ -38,9 +36,16 @@ class TabWindowConstSR(QMainWindow):
     def closeEvent(self, event):
         #stop all the background processes
 
-        self.serial_terminal.stop_reader()
+        self.main_window.worker_socket.stop()
+        self.main_window.worker_DataUpdate.stop()
+        serial_backend.q_to_graph.put(None)
+        self.main_window.worker_DataUpdate.wait()
 
-        for q in (serial_backend.q_to_process, serial_backend.q_to_graph, serial_backend.q_to_csv):
+
+        self.main_window.worker_socket.terminate()
+        self.main_window.worker_socket.wait()
+
+        for q in (serial_backend.q_to_process, serial_backend.q_to_graph, serial_backend.q_to_csv, serial_backend.q_to_watchdog):
             q.close()
             q.join_thread()
 
@@ -49,12 +54,6 @@ class TabWindowConstSR(QMainWindow):
         if serial_backend.p1 is not None:
             serial_backend.p1.terminate()
             serial_backend.p1.join()
-
-        #stop all the threads
-
-        self.main_window = ConstShearGUI()
-        self.main_window.worker_socket.stop()
-        self.main_window.worker_DataUpdate.stop()
 
         #DELETE THE GODDAMN FILE
         try:

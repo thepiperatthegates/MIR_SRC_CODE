@@ -405,6 +405,17 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.worker_DataUpdate.start()
         self.worker_sleep = None
         self.worker_vector_sleep = None
+
+        #--------- Drain the shared watchdog queue ---------
+        # This window has no "connected" indicator, but serial_backend's
+        # start_process_live_graph() still pushes a watchdog packet onto
+        # q_to_watchdog every 500ms regardless of which GUI is running --
+        # nothing draining it here means it grows for the life of the
+        # session (confirmed via memory profiling).
+        self.watchdog_drain_timer = QTimer(self)
+        self.watchdog_drain_timer.setInterval(1000)
+        self.watchdog_drain_timer.timeout.connect(self._drain_watchdog)
+        self.watchdog_drain_timer.start()
         ################################################################################################
 
         ####### flag init ##############################################################################
@@ -448,6 +459,14 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.select_mode_comboBox.activated.connect(self.change_graph)
         ##### same as above but for time interval change
         self.timeInterval_comboBox.activated.connect(self.change_graph)
+
+    def _drain_watchdog(self):
+        """Discard queued watchdog packets so q_to_watchdog doesn't grow unbounded."""
+        while True:
+            try:
+                sockets_files.q_to_watchdog.get_nowait()
+            except Exception:
+                break
 
     def change_graph(self):
 
@@ -814,10 +833,14 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             self.worker_remaining_time.time_for_resetting_time = self.worker_remaining_time.total_time_for_file_save - input_sampling_time
 
             #start the overall timer (combined timer)
+            if self.worker_sleep is not None:
+                self.worker_sleep.stop()
             self.worker_sleep = SleepTimer()
             self.worker_sleep.update_time_signal.connect(self.update_time_counter_acquisition)
             self.worker_sleep.start()
 
+            if self.worker_vector_sleep is not None:
+                self.worker_vector_sleep.stop()
             self.worker_vector_sleep = SleepTimerVector(self.start_vector_time)
             self.worker_vector_sleep.update_time_signal_vector.connect(self.update_time_counter_start_vector)
             self.worker_vector_sleep.start()
@@ -902,6 +925,8 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             self.status_label.setStyleSheet("color: #7da832;")
             self.status_label.setText("Creep test end vector.......")
 
+            if self.worker_vector_sleep is not None:
+                self.worker_vector_sleep.stop()
             self.worker_vector_sleep = SleepTimerVector(self.end_vector_time)
             self.worker_vector_sleep.update_time_signal_vector.connect(self.update_timer_end_vector)
             self.worker_vector_sleep.start()
@@ -973,6 +998,8 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.status_label.setStyleSheet("color: #7da832;")
         self.status_label.setText("Rotation starts for normalising!!!!")
 
+        if self.worker_sleep is not None:
+            self.worker_sleep.stop()
         self.worker_sleep = SleepTimer()
         self.worker_sleep.update_time_signal.connect(self.update_timer_rotation)
         self.worker_sleep.start()

@@ -48,9 +48,10 @@ class PlotWindow(QMainWindow, Ui_MainWindow):
         self.mlp_toolbar =  NavigationToolbar2QT(self.canvas, self.centralwidget)
         self.horizontalLayout.addWidget(self.mlp_toolbar)
         
-        #project root dir
-        #go two level up (chaining dirname)
-        self.project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        #project root dir (GUI_SRC_CODE/src) -- three levels up from
+        #popout_graph/graph_fr.py, since this file moved one directory
+        #deeper when popout_graph/ was split out of constant_shear_rate/
+        self.project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         self.dir_name = os.path.join(self.project_root, "files", "results_fr.csv")
         #open results_fr.csv files
         

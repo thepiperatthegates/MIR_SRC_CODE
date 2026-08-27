@@ -8,18 +8,21 @@ import sys
 import threading
 import time
 import multiprocessing
-import serial
-import serial.tools.list_ports
+import socket
 import struct
 
 
-baud_rate = 128000
+# Board's static IP/port (see ZYBO_project/sw/app_component/src/ETH_Server/ETH_Server.h
+# -- ETH_IP_ADDR0..3 / ETH_SERVER_PORT -- must match the firmware's lwIP config).
+ETH_SERVER_IP   = "192.168.1.10"
+ETH_SERVER_PORT = 5001
 
-append_payload =0 
+append_payload =0
 
 q_to_process = multiprocessing.Queue()
 q_to_graph = multiprocessing.Queue()
 q_to_csv = multiprocessing.Queue()
+q_to_watchdog = multiprocessing.Queue()
 
 
 offset_1 = 0
@@ -48,60 +51,50 @@ tot_count_accumulate_recv = 250
 
 def init_queues():
     """Re-initialize all multiprocessing queues (call before restarting the pipeline)."""
-    global q_to_process, q_to_graph, q_to_csv
+    global q_to_process, q_to_graph, q_to_csv, q_to_watchdog
     q_to_process = multiprocessing.Queue()
     q_to_graph = multiprocessing.Queue()
     q_to_csv = multiprocessing.Queue()
+    q_to_watchdog = multiprocessing.Queue()
     print("Multiprocessing queues initialized.")
 
 
-def find_port(PID=0x0100, VID=0x03FD):
-    """Return the COM port name matching the given USB PID/VID, or None if not found."""
-    for ports_info in serial.tools.list_ports.comports():
-        if ports_info.pid == PID and ports_info.vid == VID:
-            return ports_info.device
-        
-    return None
-
-#---------------------- start socket connection for USB ----------------------
+#---------------------- start socket connection over ETH (lwIP TCP server) ----------------------
 def socket_start_connect(retries=10, delay=0.5):
-    """Open a serial connection to the device, retrying up to `retries` times."""
-    baud_rate = 128000
-    
+    """Open a TCP connection to the board's ETH_Server, retrying up to `retries` times."""
     for attempt in range(retries):
-        port_num = find_port()
-        
-        if port_num == None:
-            print(f"Device cannot detect the USB COM Port, trying to reconnect ({attempt + 1}/{retries}) !........")
-            time.sleep(delay)
-            continue
-        
         try:
-            ser = serial.Serial(port_num, 128000)
-            print(f"Succesfully connected on {port_num}!")
-            return ser
-        except Exception as e:
-            print(f"Connection failed: {e}, retrying... ({attempt + 1}/{retries})")
+            sock = socket.create_connection((ETH_SERVER_IP, ETH_SERVER_PORT), timeout=delay * retries)
+            sock.settimeout(None)  # blocking recv/sendall once connected, same semantics as pyserial's default
+            print(f"Successfully connected to {ETH_SERVER_IP}:{ETH_SERVER_PORT}!")
+            return sock
+        except OSError as e:
+            print(f"Device cannot connect to {ETH_SERVER_IP}:{ETH_SERVER_PORT} ({e}), "
+                  f"retrying ({attempt + 1}/{retries}) !........")
             time.sleep(delay)
 
     raise RuntimeError("Could not connect to device after several attempts")
+
+
+ETH_RECV_CHUNK_SIZE = 4096
+
 ##########################################################################
 #start creating two separate thread
 ##########################################################################
 def thread_start():
     """Connect to the device, start the receive thread, and poll for outgoing transmissions."""
-    ser1 = socket_start_connect()
+    sock = socket_start_connect()
     worker_kb_property = packet_transmission.kbCoefficient()
     worker_specific_downsampling = packet_transmission.DownSampleSpecificFlag()
     worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
-    #Event for run time receiving data from Serial Porte
-    thread_recv = threading.Thread(target=recv_thread, args=(ser1,worker_kb_property, worker_specific_downsampling, worker_normalise_properties))
+    #Event for run time receiving data from the ETH socket
+    thread_recv = threading.Thread(target=recv_thread, args=(sock,worker_kb_property, worker_specific_downsampling, worker_normalise_properties))
     thread_recv.start()
-    
+
     while True:
         packet_transmission.tx_event.wait()
         packet_transmission.tx_event.clear()
-        thread_send = threading.Thread(target=send_thread, daemon=False, args=(ser1,))
+        thread_send = threading.Thread(target=send_thread, daemon=False, args=(sock,))
         thread_send.start()
 
 # --- Data Type Sizes (in Byte) ---
@@ -118,7 +111,7 @@ PAYLOAD_DATA_SIZE    = 4 * UINT16_SIZE
 BYTES_PER_SAMPLE     = HEADER_SIZE + PAYLOAD_DATA_SIZE
 TOTAL_ONE_CYCLE_BYTES    = BYTES_PER_SAMPLE * ADC_BUFFER_SIZE
 
-SAMPLE_FREQ = 1000  #Hz
+SAMPLE_FREQ = 5000  #Hz
 SAMPLE_PERIOD = 1.0/(SAMPLE_FREQ)   #s
 SAMPLE_PERIOD_TOTAL = SAMPLE_PERIOD * ADC_BUFFER_SIZE   #s
 TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC   = int(0.1 / SAMPLE_PERIOD_TOTAL)
@@ -127,42 +120,40 @@ TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND =   int(0.1 / SAMPLE_PERIOD_TOTAL)
 range_len = 50000
 
 
-def recv_thread(ser1, worker_kb_property, worker_specific_downsampling, worker_normalise_properties):
-    """Continuously read serial data, forward frames for live plotting, and save to CSV when recording."""
+def recv_thread(sock, worker_kb_property, worker_specific_downsampling, worker_normalise_properties):
+    """Accumulate ETH bytes until at least one interval's worth has arrived, forward the batch for live plotting, and save to CSV when recording. """
     global flag_for_process, p1, tot_count_accumulate_recv, flag_for_downsampling
     num_columns = 4
     worker_process_flag = packet_transmission.ProcessUnpackingFlag()
     worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
-    
-    #start count with zero
-    count = 0
+
+    carry = b''  # bytes read past target_bytes on the previous batch, carried forward so none get dropped
     while True:
         try:
-            received_data = b''
-
             try:
-                while count < TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC:
-                    count += 1
-                    chunk = b''
-                    while len(chunk) < TOTAL_ONE_CYCLE_BYTES:
-                        chunk += ser1.read(TOTAL_ONE_CYCLE_BYTES - len(chunk))
+                target_bytes = TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC * TOTAL_ONE_CYCLE_BYTES
+                received_data = carry
+                while len(received_data) < target_bytes:
+                    chunk = sock.recv(ETH_RECV_CHUNK_SIZE)
+                    if not chunk:
+                        raise ConnectionError("ETH_Server closed the connection")
                     received_data += chunk
 
-                count = 0
+                received_data, carry = received_data[:target_bytes], received_data[target_bytes:]
 
                 # -----  Start live graph process for the first time --------
-                if not worker_process_flag.flag_process and received_data:
+                if not worker_process_flag.flag_process:
                     p1 = multiprocessing.Process(target=start_process_live_graph,
-                                                  args=(q_to_process, q_to_graph, q_to_csv))
+                                                  args=(q_to_process, q_to_graph, q_to_csv, q_to_watchdog),
+                                                  daemon=True)
                     p1.start()
                     worker_process_flag.flag_process = True
-                # ---- Non-blocking get with timeout to avoid freeze ----
+                # ---- Non-blocking check so this loop stays responsive to the socket ----
                 sensor_data_recv = None
                 try:
-                    # Non blocking queue get (since it might takes a while for firmware to react)
-                    sensor_data_recv = q_to_csv.get(timeout=1.0)  
+                    sensor_data_recv = q_to_csv.get_nowait()
                 except Exception:
-                    pass  # timeout hit, restart the process
+                    pass  # nothing queued yet
 
                 # ---- Saving data function -------
                 if packet_transmission.running_time_event.is_set():
@@ -171,9 +162,12 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling, worker_n
                                     worker_normalise_properties, num_columns=num_columns)
                         sensor_data_recv = None
 
-                                   
-
                 q_to_process.put(received_data)
+            except (ConnectionError, OSError) as e:
+                print(f"[ETH] connection lost ({e}), reconnecting...")
+                carry = b''  # bytes from the dead connection, not a continuation of the new one
+                time.sleep(1)
+                sock = socket_start_connect()
             except Exception as e:
                 print(f"Here 1: {e}")
         except Exception as e:
@@ -184,14 +178,14 @@ def recv_thread(ser1, worker_kb_property, worker_specific_downsampling, worker_n
 ##########################################################################
 #thread for TCP Tx
 ##########################################################################
-def send_thread(ser1):
-    """Pack and transmit the current command data over the serial port."""
+def send_thread(sock):
+    """Pack and transmit the current command data over the ETH socket."""
     worker_combined_send = packet_transmission.TxData()
     #combined everything
     combined_send = worker_combined_send.combine_data()
     #reset the flag
     try:
-        ser1.write(combined_send)
+        sock.sendall(combined_send)
     except Exception as e:
         print("Cannot send data!", e)
 
@@ -213,8 +207,13 @@ NORM_H2   = 0xBB
 KB_HEADER_1 = 0xBC
 KB_HEADER_2 = 0xBD
 
+WATCHDOG_H1   = 0xCE
+WATCHDOG_H2   = 0xCF
+WATCHDOG_SIZE = 6
+WATCHDOG_FMT  = '<I'
+
 # ----- Protocol Headers & Formatting ------
-def start_process_live_graph(q_to_process, q_to_graph, q_to_csv):
+def start_process_live_graph(q_to_process, q_to_graph, q_to_csv, q_to_watchdog):
     """Parse raw serial bytes into sensor frames and distribute them to the graph and CSV queues."""
     leftover = b''
 
@@ -231,7 +230,7 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv):
         buf_len = len(recv_buffer)
 
         while index < buf_len - 1:
-                
+
             # ----- Sensor frame -----
             if recv_buffer[index] == SENSOR_H1 and recv_buffer[index+1] == SENSOR_H2:
                 end = index + FRAME_SIZE
@@ -240,6 +239,17 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv):
                     break
                 c1, c2, h1, h2 = struct.unpack(FRAME_FMT, recv_buffer[index+2 : end])
                 batch_frames.extend([c1, c2, h1, h2])
+                index = end
+                continue
+
+            # ----- Watchdog packet -----
+            if recv_buffer[index] == WATCHDOG_H1 and recv_buffer[index+1] == WATCHDOG_H2:
+                end = index + WATCHDOG_SIZE
+                if end > buf_len:
+                    leftover = recv_buffer[index:]
+                    break
+                (seq,) = struct.unpack(WATCHDOG_FMT, recv_buffer[index+2 : end])
+                q_to_watchdog.put(seq)
                 index = end
                 continue
 

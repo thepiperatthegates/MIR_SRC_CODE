@@ -5,6 +5,7 @@
 ##
 ## Created by: Qt User Interface Compiler version 6.11.1
 ##
+
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
 
@@ -49,7 +50,6 @@ class Ui_analyse_Window(object):
         self.refresh_Button = QPushButton(self.centralwidget)
         self.refresh_Button.setObjectName(u"refresh_Button")
         self.refresh_Button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.refresh_Button.setStyleSheet(u"background-color: rgb(85, 170, 255);")
 
         self.horizontalLayout_2.addWidget(self.refresh_Button)
 

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'gui_baru.ui'
+# Form implementation generated from reading ui file 'constant_shear_rate_main_gui.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
