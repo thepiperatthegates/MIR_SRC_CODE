@@ -11,9 +11,6 @@ import multiprocessing
 import socket
 import struct
 
-
-# Board's static IP/port (see ZYBO_project/sw/app_component/src/ETH_Server/ETH_Server.h
-# -- ETH_IP_ADDR0..3 / ETH_SERVER_PORT -- must match the firmware's lwIP config).
 ETH_SERVER_IP   = "192.168.1.10"
 ETH_SERVER_PORT = 5001
 

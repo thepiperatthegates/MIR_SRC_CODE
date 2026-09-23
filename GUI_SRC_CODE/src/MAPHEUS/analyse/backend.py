@@ -175,8 +175,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         )
 
         self.canvas = MatplotlibCanvas(self)
-        # wrap the canvas in a framed container so the white plot area reads as a
-        # distinct widget instead of blending into the grey window background
+
         self.canvas_frame = QFrame(self.centralwidget)
         self.canvas_frame.setObjectName("canvas_frame")
         self.canvas_frame.setStyleSheet(
@@ -188,6 +187,23 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         _canvas_frame_layout.addWidget(self.canvas)
         self.mlp_layout.addWidget(self.canvas_frame)
         self.mpl_toolbar = NavigationToolbar2QT(self.canvas, self.centralwidget)
+
+        self.mpl_toolbar.setStyleSheet(
+            "QToolBar { background: #ffffff; border: 1px solid #6f6f6f;"
+            " border-radius: 4px; padding: 2px; spacing: 2px; }"
+            "QToolButton { background: transparent; padding: 2px; }"
+            "QToolButton:hover { background: #d8d8d8; border-radius: 3px; }"
+        )
+
+        _mpl_img_dir = os.path.join(mpl.get_data_path(), "images")
+        for _txt, _tip, _img, _cb in self.mpl_toolbar.toolitems:
+            if _img is None:
+                continue
+            _act = self.mpl_toolbar._actions.get(_cb)
+            if _act is not None:
+                _act.setIcon(QtGui.QIcon(os.path.join(_mpl_img_dir, _img + ".png")))
+                
+                
         self.canvas_frame.hide()
         self.horizontalLayout.addWidget(self.mpl_toolbar)
         self.csv_Button.clicked.connect(self.find_filename_button_pressed)
@@ -279,9 +295,6 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
 
     def choose_option_after_unpacking(self):
         #------------------ read csv files ------------------
-
-        # some CSVs are exported with a Windows codepage (e.g. degree/micro signs
-        # in the header) instead of UTF-8, which raises UnicodeDecodeError otherwise
         try:
             with open(self.analyse_filename, 'r', encoding='utf-8-sig') as check:
                 first_line = check.readline().strip()

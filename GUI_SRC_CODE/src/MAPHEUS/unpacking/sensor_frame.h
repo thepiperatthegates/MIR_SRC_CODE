@@ -3,23 +3,23 @@
 
 #include <stdint.h>
 #include <stddef.h>
-#include <string.h>   /* memcpy */
+#include <string.h>  
 
 #define SENSOR_HEADER_BYTES 8u
 #define BYTE_SIZE_UINT6 (2U2)
 
-enum {                    /* channel indices in the FULL frame */
+enum {                    /* channel index */
     CH_DAC1   = 2, CH_DAC2   = 3,
     CH_HALL_A = 4, CH_HALL_B = 5,
     CH_COIL_A = 6, CH_COIL_B = 7
 };
 
-enum {                    /* channel indices in the REDUCED (4-ch) frame */
+enum {                    /* signal frame */
     R_HALL_A = 0, R_HALL_B = 1, R_COIL_A = 2, R_COIL_B = 3
 };
 
 typedef struct {
-    const uint8_t *base;  /* points at the frame buffer (not copied) */
+    const uint8_t *base;  /* points at the frame buffer */
     uint32_t channel_count;
     uint32_t samples_per_channel;
 } sensor_frame_t;

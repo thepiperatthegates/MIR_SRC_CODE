@@ -69,6 +69,24 @@ class PlotWindow(QMainWindow, Ui_MainWindow):
         _canvas_frame_layout.addWidget(self.canvas)
         self.mlp_layout.addWidget(self.canvas_frame)
         self.mlp_toolbar =  NavigationToolbar2QT(self.canvas, self.centralwidget)
+        # give the nav toolbar its own bordered white bar so it doesn't wash out
+        # against the grey window background
+        self.mlp_toolbar.setStyleSheet(
+            "QToolBar { background: #ffffff; border: 1px solid #6f6f6f;"
+            " border-radius: 4px; padding: 2px; spacing: 2px; }"
+            "QToolButton { background: transparent; padding: 2px; }"
+            "QToolButton:hover { background: #d8d8d8; border-radius: 3px; }"
+        )
+        # matplotlib recolours the toolbar icons to near-white when it decides the
+        # widget palette is dark, making them vanish on the white bar; load the
+        # plain black PNG icons directly so they stay visible
+        _mpl_img_dir = os.path.join(mpl.get_data_path(), "images")
+        for _txt, _tip, _img, _cb in self.mlp_toolbar.toolitems:
+            if _img is None:
+                continue
+            _act = self.mlp_toolbar._actions.get(_cb)
+            if _act is not None:
+                _act.setIcon(QtGui.QIcon(os.path.join(_mpl_img_dir, _img + ".png")))
         self.horizontalLayout.addWidget(self.mlp_toolbar)
         
         #project root dir (GUI_SRC_CODE/src) -- three levels up from
