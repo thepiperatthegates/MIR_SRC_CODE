@@ -3,6 +3,7 @@ from PySide6 import QtGui
 from PySide6.QtCore import QFileInfo, Qt
 from PySide6.QtWidgets import *
 import subprocess
+import sys
 
 from .analyse_Window import Ui_analyse_Window
 from .calculation import AnalyseCalculationMixin
@@ -242,17 +243,16 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         self.show_analysed_data()
 
     def unpack_bin_file(self):
-        """Run unpacking_bytes.exe on self.analyse_filename to convert it to CSV."""
-        #find exe path (should be inside unpacking folder)
-        c_exe_path = os.path.join(self.project_root, "MAPHEUS", "unpacking", "unpacking_bytes.exe")
+        """Run unpacking_bytes.py on self.analyse_filename to convert it to CSV."""
+        #find script path (should be inside unpacking folder)
+        unpack_script_path = os.path.join(self.project_root, "MAPHEUS", "unpacking", "unpacking_bytes.py")
 
-        if not os.path.isfile(c_exe_path):
+        if not os.path.isfile(unpack_script_path):
             QMessageBox.critical(
                 self,
-                "unpacking_bytes.exe not found",
-                "Could not find unpacking_bytes.exe at:\n"
-                f"{c_exe_path}\n\n"
-                "This file is not tracked in git and must be built locally.\n"
+                "unpacking_bytes.py not found",
+                "Could not find unpacking_bytes.py at:\n"
+                f"{unpack_script_path}\n"
             )
             return False
 
@@ -261,22 +261,22 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         out_file_bin = base + "_unpacked.bin"
         out_file_csv = base + "_unpacked.csv"
 
-        #run the c exe file from python script
+        #run the unpacking script from python script
         try:
             run = subprocess.run(
-                [c_exe_path, self.analyse_filename, out_file_bin, out_file_csv],
+                [sys.executable, unpack_script_path, self.analyse_filename, out_file_bin, out_file_csv],
                 capture_output=True, text=True
             )
         except OSError as e:
             QMessageBox.critical(
                 self,
-                "Failed to run unpacking_bytes.exe",
-                f"Could not launch unpacking_bytes.exe:\n{e}"
+                "Failed to run unpacking_bytes.py",
+                f"Could not launch unpacking_bytes.py:\n{e}"
             )
             return False
 
         if run.returncode != 0:
-            print("unpacking_bytes.exe failed:", run.stderr)
+            print("unpacking_bytes.py failed:", run.stderr)
             return False
 
         # downstream code (choose_option_after_unpacking) reads a CSV, so point it there
