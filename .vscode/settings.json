@@ -4,5 +4,6 @@
     "DockerRun.DisableDockerrc": true,
     "cSpell.words": [
         "normalise"
-    ]
+    ],
+    "python-envs.defaultEnvManager": "ms-python.python:system"
 }

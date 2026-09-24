@@ -2,13 +2,13 @@ import numpy as np
 from PySide6 import QtGui
 from PySide6.QtCore import QFileInfo, Qt
 from PySide6.QtWidgets import *
-import subprocess
-import sys
+
+from MAPHEUS.unpacking.unpacking_bytes import main_sd_recording
 
 from .analyse_Window import Ui_analyse_Window
 from .calculation import AnalyseCalculationMixin
 from serial_comm import device_state
-
+import tempfile
 import pandas
 
 from pathlib import Path
@@ -256,28 +256,45 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
             )
             return False
 
-        #name of the output file
-        base, _ = os.path.splitext(self.analyse_filename)
-        out_file_bin = base + "_unpacked.bin"
-        out_file_csv = base + "_unpacked.csv"
-
-        #run the unpacking script from python script
+        #get temp dir
+        out_dir = os.path.join(tempfile.gettempdir(), "mapheus_unpacked")
+        #make temp dir
+        os.makedirs(out_dir, exist_ok=True)
+        #get chosen file name
+        base, _ = os.path.splitext(os.path.basename(self.analyse_filename))
+        #name it 
+        out_file_csv = os.path.join(out_dir, base + "_unpacked.csv")
+        
+        #run unpack 
         try:
-            run = subprocess.run(
-                [sys.executable, unpack_script_path, self.analyse_filename, out_file_bin, out_file_csv],
-                capture_output=True, text=True
-            )
-        except OSError as e:
+            with open(self.analyse_filename, "rb") as fptr:
+                in_buf = fptr.read()
+            status = main_sd_recording(in_buf, out_file_csv) 
+        except Exception as e:
             QMessageBox.critical(
-                self,
-                "Failed to run unpacking_bytes.py",
-                f"Could not launch unpacking_bytes.py:\n{e}"
+                self, 
+                "Unpacking failed!", 
+                f"Could not unpack {self.analyse_filename}:\n{e}"
+                
             )
             return False
-
-        if run.returncode != 0:
-            print("unpacking_bytes.py failed:", run.stderr)
+        
+        if status != 0:
+            print("unpacking failed: no data images found")
             return False
+        # #run the unpacking script from python script
+        # try:
+        #     run = subprocess.run(
+        #         [sys.executable, unpack_script_path, self.analyse_filename, out_file_csv],
+        #         capture_output=True, text=True
+        #     )
+        # except OSError as e:
+        #     QMessageBox.critical(
+        #         self,
+        #         "Failed to run unpacking_bytes.py",
+        #         f"Could not launch unpacking_bytes.py:\n{e}"
+        #     )
+        #     return False
 
         # downstream code (choose_option_after_unpacking) reads a CSV, so point it there
         self.analyse_filename = out_file_csv
@@ -422,10 +439,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
     def save_button_event(self):
 
         self.save_Button.setEnabled(False)
-
-
-        filename, _ = QFileDialog.getSaveFileName(parent=self, caption="Save File", directory="",
-                                                  filter="CSV Files (*.csv)")
+        filename, _ = QFileDialog.getSaveFileName(self, "Save File", "", "CSV Files (*.csv)")
         if filename:
             try:
                 # Ensure filename ends with .csv if the user didn't type it
