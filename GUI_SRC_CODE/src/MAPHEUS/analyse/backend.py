@@ -131,6 +131,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         self.current_2 = None
         self.voltage_1 = None
         self.voltage_2 = None
+        self.voltage_1_normalised = None
+        self.voltage_2_normalised = None
         # ------------------------------------------------------
 
         #------------------ declare bunch of important variable stuffs ------------------
@@ -503,10 +505,10 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
 
     def draw_voltage_diagrams(self):
         title = r"Voltage Sensors"
-        ylabel = r"Voltage / V"
+        ylabel = r"Normalised voltage"
         lines = [
-            {"y": self.voltage_1, "label": r"Hall sensor 1 $U_1$", "color": "#890304"},
-            {"y": self.voltage_2, "label": r"Hall sensor 2 $U_2$", "color": "#00113a"},
+            {"y": self.voltage_1_normalised, "label": r"Hall sensor 1 $U_1$", "color": "#890304"},
+            {"y": self.voltage_2_normalised, "label": r"Hall sensor 2 $U_2$", "color": "#00113a"},
         ]
 
         self.template_draw_diagram(title, ylabel, lines)

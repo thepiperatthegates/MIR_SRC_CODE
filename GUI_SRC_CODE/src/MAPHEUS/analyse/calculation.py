@@ -51,6 +51,7 @@ class AnalyseCalculationMixin:
                 self.textbox_offset2.setDisabled(False)
             except ValueError:
                 print("Invalid offset inputs")
+                
 
     def calculate_functions(self):
         #############################################################################
@@ -84,6 +85,8 @@ class AnalyseCalculationMixin:
         self.time = self.data[:, 0]
         self.voltage_1 = self.data[:, 1]
         self.voltage_2 = self.data[:, 2]
+
+        self.normalise_hall_voltages()
 
         print("self.offset_1, self.offset_2",  self.offset_1)
         print(self.offset_2)
@@ -152,6 +155,21 @@ class AnalyseCalculationMixin:
             self.fr0_to_be_saved,
             self.fr1_to_be_saved
         ))
+        
+        
+    def normalise_hall_voltages(self):
+
+        self.amp_hall_voltage_1 = (np.max(self.voltage_1 ) - np.min(self.voltage_1) ) / 2
+        self.zero_offset_hall_voltage_1 =(np.max(self.voltage_1) + np.min(self.voltage_1)) /2
+
+
+        self.amp_hall_voltage_2 = (np.max(self.voltage_2 ) - np.min(self.voltage_2) ) / 2
+        self.zero_offset_hall_voltage_2 =(np.max(self.voltage_2) + np.min(self.voltage_2)) /2
+
+        # remove DC offset and scale to unit amplitude -> both sensors in [-1, 1]
+        self.voltage_1_normalised = (self.voltage_1 - self.zero_offset_hall_voltage_1) / self.amp_hall_voltage_1
+        self.voltage_2_normalised = (self.voltage_2 - self.zero_offset_hall_voltage_2) / self.amp_hall_voltage_2
+
 
     def reference_var_for_saved_data(self):
         #############################################################################
@@ -174,6 +192,7 @@ class AnalyseCalculationMixin:
         self.time = self.final_data_to_show[:, 0]
         self.voltage_1 = self.final_data_to_show[:, 1]
         self.voltage_2 = self.final_data_to_show[:, 2]
+        self.normalise_hall_voltages()
         self.current_1 = self.final_data_to_show[:, 3]
         self.current_2 = self.final_data_to_show[:, 4]
         self.magnitude_current = np.hypot(self.current_1 , self.current_2)
