@@ -2,9 +2,9 @@ import struct
 import sys
 import os
 
-IN_FILE = "20260723_133155,286.bin"       # Binary input
-OUT_FILE_BIN = "unpacked_byte.bin"        # Output: raw reduced frame
-OUT_FILE_CSV = "unpacked_byte.csv"        # Output: decoded CSV
+IN_FILE = "20260723_133155,286.bin"       
+OUT_FILE_BIN = "unpacked_byte.bin"        
+OUT_FILE_CSV = "unpacked_byte.csv"     
 CSV_SEP = ";"
 
 SAMPLE_FREQ = 1000
@@ -21,32 +21,7 @@ CH_COIL_A, CH_COIL_B = 6, 7
 # channel indices in the frame
 R_HALL_A, R_HALL_B, R_COIL_A, R_COIL_B = 0, 1, 2, 3
 
-# ---------------------------------------------------------------------------
-# SD recorder format (REC*.BIN)
-#
-# The file is a sequence of images, each IMAGE_STEPS * IMAGE_LINES * 2 bytes
-# (1000 samples * 8 lines * 2 = 16000 bytes), all little-endian uint16/int16.
-# Every image slot is one of:
-#
-#   header image : TestImage_CreateImageHeader() output, no samples
-#       word 0      0x55AA  SYNC1
-#       word 1      siX     samples per line (1000)
-#       word 2      siY     lines (8)
-#       word 3      ImageNr
-#       word 4..5   tick count t1 (LO, HI) in ms
-#       word 6      DataSource
-#       word 7      CommChannel
-#       word 8..10  rfu
-#       word 11     0xCAFE  SYNC2
-#       word 12..139  RMAP register copy (128 words)
-#       word 140..142 rfu
-#       word 143    0xFFFE  SYNC3
-#
-#   data image   : no header, lines DAC1..COIL_B hold samples, but the whole
-#                  image sits DATA_SHIFT bytes earlier than the line grid
-#
-#   empty image  : all zeros
-# ---------------------------------------------------------------------------
+
 IMAGE_STEPS = 1000
 IMAGE_LINES = 8
 LINE_BYTES = IMAGE_STEPS * BYTE_INT16T
@@ -137,9 +112,9 @@ def parse_image_header(buf, off):
     }
 
 
-def data_image_lines(buf, off):
-    """Return the 8 lines of a headerless data image as lists of int16, or None if empty."""
-    start = off - DATA_SHIFT
+def data_image_lines(buf, off, shift=DATA_SHIFT):
+    """Return the 8 lines of a data image as lists of int16"""
+    start = off - shift
     img = bytearray(IMAGE_BYTES)
     src_from = max(start, 0)
     src_to = min(start + IMAGE_BYTES, len(buf))
@@ -154,36 +129,37 @@ def data_image_lines(buf, off):
 
 
 def unpack_sd_recording(in_buf):
-    """Split a REC*.BIN file into header images and data images.
-
-    Returns (headers, frames) where headers is a list of (slot, header dict) and
-    frames is a list of (slot, est_tick_ms, lines)."""
+    """Split a REC*.BIN file into header images and data images"""
     n_slots = len(in_buf) // IMAGE_BYTES
-    headers, data_slots = [], []
+    headers, frames = [], []
 
     for slot in range(n_slots):
         off = slot * IMAGE_BYTES
         hdr = parse_image_header(in_buf, off)
         if hdr is not None:
             headers.append((slot, hdr))
+            lines = data_image_lines(in_buf, off, shift=0)
+            if lines is not None:
+                frames.append((slot, hdr["tick_ms"], lines))
             continue
-        lines = data_image_lines(in_buf, off)
+        lines = data_image_lines(in_buf, off, shift=DATA_SHIFT)
         if lines is not None:
-            data_slots.append((slot, lines))
+            frames.append((slot, None, lines))
 
-    # data images carry no tick count -> estimate it from the header images,
-    # which advance one image (1 s at 1 kHz) per slot
-    ms_per_slot = IMAGE_STEPS * 1000 // SAMPLE_FREQ
-    if headers:
-        ref_slot, ref_hdr = headers[0]
-        t0 = ref_hdr["tick_ms"] - ref_slot * ms_per_slot
-    else:
-        t0 = 0
+   
+    if any(tick_ms is None for _, tick_ms, _ in frames):
+        ms_per_slot = IMAGE_STEPS * 1000 // SAMPLE_FREQ
+        if headers:
+            ref_slot, ref_hdr = headers[0]
+            t0 = ref_hdr["tick_ms"] - ref_slot * ms_per_slot
+        else:
+            t0 = 0
+        frames = [
+            (slot, t0 + slot * ms_per_slot if tick_ms is None else tick_ms, lines)
+            for slot, tick_ms, lines in frames
+        ]
 
-    frames =[]
-    for slot, lines in data_slots:
-        tick_ms = t0 + slot * ms_per_slot
-        frames.append((slot, tick_ms, lines))
+    frames.sort(key=lambda f: f[0])
     return headers, frames
 
 
@@ -300,7 +276,7 @@ def main_sd_recording(in_buf, out_file_csv):
 
 
 def main():
-    # Sort out the passed arguments
+    # passed arguments
     in_file = sys.argv[1] if len(sys.argv) > 1 else IN_FILE
     out_file_bin = sys.argv[2] if len(sys.argv) > 2 else OUT_FILE_BIN
     out_file_csv = sys.argv[3] if len(sys.argv) > 3 else OUT_FILE_CSV
