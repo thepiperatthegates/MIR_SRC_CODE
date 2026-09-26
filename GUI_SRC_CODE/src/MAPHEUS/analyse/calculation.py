@@ -196,9 +196,13 @@ class AnalyseCalculationMixin:
         self.current_1 = self.final_data_to_show[:, 3]
         self.current_2 = self.final_data_to_show[:, 4]
         self.magnitude_current = np.hypot(self.current_1 , self.current_2)
-        self.angle_magnetic_field = self.final_data_to_show[:, 5]
-        self.angle_magnet = self.final_data_to_show[:, 6]
-        self.phase_difference = self.final_data_to_show[:, 7]
+        # saved file stores the angles in degrees, internal variables are in radians
+        self.angle_magnetic_field_degree = self.final_data_to_show[:, 5]  # [deg]
+        self.angle_magnet_degree = self.final_data_to_show[:, 6]  # [deg]
+        self.phase_difference_degree = self.final_data_to_show[:, 7]  # [deg]
+        self.angle_magnetic_field = np.radians(self.angle_magnetic_field_degree)  # [rad]
+        self.angle_magnet = np.radians(self.angle_magnet_degree)  # [rad]
+        self.phase_difference = np.radians(self.phase_difference_degree)  # [rad]
         self.angular_velocity = self.final_data_to_show[:, 8]
         self.total_torque = self.final_data_to_show[:, 9]
         self.shear_rate = self.final_data_to_show[:, 10]

@@ -15,7 +15,8 @@ from pathlib import Path
 import os
 
 os.environ['MPLCONFIGDIR'] = str(Path.home()) + "/.matplotlib/"
-
+import matplotlib
+matplotlib.use('QtAgg')
 import matplotlib.pyplot as plt
 
 plt.rcParams.update({
@@ -143,6 +144,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         self.angle_magnetic_field_degree = None
         self.angle_magnet_degree = None
         self.phase_difference = None
+        self.phase_difference_degree = None
         self.angular_velocity = None
         self.fr1on_moment = None
         self.magnitude_current = None
@@ -188,8 +190,17 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         _canvas_frame_layout = QVBoxLayout(self.canvas_frame)
         _canvas_frame_layout.setContentsMargins(6, 6, 6, 6)
         _canvas_frame_layout.addWidget(self.canvas)
+
+        # cursor readout lives under the plot: the toolbar sits in a narrow splitter
+        # pane, so its built-in coordinate label gets pushed into the overflow menu
+        self.coord_label = QLabel("", self.canvas_frame)
+        self.coord_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        _canvas_frame_layout.addWidget(self.coord_label)
+        self.canvas.mpl_connect("motion_notify_event", self.update_coord_label)
+        self.canvas.mpl_connect("axes_leave_event", lambda event: self.coord_label.setText(""))
+
         self.mlp_layout.addWidget(self.canvas_frame)
-        self.mpl_toolbar = NavigationToolbar2QT(self.canvas, self.centralwidget)
+        self.mpl_toolbar = NavigationToolbar2QT(self.canvas, self.centralwidget, coordinates=False)
 
         self.mpl_toolbar.setStyleSheet(
             "QToolBar { background: #ffffff; border: 1px solid #6f6f6f;"
@@ -221,6 +232,12 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         self.refresh_Button.clicked.connect(self.refresh_event)
         #toggle button for radio button offsets
         self.take_Button.toggled.connect(self.refresh_event)
+
+    def update_coord_label(self, event):
+        if event.inaxes is None or event.xdata is None:
+            self.coord_label.setText("")
+            return
+        self.coord_label.setText(event.inaxes.format_coord(event.xdata, event.ydata))
 
     def save_offset1_event_textbox(self):
         self.offset_1 = float(self.textbox_offset1.text())

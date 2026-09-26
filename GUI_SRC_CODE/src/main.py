@@ -82,7 +82,7 @@ class FirstGUI(QMainWindow, Ui_MainWindow):
     def choose_window(self, index):
         """Open the selected experiment window and close the launcher."""
         mode = self.choose_experiment_comboBox.currentText()
-        
+
         if mode == "Control shear rate":
             
             self.csr_window = TabWindowConstSR()    

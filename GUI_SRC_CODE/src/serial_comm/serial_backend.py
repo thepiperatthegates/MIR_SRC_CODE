@@ -68,7 +68,7 @@ def socket_start_connect(retries=10, delay=0.5):
         except OSError as e:
             print(f"Device cannot connect to {ETH_SERVER_IP}:{ETH_SERVER_PORT} ({e}), "
                   f"retrying ({attempt + 1}/{retries}) !........")
-            time.sleep(delay)
+            # time.sleep(delay)
 
     raise RuntimeError("Could not connect to device after several attempts")
 

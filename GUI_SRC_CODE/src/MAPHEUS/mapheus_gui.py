@@ -217,6 +217,9 @@ class SleepTimer(QObject):
             self.timer.stop()
             device_state.running_time_event.clear()
 
+# set to True to connect to the board over ETH again
+ENABLE_SOCKET_CONNECTION = False
+
 class SocketThread(QThread):
 
     def __init__(self, parent=None):
@@ -366,8 +369,12 @@ class MAPHEUS_GUI(QMainWindow, Ui_Title):
 
     def _start_services(self):
         """Launch background threads."""
+        # the thread object is still created so the shutdown/restart code can call stop()/terminate()/wait()
         self.worker_socket = SocketThread()
-        self.worker_socket.start()
+        if ENABLE_SOCKET_CONNECTION:
+            self.worker_socket.start()
+        else:
+            print("Socket connection disabled (ENABLE_SOCKET_CONNECTION = False)")
 
         self.worker_DataUpdate = DataUpdate(self)
 

@@ -113,7 +113,7 @@ def parse_image_header(buf, off):
 
 
 def data_image_lines(buf, off, shift=DATA_SHIFT):
-    """Return the 8 lines of a data image as lists of int16"""
+    """Return the 8 lines of a data image as lists of uint16"""
     start = off - shift
     img = bytearray(IMAGE_BYTES)
     src_from = max(start, 0)
@@ -124,7 +124,7 @@ def data_image_lines(buf, off, shift=DATA_SHIFT):
     if not any(hall_coil):
         return None
 
-    samples = struct.unpack(f"<{IMAGE_STEPS * IMAGE_LINES}h", img)
+    samples = struct.unpack(f"<{IMAGE_STEPS * IMAGE_LINES}H", img)
     return [samples[ch * IMAGE_STEPS:(ch + 1) * IMAGE_STEPS] for ch in range(IMAGE_LINES)]
 
 
