@@ -693,13 +693,13 @@ def change_adc_hall(digital_hall_voltage):
     """digital_hall_voltage is a signed int16 raw ADC code (-32768..32767);
     physical zero is at code 0, full scale is +-2.5 V."""
 
-    return digital_hall_voltage / 32768 * 2.5
+    return digital_hall_voltage         #   / 32768 * 2.5
 
 def change_current_adc(digital_current_values):
     """digital_current_values is a signed int16 raw ADC code (-32768..32767);
     physical zero is at code 0, full scale is +-500 mA."""
 
-    return digital_current_values / 32768 * 500
+    return digital_current_values / 16000 * 259
 
 def calibrated_hall_sensors1(k_b_1, hall_voltage, actual_current):
     

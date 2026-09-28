@@ -81,9 +81,8 @@ class AnalyseCalculationMixin:
         #------------ Convert the digital value to analogue value first -------------
         self.data[:, 1] = change_adc_hall(self.data[:, 1])          # Hall 1 [V]
         self.data[:, 2] = change_adc_hall(self.data[:, 2])          # Hall 2 [V]
-        self.data[:, 3] = change_current_adc(self.data[:, 3] )
-        self.data[:, 4] = change_current_adc(self.data[:, 4] )        
-        
+        self.data[:, 3] = change_current_adc(self.data[:, 3] ) - (34634 / 16000 * 259)     # Current 1 [mA]
+        self.data[:, 4] = change_current_adc(self.data[:, 4] ) - (34727 / 16000 * 259)     # Current 2 [mA]  
 
         self.time = self.data[:, 0]
         self.voltage_1 = self.data[:, 1]
@@ -244,8 +243,8 @@ class AnalyseCalculationMixin:
         """
         for row in range(self.num_rows):
             # angle from 2nd and 3rd columns (index 1 and 2)
-            self.angle_magnet[row, 0] = np.arctan2(self.data[row, 2], self.data[row, 1])
-
+            # self.angle_magnet[row, 0] = np.arctan2(self.data[row, 2], self.data[row, 1])
+            self.angle_magnet[row, 0] = np.arctan2(self.voltage_2_normalised[row],self.voltage_1_normalised[row])
 
             # angle from 4th and 5th columns (index 3 and 4)
             self.angle_magnetic_field[row, 0] = np.arctan2(self.data[row, 4], self.data[row, 3])
@@ -293,11 +292,12 @@ class AnalyseCalculationMixin:
             deriv=1,  # first derivative
             delta=np.mean(np.diff(self.time))  # time step
         )  # [rad /s]
-
-        self.shear_rate = self.angular_velocity * self.C_SR  # [1 / s]
+        
+        self.shear_rate = self.angular_velocity * 3500 /280 # self.C_SR =R / h   # [1 / s] (max value since plate-plate geometry)
 
     def calculate_friction_moment(self):
-        self.friction_moment = self.angular_velocity * self.fr1 + self.fr0  # - y_0        # [Nm]
+        # self.friction_moment = self.angular_velocity * self.fr1 + self.fr0  # - y_0        # [Nm]
+        self.friction_moment = 0 #self.angular_velocity * self.fr1 + self.fr0  # - y_0        # [Nm]
 
     def calculate_magnitude_current(self):
         self.magnitude_current = np.hypot(self.current_1, self.current_2) # [mA]
