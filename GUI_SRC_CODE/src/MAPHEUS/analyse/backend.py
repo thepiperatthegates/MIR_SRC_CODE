@@ -103,6 +103,10 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         self.worker_get_fr_coefficient = device_state.fRCoefficients()
         self.fr0 = self.worker_get_fr_coefficient.fr0
         self.fr1 = self.worker_get_fr_coefficient.fr1
+        
+        self.worker_kb = device_state.kbCoefficient()
+        self.k_b_1 = self.worker_kb.k_b_1
+        self.k_b_2 = self.worker_kb.k_b_2
 
         self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
                               f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
@@ -391,6 +395,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
             diagram_map[mode]()
 
     def refresh_event(self):
+        self.k_b_1 = self.worker_kb.k_b_1
+        self.k_b_2 = self.worker_kb.k_b_2
         self.choose_option_after_unpacking()
 
     def data_mode_function(self):

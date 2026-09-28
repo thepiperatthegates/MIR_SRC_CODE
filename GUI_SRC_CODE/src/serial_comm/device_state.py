@@ -466,14 +466,14 @@ class fRCoefficients:
             # cls._CALIBRATION_FACTOR = 0.773
             cls._fr1 = 1.0
             cls._fr0 = 0.0
-            cls._CALIBRATION_FACTOR = 0.0
+            cls._CALIBRATION_FACTOR = 1.0
         elif ELECTRONICS_FLAG == 2:
             # cls._fr1 = 2.613e-08
             # cls._fr0 = 1.186e-07
             # cls._CALIBRATION_FACTOR = 0.875
             cls._fr1 = 1.0
             cls._fr0 = 0.0
-            cls._CALIBRATION_FACTOR = 0.0
+            cls._CALIBRATION_FACTOR = 1.0
             
         else:
             raise ValueError(f"Invalid ELECTRONICS_FLAG = {ELECTRONICS_FLAG}")
@@ -528,7 +528,8 @@ class kbCoefficient:
 
     @classmethod
     def _initialize(cls):
-        """Run once based on the global ELECTRONICS_FLAG."""
+        """Run once based on the global ELECTRONICS_FLAG.
+           For MAPHEUS, kb is V/mA and previously it was kb is V/A"""
         global ELECTRONICS_FLAG
         
         if cls._initialized:

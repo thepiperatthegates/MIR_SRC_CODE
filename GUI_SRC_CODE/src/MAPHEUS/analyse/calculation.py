@@ -5,6 +5,8 @@ from scipy.signal import savgol_filter
 from serial_comm.device_state import change_adc_hall 
 from serial_comm.device_state import change_current_adc
 
+from serial_comm.device_state import calibrated_hall_sensors1, calibrated_hall_sensors2
+
 
 class AnalyseCalculationMixin:
 
@@ -72,6 +74,8 @@ class AnalyseCalculationMixin:
         self.fr1on_moment = np.zeros((self.num_rows, 1))
         self.total_torque = np.zeros((self.num_rows, 1))
         self.magnitude_current = np.zeros((self.num_rows, 1))
+        
+        
         ###############################################################################
 
         #------------ Convert the digital value to analogue value first -------------
@@ -80,15 +84,12 @@ class AnalyseCalculationMixin:
         self.data[:, 3] = change_current_adc(self.data[:, 3] )
         self.data[:, 4] = change_current_adc(self.data[:, 4] )        
         
-        
-        # declare variables to read from the files (already given)
+
         self.time = self.data[:, 0]
         self.voltage_1 = self.data[:, 1]
         self.voltage_2 = self.data[:, 2]
 
-        self.normalise_hall_voltages()
-
-        print("self.offset_1, self.offset_2",  self.offset_1)
+        print("self.offset_1, self.offset_2", self.offset_1)
         print(self.offset_2)
         self.data[:, 3] -= self.offset_1
         self.data[:, 4] -= self.offset_2
@@ -96,6 +97,9 @@ class AnalyseCalculationMixin:
         self.current_1 = self.data[:, 3]
         self.current_2 = self.data[:, 4]
 
+        self.kb_calibration()
+        self.normalise_hall_voltages()
+        
         self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
                               f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
 
@@ -156,9 +160,16 @@ class AnalyseCalculationMixin:
             self.fr1_to_be_saved
         ))
         
+    def kb_calibration(self):
+        #calibrate voltage with kb
+        self.voltage_1 = calibrated_hall_sensors1(self.k_b_1, self.voltage_1, self.current_1)    # [V] (current is in mA)
+        self.voltage_2 = calibrated_hall_sensors2(self.k_b_2, self.voltage_2, self.current_2)    # [V] (current is in mA)
+
+        # wrie back
+        self.data[:, 1] = self.voltage_1
+        self.data[:, 2] = self.voltage_2
         
     def normalise_hall_voltages(self):
-
         self.amp_hall_voltage_1 = (np.max(self.voltage_1 ) - np.min(self.voltage_1) ) / 2
         self.zero_offset_hall_voltage_1 =(np.max(self.voltage_1) + np.min(self.voltage_1)) /2
 
