@@ -225,6 +225,24 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         #toggle button for radio button offsets
         self.take_Button.toggled.connect(self.refresh_event)
 
+        #---------------- init for view switching (diagram) ----------------
+        self.raw_data = None        #untouched copy of the loaded file
+        self._is_table_dirty = True      #flag that tells that table only needs refilling after a recalculation
+
+        self.diagram_map = {
+            "Currents diagram" :            self.draw_current_diagrams,
+            "Voltage diagram"  :            self.draw_voltage_diagrams,
+            "Phase diagram":                self.draw_phase_diagram,
+            "Phase difference diagram":     self.draw_phase_difference_diagram,
+            "Angular velocity diagram":     self.draw_angular_velocity_diagram,
+            "Torque diagram":               self.draw_torque_diagram,
+            "Shear rate diagram":           self.draw_shear_rate_diagram,
+            "Shear stress diagram":         self.draw_shear_stress_diagram,
+            "Viscosity diagram":            self.draw_viscosity_diagram,
+        }
+
+        self.data_show_comboBox.activated.connect(self.update_view)
+
     def save_offset1_event_textbox(self):
         self.offset_1 = float(self.textbox_offset1.text())
 
@@ -233,13 +251,15 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
 
     def find_filename_button_pressed(self):
         self.analyse_filename = QFileDialog.getOpenFileName(filter="csv (*.csv)")[0]
+        if not self.analyse_filename:
+            return  # user cancelled the dialog
         self.label_file.setText(QFileInfo(self.analyse_filename).fileName())
         self.data_show_comboBox.setDisabled(False)
         self.data_show_comboBox.setCurrentText("Data table")
-        self.choose_option()
-        self.data_show_comboBox.activated.connect(self.choose_option)
+        self.load_file()
 
-    def choose_option(self):
+    def load_file(self):
+        """Read self.analyse_filename from disk. Only runs when a new file is opened."""
         #------------------ read csv files ------------------
         # Notes: the legacy codes has the files without headers, recent updates has a header for the variables
         with open(self.analyse_filename, 'r', encoding='utf-8-sig') as check:
@@ -256,56 +276,54 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
             print("New code")
 
         # Load selected file
-        self.data = np.genfromtxt(
+        self.raw_data = np.genfromtxt(
             self.analyse_filename,
             delimiter=";",
             skip_header=skip_check,
             encoding='utf-8-sig'
         )
 
-        mode = self.data_show_comboBox.currentText()
+        self.recalculate()
+
+    def recalculate(self):
+        if self.raw_data is None:
+            return #no data has been read yet
+
+        # calculate_functions() subtracts the offsets in place, so always start from a fresh copy
+        self.data = self.raw_data.copy()
         self.num_rows, self.num_column = self.data.shape
-
         self.data_calculation_function()
-
-        diagram_map = {
-            "Currents diagram" : self.draw_current_diagrams,
-            "Voltage diagram" : self.draw_voltage_diagrams,
-            "Phase diagram" : self.draw_phase_diagram,
-            "Phase difference diagram" : self.draw_phase_difference_diagram,
-            "Angular velocity diagram" :  self.draw_angular_velocity_diagram,
-            "Torque diagram" :          self.draw_torque_diagram,
-            "Shear rate diagram":       self.draw_shear_rate_diagram,
-            "Shear stress diagram":     self.draw_shear_stress_diagram,
-            "Viscosity diagram":   self.draw_viscosity_diagram,
-        }
-
-
         self.offsets_update()
-        # first mode
-        if mode == "Data table":
-            # HIDE THE TABLE WIDGET
-            self.table_Widget.show()
-            self.canvas_frame.hide()
-            self.data_mode_function()
 
-        elif mode in diagram_map:
-            # DRAW THE GRAPH
+        self._is_table_dirty = True
+        self.update_view()
+
+    def update_view(self):
+        """Show the table or diagram selected in the combo box"""
+        if self.raw_data is None:
+            return
+
+        mode = self.data_show_comboBox.currentText()
+        if mode == "Data table":
+            self.canvas_frame.hide()
+            self.table_Widget.show()
+            if self._is_table_dirty:
+                self.data_mode_function()
+                self._is_table_dirty = False
+
+        elif mode in self.diagram_map:
             self.table_Widget.hide()
             self.canvas_frame.show()
-            diagram_map[mode]()
+            self.diagram_map[mode]()
 
     def refresh_event(self):
-        self.choose_option()
+        self.recalculate()
 
     def data_mode_function(self):
 
-        # set row and column count
+        # set row and column count (+1 for the mean row at the top)
         self.table_Widget.setRowCount(self.final_data_to_show.shape[0] + 1)
         self.table_Widget.setColumnCount(self.final_data_to_show.shape[1])
-
-        # insert mean row at the top
-        self.table_Widget.insertRow(0)
 
         # fill the table starting from row 1
         for row in range(self.final_data_to_show.shape[0]):

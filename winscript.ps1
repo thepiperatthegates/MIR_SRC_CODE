@@ -15,6 +15,26 @@ $MainScriptPath   = Join-Path $ProjectRoot "src\main.py"
 $ReqFile          = Join-Path $ProjectRoot "requirements.txt"
 
 # --------------------------------------------
+# Delete micromamba if corrupted 
+# --------------------------------------------
+if (Test-Path $MambaExe) {
+    $MambaOk = $false
+    try {
+        & $MambaExe --version *> $null;
+        $MambaOk = ($LASTEXITCODE -eq 0);
+    }
+    catch {
+        $MambaOk = $false
+    }
+
+    if (-not $MambaOk) {
+        Write-Host "[WARN] micromamba.exe is corrupted. Deleting and re-downloading..." -ForegroundColor Yellow
+        Remove-Item $MambaExe -Force
+    }
+}
+
+
+# --------------------------------------------
 # Download micromamba if missing
 # --------------------------------------------
 if (-not (Test-Path $MambaExe)) {

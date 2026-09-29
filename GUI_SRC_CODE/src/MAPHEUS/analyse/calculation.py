@@ -56,27 +56,6 @@ class AnalyseCalculationMixin:
                 
 
     def calculate_functions(self):
-        #############################################################################
-        self.time = np.zeros((self.num_rows, 1))
-        self.current_1 = np.zeros((self.num_rows, 1))
-        self.current_2 = np.zeros((self.num_rows, 1))
-        self.voltage_1 = np.zeros((self.num_rows, 1))
-        self.voltage_2 = np.zeros((self.num_rows, 1))
-        self.angle_magnetic_field = np.zeros((self.num_rows, 1))
-        self.angle_magnetic_field_unwrapped = np.zeros((self.num_rows, 1))
-        self.angle_magnetic_field_degree = np.zeros((self.num_rows, 1))
-        self.angle_magnet = np.zeros((self.num_rows, 1))
-        self.angle_magnet_unwrapped = np.zeros((self.num_rows, 1))
-        self.angle_magnet_degree = np.zeros((self.num_rows, 1))
-        self.phase_difference = np.zeros((self.num_rows, 1))
-        self.angular_velocity = np.zeros((self.num_rows, 1))
-        self.shear_rate = np.zeros((self.num_rows, 1))
-        self.fr1on_moment = np.zeros((self.num_rows, 1))
-        self.total_torque = np.zeros((self.num_rows, 1))
-        self.magnitude_current = np.zeros((self.num_rows, 1))
-        
-        
-        ###############################################################################
 
         #------------ Convert the digital value to analogue value first -------------
         self.data[:, 1] = change_adc_hall(self.data[:, 1])          # Hall 1 [V]
@@ -182,22 +161,6 @@ class AnalyseCalculationMixin:
 
 
     def reference_var_for_saved_data(self):
-        #############################################################################
-        self.time = np.zeros((self.num_rows, 1))
-        self.current_1 = np.zeros((self.num_rows, 1))
-        self.current_2 = np.zeros((self.num_rows, 1))
-        self.voltage_1 = np.zeros((self.num_rows, 1))
-        self.voltage_2 = np.zeros((self.num_rows, 1))
-        self.angle_magnetic_field = np.zeros((self.num_rows, 1))
-        self.angle_magnet = np.zeros((self.num_rows, 1))
-        self.phase_difference = np.zeros((self.num_rows, 1))
-        self.angular_velocity = np.zeros((self.num_rows, 1))
-        self.shear_rate = np.zeros((self.num_rows, 1))
-        self.fr1on_moment = np.zeros((self.num_rows, 1))
-        self.total_torque = np.zeros((self.num_rows, 1))
-        self.magnitude_current = np.zeros((self.num_rows, 1))
-        ###############################################################################
-
         # declare variables to read from the files (already given)
         self.time = self.final_data_to_show[:, 0]
         self.voltage_1 = self.final_data_to_show[:, 1]
@@ -228,28 +191,32 @@ class AnalyseCalculationMixin:
         self.textbox_offset2.setText(str(object=self.offset_2))
     def calculate_angle(self):
         """
-        Calculate magnet and magnetic field angles and their phase difference.
+        Calculate the magnet and magnetic field angles and their phase difference.
 
-        This method computes the angles for the magnet and the magnetic field
-        from the Hall voltage data stored in `self.data`.
+        The magnet angle comes from the normalised Hall voltages (U_1, U_2), the
+        field angle from the coil currents (I_1, I_2 in `self.data[:, 3:5]`).
+        Both are unwrapped before taking the difference, so it has no 2*pi jumps.
 
-        - The magnet angle is calculated using columns 2 and 3 (`self.data[:, 1]` and `self.data[:, 2]`).
-        - The magnetic field angle is calculated using columns 4 and 5 (`self.data[:, 3]` and `self.data[:, 4]`).
-        - Angles are unwrapped along axis 0 to remove discontinuities.
-        - The phase difference between the magnetic field and the magnet is stored
-        in `self.phase_difference`.
-
-        :return: None
+        Sets:
+            self.angle_magnet, self.angle_magnetic_field : wrapped angles [rad], shape (N, 1)
+            self.angle_magnet_degree, self.angle_magnetic_field_degree : same in [deg]
+            self.phase_difference : field angle - magnet angle [rad]
+            self.phase_difference_degree : same in [deg]
         """
-        for row in range(self.num_rows):
-            # angle from 2nd and 3rd columns (index 1 and 2)
-            # self.angle_magnet[row, 0] = np.arctan2(self.data[row, 2], self.data[row, 1])
-            self.angle_magnet[row, 0] = np.arctan2(self.voltage_2_normalised[row],self.voltage_1_normalised[row])
+        # for row in range(self.num_rows):
+        #     # angle from 2nd and 3rd columns (index 1 and 2)
+        #     # self.angle_magnet[row, 0] = np.arctan2(self.data[row, 2], self.data[row, 1])
+        #     self.angle_magnet[row, 0] = np.arctan2(self.voltage_2_normalised[row],self.voltage_1_normalised[row])
 
-            # angle from 4th and 5th columns (index 3 and 4)
-            self.angle_magnetic_field[row, 0] = np.arctan2(self.data[row, 4], self.data[row, 3])
+        #     # angle from 4th and 5th columns (index 3 and 4)
+        #     self.angle_magnetic_field[row, 0] = np.arctan2(self.data[row, 4], self.data[row, 3])
+
+
+        # angle from 2nd and 3rd columns (index 1 and 2)
+        self.angle_magnet = np.arctan2(self.voltage_2_normalised, self.voltage_1_normalised)[:, None]
+        # angle from 4th and 5th columns (index 3 and 4)
+        self.angle_magnetic_field = np.arctan2(self.data[:, 4], self.data[:, 3])[:, None]
         # TODO: OFFSETS
-
         # calculate the angles
 
         self.angle_magnetic_field_degree = np.degrees(self.angle_magnetic_field) #[deg]
@@ -263,27 +230,16 @@ class AnalyseCalculationMixin:
 
     def calculate_shear_rate(self):
         """
-        Calculate the shear rate from the magnet angle signal.
+        Calculate angular velocity and shear rate from the magnet angle.
 
-        This method uses a Savitzky-Golay filter to smooth and differentiate
-        the noisy angular position data (`self.angle_magnet`) with respect
-        to time (`self.time`). The first derivative of the angle signal gives
-        the angular velocity in [rad/s]. The shear rate is then obtained by
-        scaling the angular velocity with the shear rate constant `C_SR`.
+        A Savitzky-Golay filter smooths and differentiates the unwrapped magnet
+        angle (`self.angle_magnet_unwrapped`) over time, using the mean time
+        step as `delta`. The shear rate is the angular velocity scaled by R / h
+        (plate-plate geometry, so it is the maximum value at the rim).
 
-        Steps:
-            1. Apply Savitzky-Golay filter to estimate angular velocity.
-            2. Compute shear rate as angulalabelr_velocity * shear rate coefficient [C_SR].
-
-        Updates Attributes:
-            self.angular_velocity : np.ndarray
-                Estimated angular velocity of the magnet [rad/s].
-            self.shear_rate : np.ndarray
-                Calculated shear rate [1/s].
-
-        Notes:
-            - The smoothness depends on the chosen `window_length` and `polyorder`.
-            - `delta` is set as the mean time step from `self.time`.
+        Sets:
+            self.angular_velocity : angular velocity of the magnet [rad/s]
+            self.shear_rate : shear rate [1/s]
         """
         self.angular_velocity = savgol_filter(
             self.angle_magnet_unwrapped[:, 0],

@@ -34,16 +34,9 @@ plt.rcParams.update({
     'grid.alpha': 0.7,
 })
 
-import matplotlib as mpl
-
-mpl.use('QtAgg')
 
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
-
-data_4 = 0.0
-data_6 = 0.0
-
 
 # MATPLOTLIB CANVAS
 class MatplotlibCanvas(FigureCanvasQTAgg):
@@ -93,9 +86,6 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         self.final_data_to_show = np.array([])
         self.num_rows = None
         self.num_column = None
-        self.total_torque = None
-
-
         #------------------ calculation constant ------------------
 
         #------------------ inherited from another process ------------------
@@ -125,9 +115,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         self.textbox_offset2.setText(str(self.offset_2))
 
         # ------------------ geometry constants ------------------
-        self.C_SS = 11160103  # conversion factor to stress in Pa / Nm
+        self.C_SS = 1  # conversion factor to stress in Pa / Nm
         self.C_SR = 37.099  # conversion factor to shear rate in s^-1 / s^-1
-
 
         # ------------------variables to save ------------------
         # ready up variables
@@ -213,7 +202,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
             "QToolButton:hover { background: #d8d8d8; border-radius: 3px; }"
         )
 
-        _mpl_img_dir = os.path.join(mpl.get_data_path(), "images")
+        _mpl_img_dir = os.path.join(matplotlib.get_data_path(), "images")
         for _txt, _tip, _img, _cb in self.mpl_toolbar.toolitems:
             if _img is None:
                 continue
@@ -231,12 +220,30 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
 
         self.textbox_offset1.editingFinished.connect(self.save_offset1_event_textbox)
         self.textbox_offset2.editingFinished.connect(self.save_offset2_event_textbox)
-
+        
         #refresh button event clicked
         self.refresh_Button.clicked.connect(self.refresh_event)
         #toggle button for radio button offsets
         self.take_Button.toggled.connect(self.refresh_event)
-
+        
+        #---------------- init for view switching (diagram) ----------------
+        self.raw_data = None        #untouched copy of the loaded file
+        self._is_table_dirty = True      #flag that tells that table only needs refilling after a recalculation
+        
+        self.diagram_map = {
+            "Currents diagram" :            self.draw_current_diagrams,
+            "Voltage diagram"  :            self.draw_voltage_diagrams,
+            "Phase diagram":                self.draw_phase_diagram,
+            "Phase difference diagram":     self.draw_phase_difference_diagram,
+            "Angular velocity diagram":     self.draw_angular_velocity_diagram,
+            "Torque diagram":               self.draw_torque_diagram,
+            "Shear rate diagram":           self.draw_shear_rate_diagram,
+            "Shear stress diagram":         self.draw_shear_stress_diagram,
+            "Viscosity diagram":            self.draw_viscosity_diagram,
+        }
+        
+        self.data_show_comboBox.activated.connect(self.update_view)    
+        
     def update_coord_label(self, event):
         if event.inaxes is None or event.xdata is None:
             self.coord_label.setText("")
@@ -319,7 +326,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         #     )
         #     return False
 
-        # downstream code (choose_option_after_unpacking) reads a CSV, so point it there
+        # downstream code (load_file) reads a CSV, so point it there
         self.analyse_filename = out_file_csv
         return True
 
@@ -330,10 +337,10 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         
         self.data_show_comboBox.setDisabled(False)
         self.data_show_comboBox.setCurrentText("Data table")
-        self.choose_option_after_unpacking()
-        self.data_show_comboBox.activated.connect(self.choose_option_after_unpacking)
-
-    def choose_option_after_unpacking(self):
+        self.load_file()
+        
+    def load_file(self):
+        """Read self.analyse_filename from disk. Only runs when a new file is opened."""
         #------------------ read csv files ------------------
         try:
             with open(self.analyse_filename, 'r', encoding='utf-8-sig') as check:
@@ -350,63 +357,57 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
             print("Legacy code")
         else:
             skip_check = 1
-            print("New code")
-
-        #-------------------------------  Load selected file -------------------------------
-        self.data = np.genfromtxt(
-            self.analyse_filename,
+            print("Latest/MAPHEUS code")
+            
+        self.raw_data = np.genfromtxt(
+            self.analyse_filename, 
             delimiter=";",
             skip_header=skip_check,
             encoding=csv_encoding
         )
-        #-----------------------------------------------------------------------------------
         
+        self.recalculate()
+        
+    def recalculate(self):
+        if self.raw_data is None:
+            return #no data has been read yet
+        
+        self.data = self.raw_data.copy()
+        self.num_rows, self.num_column = self.data.shape
+        self.data_calculation_function()
+        self.offsets_update()
+        
+        self._is_table_dirty =  True
+        self.update_view()
+        
+    def update_view(self):
+        """Show the table or diagram selected in the combo box"""
+        if self.raw_data is None:
+            return 
         
         mode = self.data_show_comboBox.currentText()
-        self.num_rows, self.num_column = self.data.shape
-
-        self.data_calculation_function()
-
-        diagram_map = {
-            "Currents diagram" : self.draw_current_diagrams,
-            "Voltage diagram" : self.draw_voltage_diagrams,
-            "Phase diagram" : self.draw_phase_diagram,
-            "Phase difference diagram" : self.draw_phase_difference_diagram,
-            "Angular velocity diagram" :  self.draw_angular_velocity_diagram,
-            "Torque diagram" :          self.draw_torque_diagram,
-            "Shear rate diagram":       self.draw_shear_rate_diagram,
-            "Shear stress diagram":     self.draw_shear_stress_diagram,
-            "Viscosity diagram":   self.draw_viscosity_diagram,
-        }
-
-
-        self.offsets_update()
-        # first mode
         if mode == "Data table":
-            # HIDE THE TABLE WIDGET
-            self.table_Widget.show()
             self.canvas_frame.hide()
-            self.data_mode_function()
+            self.table_Widget.show()
+            if self._is_table_dirty:
+                self.data_mode_function()
+                self._is_table_dirty = False
 
-        elif mode in diagram_map:
-            # DRAW THE GRAPH
+        elif mode in self.diagram_map:
             self.table_Widget.hide()
             self.canvas_frame.show()
-            diagram_map[mode]()
+            self.diagram_map[mode]()
 
     def refresh_event(self):
         self.k_b_1 = self.worker_kb.k_b_1
         self.k_b_2 = self.worker_kb.k_b_2
-        self.choose_option_after_unpacking()
-
+        self.recalculate()
+        
     def data_mode_function(self):
 
-        # set row and column count
+        # set row and column count (+1 for the mean row at the top)
         self.table_Widget.setRowCount(self.final_data_to_show.shape[0] + 1)
         self.table_Widget.setColumnCount(self.final_data_to_show.shape[1])
-
-        # insert mean row at the top
-        self.table_Widget.insertRow(0)
 
         # fill the table starting from row 1
         for row in range(self.final_data_to_show.shape[0]):
