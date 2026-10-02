@@ -2,9 +2,9 @@
 import numpy as np
 from PySide6 import QtCore, QtGui
 from PySide6 import *
-from PySide6.QtCore import QThread, Signal, QMutex, QRegularExpression, QObject, QTimer
+from PySide6.QtCore import QThread, Signal, QMutex, QObject, QTimer, QElapsedTimer, Qt
 from PySide6.QtWidgets import *
-from PySide6.QtGui import QRegularExpressionValidator, QDoubleValidator
+from PySide6.QtGui import  QDoubleValidator
 import sys
 import os
 from pathlib import Path
@@ -195,29 +195,31 @@ class SleepTimer(QObject):
     """Countdown timer that ticks every 100 ms and emits remaining seconds via update_time_signal until it reaches zero."""
     update_time_signal = Signal(float)  # emit float countdown values
 
+
     def __init__(self):
         super().__init__()
-        self.worker_remaining = device_state.TxData()
-        self.remaining = float(self.worker_remaining.data_1) # get local_data_1 from global
-        self.worker_reset_current_time = device_state.DownSampleSpecificFlag()
+        self.duration = float(device_state.TxData().data_1)
+        self.clock = QElapsedTimer()
         self.timer = QTimer(self)
-        self.timer.setInterval(100)  # 100 ms per tick
+        self.timer.setTimerType(Qt.TimerType.PreciseTimer)
+        self.timer.setInterval(100)
         self.timer.timeout.connect(self._tick)
 
-
     def start(self):
+        self.clock.start()
         self.timer.start()
 
     def stop(self):
         self.timer.stop()
 
     def _tick(self):
-        self.remaining -= 0.1
-        if self.remaining >= 0.0:
-            self.update_time_signal.emit(round(self.remaining, 1))
-        else:
+        remaining = self.duration - self.clock.elapsed() / 1000.0
+        if remaining > 0.0:
+            self.update_time_signal.emit(round(remaining, 1))
+        else:   #timer ends
+            self.update_time_signal.emit(0.0)
             self.timer.stop()
-            device_state.running_time_event.clear()
+
 
 class SocketThread(QThread):
 
@@ -229,11 +231,8 @@ class SocketThread(QThread):
         if self.running:
             serial_backend.thread_start()
 
-
     def stop(self):
         self.running = False
-
-
 
 class ConstShearGUI(QMainWindow, Ui_Title):
 
@@ -358,7 +357,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #--------- Text/Labels  ---------
         self.button_stop.setDisabled(True)
         self.textbox_time.setPlaceholderText("Enter time in second")
-        self.textbox_sample_frequency.setText("10000")
+        self.textbox_sample_frequency.setText(str(device_state.SAMPLE_FREQ))
 
         self.k_b_label.setText(
             f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
@@ -610,7 +609,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
     def start_data_event(self):
 
         #  --------- Cleanup old files  --------------
-        dummy_path = os.path.join(self.project_root, "files", "dummy.csv")
+        dummy_path = serial_backend.DUMMY_FILE_PATH
         if os.path.exists(dummy_path):
             try:
                 os.remove(dummy_path)
@@ -623,12 +622,9 @@ class ConstShearGUI(QMainWindow, Ui_Title):
             return  # Silently exit if frequency is invalid/empty
 
         #  --------- Downsampling Logic & Validation.  ---------
-        fs = float(fs_text)
-        tot_avg = 10000 // int(fs)
-
-        #  --------- Validation: Ensure 5000 is divisible by tot_average  ---------
-        if not (5000 / tot_avg).is_integer():
-            return self.popout_window(5)
+        tot_avg = serial_backend.downsample_factor(fs_text)
+        if tot_avg is None:
+            return self.popout_window(5)   # fs must divide SAMPLE_FREQ evenly
 
         #   --------- Assignment (Success Path).  ------------------
         # --------- Mapping textbox data to worker block ---------
@@ -641,9 +637,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         self.worker_data_block.data_10 = 1
 
         # --------- Setting downsample properties ---------
-        self.worker_downsample_property.time_increment = 1.0 / fs
         self.worker_downsample_property.tot_average = tot_avg
         self.worker_downsample_property.current_time = 0.0
+        self.worker_downsample_property.record_duration = float(self.textbox_time.text())
+        #reset the downsample state
+        serial_backend.reset_downsample()
+    
         device_state.running_time_event.set()
 
         serial_backend.file_name_change_set("dummy")
@@ -1223,9 +1222,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
 
         # Continue only if the user selected a file
         if filename_saving:
-            dir_dummy_csv = os.path.join(self.project_root, "files", "dummy.csv")
-
-            data_read = np.loadtxt(dir_dummy_csv, delimiter=';')
+            data_read = serial_backend.load_recording()
             np.savetxt(filename_saving, data_read, delimiter=';', fmt='%.17g')
 
 

@@ -57,7 +57,7 @@ class TabWindowConstSR(QMainWindow):
 
         #DELETE THE GODDAMN FILE
         try:
-            os.remove("dummy.csv")
+            os.remove(serial_backend.DUMMY_FILE_PATH)
         except OSError as e:
             print(f"Error deleting file: {e}")
 

@@ -2,7 +2,7 @@
 import numpy as np
 from PySide6 import QtCore, QtGui
 from PySide6 import *
-from PySide6.QtCore import QThread, Signal, QMutex, QObject, QTimer
+from PySide6.QtCore import QThread, Signal, QMutex, QObject, QTimer, QElapsedTimer, Qt
 from PySide6.QtWidgets import *
 import sys
 import os
@@ -195,27 +195,27 @@ class SleepTimer(QObject):
 
     def __init__(self):
         super().__init__()
-        self.worker_remaining = device_state.TxData()
-        self.remaining = float(self.worker_remaining.data_1) # get local_data_1 from global
-        self.worker_reset_current_time = device_state.DownSampleSpecificFlag()
+        self.duration = float(device_state.TxData().data_1)
+        self.clock = QElapsedTimer()
         self.timer = QTimer(self)
+        self.timer.setTimerType(Qt.TimerType.PreciseTimer)
         self.timer.setInterval(100)  # 100 ms per tick
         self.timer.timeout.connect(self._tick)
 
-
     def start(self):
+        self.clock.start()
         self.timer.start()
 
     def stop(self):
         self.timer.stop()
 
     def _tick(self):
-        self.remaining -= 0.1
-        if self.remaining >= 0.0:
-            self.update_time_signal.emit(round(self.remaining, 1))
-        else:
+        remaining = self.duration - self.clock.elapsed() / 1000.0
+        if remaining > 0.0:
+            self.update_time_signal.emit(round(remaining, 1))
+        else:   #timer ends
+            self.update_time_signal.emit(0.0)
             self.timer.stop()
-            device_state.running_time_event.clear()
 
 # set to True to connect to the board over ETH again
 ENABLE_SOCKET_CONNECTION = False
@@ -689,9 +689,7 @@ class MAPHEUS_GUI(QMainWindow, Ui_Title):
 
         # Continue only if the user selected a file
         if filename_saving:
-            dir_dummy_csv = os.path.join(self.project_root, "files", "dummy.csv")
-
-            data_read = np.loadtxt(dir_dummy_csv, delimiter=';')
+            data_read = serial_backend.load_recording()
             np.savetxt(filename_saving, data_read, delimiter=';', fmt='%.17g')
 
 

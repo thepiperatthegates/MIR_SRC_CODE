@@ -1,7 +1,7 @@
 import numpy as np
 from PySide6 import QtCore, QtGui, QtWidgets
 from PySide6 import *
-from PySide6.QtCore import QThread, Signal, QMutex, QRegularExpression, QObject, QTimer, Qt
+from PySide6.QtCore import QThread, Signal, QMutex, QRegularExpression, QObject, QTimer, QElapsedTimer, Qt
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QRegularExpressionValidator, QDoubleValidator
 import os
@@ -256,36 +256,27 @@ class SleepTimer(QObject):
     def __init__(self):
         super().__init__()
 
-        self.worker_remaining = packet_transmission.RemainingTimeForCreepTest()
-        self.remaining = float(self.worker_remaining.total_time_for_file_save)
-        self.time_for_resetting_time =  self.worker_remaining.time_for_resetting_time
-
+        # display only: save_to_bin stops the recording and ends the fast-rate phase by sample count
+        self.duration = float(packet_transmission.RemainingTimeForCreepTest().total_time_for_file_save)
+        self.clock = QElapsedTimer()
         self.timer = QTimer(self)
+        self.timer.setTimerType(Qt.TimerType.PreciseTimer)
         self.timer.setInterval(100)  # 100 ms per tick
         self.timer.timeout.connect(self._tick)
 
-
-        self.worker_reset_current_time = packet_transmission.DownSampleSpecificFlag()
-
-
-
     def start(self):
+        self.clock.start()
         self.timer.start()
 
     def stop(self):
         self.timer.stop()
 
     def _tick(self):
-        self.remaining -= 0.1
-        if self.remaining >= 0.0000000:
-
-            #STOPS THE SPECIFIC DOWNSAMPLE
-            if abs(self.remaining - self.time_for_resetting_time) < 0.0001:
-                self.worker_reset_current_time.flag_specific_downsample = False
-            self.update_time_signal.emit(round(self.remaining, 1))
-
-        else:
-            packet_transmission.running_time_event.clear()
+        remaining = self.duration - self.clock.elapsed() / 1000.0
+        if remaining > 0.0:
+            self.update_time_signal.emit(round(remaining, 1))
+        else:   #timer ends
+            self.update_time_signal.emit(0.0)
             self.timer.stop()
 
 
@@ -728,15 +719,14 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         """
         Send start vector for magnet
         """
-        #### delete previous dummy files before acquisition starts.
-        path_join =  os.path.join(self.project_root, "files", "dummy.csv")
         #remove the dummy if it exists
+        path_join = sockets_files.DUMMY_FILE_PATH
         if os.path.exists(path_join):
             try:
                 os.remove(path_join)
-                print("dummy.csv deleted")
+                print("dummy.bin deleted")
             except OSError as e:
-                print(f"Error deleting file csv: {e}")
+                print(f"Error deleting file: {e}")
         else:
             print("First measurements")
 
@@ -787,45 +777,26 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         packet_transmission.tx_event.set()
 
         ######################################################################################
-        ######## get the desired sampling frequency from the textbox
-        sampling_frequency_standard = self.textbox_standard_sampling_rate.text()
-        if sampling_frequency_standard == '' or sampling_frequency_standard == 0:
-            pass
-        else:
-
-            self.worker_downsample_property.time_increment  = 1.0/float(sampling_frequency_standard)
-            self.worker_downsample_property.tot_average  = 10000 // int(sampling_frequency_standard)
-
-            check1 = 5000 / int(self.worker_downsample_property.tot_average)
-
-        #for specified sampling frequency
-        input_sampling_rate = int(self.textbox_input_sampling_rate.text())
+        ######## get the desired sampling frequencies from the textboxes
+        # downsample_factor returns None for empty / zero / rates that don't divide SAMPLE_FREQ evenly
+        tot_avg_standard  = sockets_files.downsample_factor(self.textbox_standard_sampling_rate.text() or 0)
+        tot_avg_specified = sockets_files.downsample_factor(self.textbox_input_sampling_rate.text() or 0)
         self.worker_remaining_time.input_sampling_time = float(self.textbox_input_sampling_time.text())
 
         ######################################################################################
+        if tot_avg_standard is not None and tot_avg_specified is not None:
+            self.worker_downsample_property.tot_average = tot_avg_standard
+            self.worker_downsample_property.tot_average_specified = tot_avg_specified
 
-
-        ######################################################################################
-        if input_sampling_rate == '' or input_sampling_rate == 0:
-            pass
-        else:
-            self.worker_downsample_property.time_increment_specified = 1.0/float(input_sampling_rate)
-            self.worker_downsample_property.tot_average_specified = 10000 // int(input_sampling_rate)
-
-            check3 = 5000 / int(self.worker_downsample_property.tot_average_specified)
-        ######################################################################################
-
-        ######################################################################################
-        if check1.is_integer() and check3.is_integer():
             self.worker_downsample_property.current_time = 0.0
+            self.worker_downsample_property.record_duration = self.worker_remaining_time.total_time_for_file_save
+            self.worker_downsample_property.specific_duration = input_sampling_time
+            sockets_files.reset_downsample()
             packet_transmission.running_time_event.set()
             #start specific
             self.worker_downsample_property.flag_specific_downsample = True
 
             sockets_files.file_name_change_set("dummy")        #set file name from gui
-            print("check is", check3)
-
-
 
             self.status_label.setStyleSheet("color: #7da832;")
             self.status_label.setText("Creep test starts.......")
@@ -872,19 +843,11 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
             self.end_vector_time = float(self.textbox_vector_end_time.text())
 
             #for specified sampling frequency
-            input_sampling_rate = int(self.textbox_input_sampling_rate.text())
             input_sampling_time = float(self.textbox_input_sampling_time.text())
 
-
-
-            if input_sampling_rate == '' or input_sampling_rate == 0:
-                pass
-            else:
-                self.worker_downsample_property.time_increment_specified = 1.0/float(input_sampling_rate)
-                self.worker_downsample_property.tot_average_specified = 10000 // int(input_sampling_rate)
-
-                check = 5000 / int(self.worker_downsample_property.tot_average_specified)
-                print("check is", check)
+            tot_avg_specified = sockets_files.downsample_factor(self.textbox_input_sampling_rate.text() or 0)
+            if tot_avg_specified is not None:
+                self.worker_downsample_property.tot_average_specified = tot_avg_specified
 
 
 
@@ -1129,8 +1092,9 @@ class CreepTestGUI(QMainWindow, Ui_CreepTestGUI):
         self.save_button.setEnabled(True)
 
         if filename_saving:
-            data_read = np.loadtxt(dir_dummy_csv, delimiter=';')
-            np.savetxt(filename_saving, data_read, delimiter=';')
+            data_read = sockets_files.load_recording()
+            np.savetxt(filename_saving, data_read, delimiter=';', fmt='%.17g')
+
 
     def popout_window(self, arg):
 

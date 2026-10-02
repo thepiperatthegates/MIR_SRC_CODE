@@ -56,7 +56,7 @@ MIN_V_AFTER_HALL = 0.0
 
 COIL_CONSTANT = 3.097e-3		# in T / A
 DIPOLE_MOMENT = 8.594e-3		# in A m^2
-
+SAMPLE_FREQ = 5000              # Hz, ADC sample rate of the board. Change it ONLY here.
 
 
 #flag for electronics type
@@ -304,7 +304,7 @@ class ProcessUnpackingFlag():
     _flag_process = False
     
     @property
-    def flag_process(self):
+    def flag_process(self) -> bool:
         return self.__class__._flag_process
     
     @flag_process.setter
@@ -322,14 +322,14 @@ class DownSampleSpecificFlag():
     
     _tot_average_specified = 1
     
-    _time_increment = 0.0001
-    
-    _time_increment_specified = 0.0001
-    
     _current_time = 0.0
-    
+
+    _record_duration = float("inf")     # no limit until a recording sets one
+
+    _specific_duration = float("inf")   # length of the fast-rate phase (creep test)
+
     @property
-    def flag_specific_downsample(self):
+    def flag_specific_downsample(self) -> bool:
         return self.__class__._flag_specific_downsample 
 
     @flag_specific_downsample.setter
@@ -338,15 +338,15 @@ class DownSampleSpecificFlag():
         
         
     @property
-    def tot_average(self):
+    def tot_average(self) -> int:
         return self.__class__._tot_average
     
     @tot_average.setter
-    def tot_average(self, val):
+    def tot_average(self, val) -> None:
         self.__class__._tot_average = val 
         
     @property
-    def tot_average_specified(self):
+    def tot_average_specified(self) -> int:
         return self.__class__._tot_average_specified
     
     @tot_average_specified.setter
@@ -354,28 +354,35 @@ class DownSampleSpecificFlag():
         self.__class__._tot_average_specified = val 
         
     @property
-    def time_increment_specified(self):
-        return self.__class__._time_increment_specified
-    
-    @time_increment_specified.setter
-    def time_increment_specified(self, val):
-        self.__class__._time_increment_specified = val  
+    def time_increment(self) -> float:
+        return self.__class__._tot_average/SAMPLE_FREQ
         
     @property
-    def time_increment(self):
-        return self.__class__._time_increment
-    
-    @time_increment.setter
-    def time_increment(self, val):
-        self.__class__._time_increment = val
-        
+    def time_increment_specified(self) -> float:
+        return self.__class__._tot_average_specified/SAMPLE_FREQ
     @property
-    def current_time(self):
+    def current_time(self) -> float:
         return self.__class__._current_time
     
     @current_time.setter
-    def current_time(self, val):
+    def current_time(self, val) -> None:
         self.__class__._current_time = val
+
+    @property
+    def record_duration(self) -> float:
+        return self.__class__._record_duration
+
+    @record_duration.setter
+    def record_duration(self, val) -> None:
+        self.__class__._record_duration = float(val)
+
+    @property
+    def specific_duration(self) -> float:
+        return self.__class__._specific_duration
+
+    @specific_duration.setter
+    def specific_duration(self, val) -> None:
+        self.__class__._specific_duration = float(val)
         
         
 

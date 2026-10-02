@@ -6,7 +6,6 @@ import sys
 import os
 from pathlib import Path
 
-
 # #fix cache problem with MATHPLOTLIB
 os.environ['MPLCONFIGDIR'] = str(Path.home()) +"/.matplotlib/"
 import multiprocessing
