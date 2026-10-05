@@ -48,17 +48,6 @@ MIN_V_BEFORE_HALL = 2.5   #or y-intercept
 MAX_V_AFTER_HALL = 3.3
 MIN_V_AFTER_HALL = 0.0
 
-
-
-
-
-#default coefficients
-
-COIL_CONSTANT = 3.097e-3		# in T / A
-DIPOLE_MOMENT = 8.594e-3		# in A m^2
-SAMPLE_FREQ = 5000              # Hz, ADC sample rate of the board. Change it ONLY here.
-
-
 #flag for electronics type
 ELECTRONICS_FLAG = 1
 
@@ -220,7 +209,7 @@ class TxData():
         byte_send10 = struct.pack('<B', int(self.__class__._data_10))                 #mir mode
 
         print(
-            f"[TX -> USB] "
+            f"[TX -> ETH]"
             f"data_1(time/s)={self.__class__._data_1}, "
             f"data_2(freq)={self.__class__._data_2}, "
             f"data_3(amplitude1)={self.__class__._data_3}, "
@@ -322,10 +311,6 @@ class DownSampleSpecificFlag():
     
     _tot_average_specified = 1
     
-    _time_increment = 0.0001
-    
-    _time_increment_specified = 0.0001
-    
     _current_time = 0.0
 
     _record_duration = float("inf")     # no limit until a recording sets one
@@ -359,11 +344,11 @@ class DownSampleSpecificFlag():
         
     @property
     def time_increment(self) -> float:
-        return self.__class__._tot_average/SAMPLE_FREQ
+        return self.__class__._tot_average/ExpConstant().SAMPLE_FREQ
         
     @property
     def time_increment_specified(self) -> float:
-        return self.__class__._tot_average_specified/SAMPLE_FREQ
+        return self.__class__._tot_average_specified/ExpConstant().SAMPLE_FREQ
     @property
     def current_time(self) -> float:
         return self.__class__._current_time
@@ -605,6 +590,7 @@ class ExpConstant():
     _C_SR = 0.0
     _COIL_CONSTANT = 0.0
     _DIPOLE_MOMENT = 0.0
+    _SAMPLE_FREQ = 0
 
     @classmethod 
     def _initialize(cls) -> None:
@@ -631,6 +617,7 @@ class ExpConstant():
         cls._C_SR = float(row["C_SR"])
         cls._COIL_CONSTANT = float(row["COIL_CONSTANT"])
         cls._DIPOLE_MOMENT = float(row["DIPOLE_MOMENT"])
+        cls._SAMPLE_FREQ = int(row ["SAMPLE_FREQ"])
 
         cls._initialized = True 
     
@@ -661,6 +648,11 @@ class ExpConstant():
     def DIPOLE_MOMENT(self) -> float:
         type(self)._initialize()
         return type(self)._DIPOLE_MOMENT
+    
+    @property
+    def SAMPLE_FREQ(self) -> int:
+        type(self)._initialize()
+        return type(self)._SAMPLE_FREQ
         
 class VoltageNormaliseCoefficient:
     

@@ -357,7 +357,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #--------- Text/Labels  ---------
         self.button_stop.setDisabled(True)
         self.textbox_time.setPlaceholderText("Enter time in second")
-        self.textbox_sample_frequency.setText(str(device_state.SAMPLE_FREQ))
+        self.textbox_sample_frequency.setText(str(device_state.ExpConstant().SAMPLE_FREQ))
 
         self.k_b_label.setText(
             f"k<sub>b1</sub> = {self.worker_k_b_property.k_b_1}&nbsp;&nbsp;&nbsp;"
@@ -445,11 +445,12 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #  ----------------------- Handle Scaling Logic -----------------------
         # factor maps 100ms -> 1, 500ms -> 5, 1000ms -> 10
         factor = interval_ms // 100
-        serial_backend.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = factor * serial_backend.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
+        serial_backend.recv_interval_factor = factor
 
         #  ----------------------- Mode-specific time axis length  -----------------------
         range_len = 50000 if (mode == "View angle" and interval_ms == 1000) else (factor * 1000)
-        self.time_axis = [i * serial_backend.SAMPLE_PERIOD for i in range(range_len)]
+        sample_period = serial_backend.sample_period()
+        self.time_axis = [i * sample_period for i in range(range_len)]
 
         # ----------------------- Mode Configuration Map -----------------------
         # Structure: { ModeName: (UpdateFunction, [Plot1_Setup, Plot2_Setup]) }

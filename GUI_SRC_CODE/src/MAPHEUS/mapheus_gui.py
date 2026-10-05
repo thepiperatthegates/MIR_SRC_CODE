@@ -218,7 +218,7 @@ class SleepTimer(QObject):
             self.timer.stop()
 
 # set to True to connect to the board over ETH again
-ENABLE_SOCKET_CONNECTION = False
+ENABLE_SOCKET_CONNECTION = True
 
 class SocketThread(QThread):
 
@@ -426,11 +426,12 @@ class MAPHEUS_GUI(QMainWindow, Ui_Title):
         #  ----------------------- Handle Scaling Logic -----------------------
         # factor maps 100ms -> 1, 500ms -> 5, 1000ms -> 10
         factor = interval_ms // 100
-        serial_backend.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC = factor * serial_backend.TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND
+        serial_backend.recv_interval_factor = factor
 
         #  ----------------------- Mode-specific time axis length  -----------------------
         range_len = 50000 if (mode == "View angle" and interval_ms == 1000) else (factor * 1000)
-        self.time_axis = [i * serial_backend.SAMPLE_PERIOD for i in range(range_len)]
+        sample_period = serial_backend.sample_period()
+        self.time_axis = [i * sample_period for i in range(range_len)]
 
         # ----------------------- Mode Configuration Map -----------------------
         # Structure: { ModeName: (UpdateFunction, [Plot1_Setup, Plot2_Setup]) }

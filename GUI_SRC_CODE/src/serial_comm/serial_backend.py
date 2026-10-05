@@ -44,8 +44,6 @@ p1 = None
 tot_count_accumulate_recv = 250
 
 
-
-
 def init_queues():
     """Re-initialize all multiprocessing queues (call before restarting the pipeline)."""
     global q_to_process, q_to_graph, q_to_csv, q_to_watchdog
@@ -71,6 +69,20 @@ def socket_start_connect(retries=10, delay=0.5):
             # time.sleep(delay)
 
     raise RuntimeError("Could not connect to device after several attempts")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ETH_RECV_CHUNK_SIZE = 4096
@@ -108,13 +120,23 @@ PAYLOAD_DATA_SIZE    = 4 * UINT16_SIZE
 BYTES_PER_SAMPLE     = HEADER_SIZE + PAYLOAD_DATA_SIZE
 TOTAL_ONE_CYCLE_BYTES    = BYTES_PER_SAMPLE * ADC_BUFFER_SIZE
 
-SAMPLE_FREQ = device_state.SAMPLE_FREQ  #Hz
-SAMPLE_PERIOD = 1.0/(SAMPLE_FREQ)   #s
-SAMPLE_PERIOD_TOTAL = SAMPLE_PERIOD * ADC_BUFFER_SIZE   #s
-TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC   = int(0.1 / SAMPLE_PERIOD_TOTAL)
 # ---------------------- for total count receiving from socket (depends if we want 0.5s, 1s or 2s) ----------------------
-TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC_FRONTEND =   int(0.1 / SAMPLE_PERIOD_TOTAL)
+# multiplier of 100 ms per receive batch, set by the GUI (100ms -> 1, 500ms -> 5, 1000ms -> 10)
+recv_interval_factor = 1
 range_len = 50000
+
+
+def sample_freq() -> int:
+    """ADC sample rate [Hz]."""
+    return device_state.ExpConstant().SAMPLE_FREQ
+
+def sample_period() -> float:
+    """ADC sample period [s]."""
+    return 1.0 / sample_freq()
+
+def recv_count_per_100ms() -> int:
+    """Number of ADC buffers that arrive in 100 ms."""
+    return int(0.1 / (sample_period() * ADC_BUFFER_SIZE))
 
 
 def recv_thread(sock, worker_kb_property, worker_specific_downsampling, worker_normalise_properties):
@@ -128,7 +150,7 @@ def recv_thread(sock, worker_kb_property, worker_specific_downsampling, worker_n
     while True:
         try:
             try:
-                target_bytes = TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC * TOTAL_ONE_CYCLE_BYTES
+                target_bytes = recv_interval_factor * recv_count_per_100ms() * TOTAL_ONE_CYCLE_BYTES
                 received_data = carry
                 while len(received_data) < target_bytes:
                     chunk = sock.recv(ETH_RECV_CHUNK_SIZE)
@@ -186,13 +208,25 @@ def send_thread(sock):
     except Exception as e:
         print("Cannot send data!", e)
 
-        
+
+
+
+
+
+
+
+
+
+
+
+
+      
 # ----- Protocol Headers & Formatting ------
 # Format: < (Little Endian), f (float), H (unsigned short)
 FRAME_SIZE  = BYTES_PER_SAMPLE      # 2 header + 4+4+2+2+4 payload
 NORM_SIZE   =  HEADER_SIZE + (4 * (FLOAT32_SIZE))      # 2 header + 2+2+2+2 payload
 KB_SIZE = HEADER_SIZE + (2 * (FLOAT32_SIZE))
-FRAME_FMT   = '<eeee'  # H1, H2, C1, C2 (uint16_t)
+FRAME_FMT   = '<HHHH'  # H1, H2, C1, C2 (uint16_t)
 NORM_FMT    = '<ffff'   # max_h1, min_h1, max_h2, min_h2
 KB_FMT = '<ff' #kb1, kb2
 
@@ -257,7 +291,18 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv, q_to_watchdog):
             q_to_graph.put(batch_frames)
             q_to_csv.put(batch_frames)
             
-        
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+
 ##########################################################################
 #write to dummy bin 
 ##########################################################################  
@@ -287,10 +332,11 @@ _ds_N = None            # block size the carry was collected with
 def downsample_factor(fs):
     
     fs = int(fs)
-    if fs <= 0 or fs > SAMPLE_FREQ or SAMPLE_FREQ % fs:
+    max_fs = sample_freq()
+    if fs <= 0 or fs > max_fs or max_fs % fs:
         return None
-    
-    return SAMPLE_FREQ // fs
+
+    return max_fs // fs
     
 def save_to_bin(cleaned_buffer, worker_kb_property, worker_specific_downsampling, worker_normalise_properties, num_columns=4):
     """Calibrate, downsample, and append a batch of ADC samples to the binary recording file."""
