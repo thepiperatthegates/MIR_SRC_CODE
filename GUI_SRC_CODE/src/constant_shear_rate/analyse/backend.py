@@ -1,6 +1,6 @@
 import numpy as np
 from PySide6 import QtGui
-from PySide6.QtCore import QFileInfo, Qt
+from PySide6.QtCore import QFileInfo, Qt, QAbstractTableModel, QModelIndex, QPersistentModelIndex
 from PySide6.QtWidgets import *
 
 from .analyse_Window import Ui_analyse_Window
@@ -39,6 +39,11 @@ mpl.use('QtAgg')
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 
+# ------------------ diagram colours (colour-blind friendly template) ------------------
+COLOR_BLUE = "#1a80bb"      # first line / single-line diagrams
+COLOR_RED = "#a00000"       # second line
+COLOR_ORANGE = "#ea801c"    # third line (current magnitude)
+
 data_4 = 0.0
 data_6 = 0.0
 
@@ -49,6 +54,51 @@ class MatplotlibCanvas(FigureCanvasQTAgg):
         fig = Figure(figsize=(width, height), dpi=dpi)
         self.axes = fig.add_subplot(111)
         super().__init__(fig)
+
+
+# TABLE MODEL
+class DataTableModel(QAbstractTableModel):
+    """This table model will ensure that the data table will only be made to the one where we actually look at, i.e. scroll."""
+
+    def __init__(self, headers, parent=None):
+        super().__init__(parent)
+        self._headers = headers
+        self._data = np.empty((0, len(headers)))
+        self._mean_row = []  # row 0: "-" for the raw columns, then the mean values
+
+    def set_table(self, data, mean_row):
+        self.beginResetModel()
+        self._data = data
+        self._mean_row = mean_row
+        self.endResetModel()
+
+    # signatures match the PySide6 stubs so the type checker accepts the overrides
+    def rowCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
+        if parent.isValid() or not self._mean_row:
+            return 0
+        return self._data.shape[0] + 1  # +1 for the mean row at the top
+
+    def columnCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
+        return 0 if parent.isValid() else len(self._headers)
+
+    def data(self, index: QModelIndex | QPersistentModelIndex, role: int = Qt.ItemDataRole.DisplayRole):
+        row, col = index.row(), index.column()
+        if role == Qt.ItemDataRole.DisplayRole:
+            if row == 0:
+                return self._mean_row[col]
+            return str(self._data[row - 1, col])  # shift by 1 because of the mean row
+        if role == Qt.ItemDataRole.TextAlignmentRole:
+            return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        if role == Qt.ItemDataRole.BackgroundRole and row == 0:
+            return QtGui.QColor(255, 0, 0)  # colour the mean row with red
+        return None
+
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole):
+        if role != Qt.ItemDataRole.DisplayRole:
+            return None
+        if orientation == Qt.Orientation.Horizontal:
+            return self._headers[section]
+        return str(section + 1)
 
 
 class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
@@ -109,8 +159,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
                               f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
 
-        self.COIL_CONSTANT = device_state.COIL_CONSTANT  # in T / A
-        self.DIPOLE_MOMENT = device_state.DIPOLE_MOMENT  # in A m^2
+        self.COIL_CONSTANT = device_state.ExpConstant().COIL_CONSTANT  # in T / A
+        self.DIPOLE_MOMENT = device_state.ExpConstant().DIPOLE_MOMENT  # in A m^2
         self.CALIBRATION_FACTOR = self.worker_get_fr_coefficient.CALIBRATION_FACTOR  # torque calibration no units (K)
 
         self.worker_get_offset = device_state.TxData()
@@ -123,8 +173,9 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         self.textbox_offset2.setText(str(self.offset_2))
 
         # ------------------ geometry constants ------------------
-        self.C_SS = 11160103  # conversion factor to stress in Pa / Nm
-        self.C_SR = 37.099  # conversion factor to shear rate in s^-1 / s^-1
+        self.worker_experiment_constant = device_state.ExpConstant()
+        self.C_SS = self.worker_experiment_constant.C_SS  # conversion factor to stress in Pa / Nm
+        self.C_SR = self.worker_experiment_constant.C_SR  # conversion factor to shear rate in s^-1 / s^-1
 
 
         # ------------------variables to save ------------------
@@ -164,23 +215,32 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
 
         self.data_show_comboBox.setCurrentIndex(-1)
 
-        self.table_Widget.setColumnCount(13)
+        # swap the Designer QTableWidget for a model-backed QTableView (filling a
+        # QTableWidget cell by cell takes ~16 s for a 540k-row recording)
+        table_headers = [self.table_Widget.horizontalHeaderItem(col).text()
+                         for col in range(self.table_Widget.columnCount())]
+        self.table_model = DataTableModel(table_headers, self)
+        self.table_View = QTableView(self.centralwidget)
+        self.table_View.setModel(self.table_model)
+        self.mlp_layout.replaceWidget(self.table_Widget, self.table_View)
+        self.table_Widget.deleteLater()
+        del self.table_Widget
 
         # let columns share the available width instead of a fixed pixel scroll-fest
-        self.table_Widget.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.table_View.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
         # alternating row shading makes a 13-column table much easier to scan
-        self.table_Widget.setAlternatingRowColors(True)
-        self.table_Widget.setStyleSheet("QTableWidget { alternate-background-color: #ececec; }")
+        self.table_View.setAlternatingRowColors(True)
+        self.table_View.setStyleSheet("QTableView { alternate-background-color: #ececec; }")
 
         # visually group the offset controls without touching the Designer layout tree
         self.layoutWidget.setStyleSheet(
             "QWidget#layoutWidget { border: 1px solid #bbbbbb; border-radius: 4px; padding: 4px; }"
         )
 
+        #----------------   MATPLOTLIB Canvas --------------------------------
         self.canvas = MatplotlibCanvas(self)
-        # wrap the canvas in a framed container so the white plot area reads as a
-        # distinct widget instead of blending into the grey window background
+
         self.canvas_frame = QFrame(self.centralwidget)
         self.canvas_frame.setObjectName("canvas_frame")
         self.canvas_frame.setStyleSheet(
@@ -192,17 +252,17 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         _canvas_frame_layout.addWidget(self.canvas)
         self.mlp_layout.addWidget(self.canvas_frame)
         self.mpl_toolbar = NavigationToolbar2QT(self.canvas, self.centralwidget)
-        # give the nav toolbar its own bordered white bar so it doesn't wash out
-        # against the grey window background
+
         self.mpl_toolbar.setStyleSheet(
             "QToolBar { background: #ffffff; border: 1px solid #6f6f6f;"
             " border-radius: 4px; padding: 2px; spacing: 2px; }"
             "QToolButton { background: transparent; padding: 2px; }"
             "QToolButton:hover { background: #d8d8d8; border-radius: 3px; }"
         )
-        # matplotlib recolours the toolbar icons to near-white when it decides the
-        # widget palette is dark, making them vanish on the white bar; load the
-        # plain black PNG icons directly so they stay visible
+        #----------------  MATPLOTLIB Canvas --------------------------------
+
+
+        #----------------   MATPLOTLIB tools --------------------------------
         _mpl_img_dir = os.path.join(mpl.get_data_path(), "images")
         for _txt, _tip, _img, _cb in self.mpl_toolbar.toolitems:
             if _img is None:
@@ -210,6 +270,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
             _act = self.mpl_toolbar._actions.get(_cb)
             if _act is not None:
                 _act.setIcon(QtGui.QIcon(os.path.join(_mpl_img_dir, _img + ".png")))
+        #----------------------------------------------------------------
+
         self.canvas_frame.hide()
         self.horizontalLayout.addWidget(self.mpl_toolbar)
         self.csv_Button.clicked.connect(self.find_filename_button_pressed)
@@ -249,6 +311,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
     def save_offset2_event_textbox(self):
         self.offset_2 = float(self.textbox_offset2.text())
 
+    #------------- Find file event button ------------------------
     def find_filename_button_pressed(self):
         self.analyse_filename = QFileDialog.getOpenFileName(filter="csv (*.csv)")[0]
         if not self.analyse_filename:
@@ -276,12 +339,14 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
             print("New code")
 
         # Load selected file
-        self.raw_data = np.genfromtxt(
+        #pandas is faster than numpy
+        self.raw_data = pandas.read_csv(
             self.analyse_filename,
-            delimiter=";",
-            skip_header=skip_check,
+            sep=";",
+            header=None,
+            skiprows=skip_check,
             encoding='utf-8-sig'
-        )
+        ).apply(pandas.to_numeric, errors="coerce").to_numpy(dtype=float)
 
         self.recalculate()
 
@@ -306,13 +371,13 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         mode = self.data_show_comboBox.currentText()
         if mode == "Data table":
             self.canvas_frame.hide()
-            self.table_Widget.show()
+            self.table_View.show()
             if self._is_table_dirty:
                 self.data_mode_function()
                 self._is_table_dirty = False
 
         elif mode in self.diagram_map:
-            self.table_Widget.hide()
+            self.table_View.hide()
             self.canvas_frame.show()
             self.diagram_map[mode]()
 
@@ -321,27 +386,9 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
 
     def data_mode_function(self):
 
-        # set row and column count (+1 for the mean row at the top)
-        self.table_Widget.setRowCount(self.final_data_to_show.shape[0] + 1)
-        self.table_Widget.setColumnCount(self.final_data_to_show.shape[1])
-
-        # fill the table starting from row 1
-        for row in range(self.final_data_to_show.shape[0]):
-            for col in range(self.final_data_to_show.shape[1]):
-                item = QTableWidgetItem(str(self.final_data_to_show[row, col]))
-                item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                self.table_Widget.setItem(row + 1, col, item)  # shift by 1
-
         #################################SET DATA FOR MEAN VALUE OF THE FIRST ROW#######################
 
-        # first 7 columns with "-"
-        for col in range(7):
-            item = QTableWidgetItem("-")
-            item.setBackground(QtGui.QColor(255, 0, 0))
-            item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            self.table_Widget.setItem(0, col, item)
-
-        # remaining columns with actual mean values
+        # first 7 columns with "-", remaining columns with actual mean values
         values = [
             self.phase_difference_degree_mean,
             self.angular_velocity_mean,
@@ -350,15 +397,12 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
             self.shear_stress_mean,
             self.viscosity_mean,
         ]
-
-        # colour the row with red
-        for i, val in enumerate(values, start=7):
-            item = QTableWidgetItem(str(val))
-            item.setBackground(QtGui.QColor(255, 0, 0))
-            item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            self.table_Widget.setItem(0, i, item)
+        mean_row = ["-"] * 7 + [str(val) for val in values]
 
         ##############################################################################################
+
+        # the model formats cells lazily, so this is instant even for huge files
+        self.table_model.set_table(self.final_data_to_show, mean_row)
 
     def offsets_update(self):
         """
@@ -438,9 +482,9 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         title = r"Current Sensors"
         ylabel = r"Current / mA"
         lines = [
-            {"y": self.current_1, "label" : r"Current 1 $I_1$", "color": "g"},
-            {"y": self.current_2, "label" : r"Current_2 $I_2$", "color": "#FFB6C1"},
-            {"y": self.magnitude_current, "label":r"Magnitude $\hat I$", "color": "r"},
+            {"y": self.current_1, "label" : r"Current 1 $I_1$", "color": COLOR_BLUE},
+            {"y": self.current_2, "label" : r"Current_2 $I_2$", "color": COLOR_RED},
+            {"y": self.magnitude_current, "label":r"Magnitude $\hat I$", "color": COLOR_ORANGE},
         ]
 
         self.template_draw_diagram(title, ylabel, lines)
@@ -450,8 +494,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         title = r"Voltage Sensors"
         ylabel = r"Voltage / V"
         lines = [
-            {"y": self.voltage_1, "label": r"Hall sensor 1 $U_1$", "color": "#890304"},
-            {"y": self.voltage_2, "label": r"Hall sensor 2 $U_2$", "color": "#00113a"},
+            {"y": self.voltage_1, "label": r"Hall sensor 1 $U_1$", "color": COLOR_BLUE},
+            {"y": self.voltage_2, "label": r"Hall sensor 2 $U_2$", "color": COLOR_RED},
         ]
 
         self.template_draw_diagram(title, ylabel, lines)
@@ -460,8 +504,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         title = "Phase diagram"
         ylabel = r"Angle $\phi$ / °"
         lines = [
-            {"y": np.degrees(self.angle_magnetic_field.reshape(-1, 1)), "label": r"$\phi_B$", "color": "#890304"},
-            {"y": np.degrees(self.angle_magnet.reshape(-1, 1)), "label": r"$\phi_m$", "color": "#00113a"},
+            {"y": np.degrees(self.angle_magnetic_field.reshape(-1, 1)), "label": r"$\phi_B$", "color": COLOR_BLUE},
+            {"y": np.degrees(self.angle_magnet.reshape(-1, 1)), "label": r"$\phi_m$", "color": COLOR_RED},
             ]
         self.template_draw_diagram(title, ylabel, lines)
 
@@ -471,7 +515,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         title = "Phase difference diagram"
         ylabel = r"Angle $\phi$ / °"
         lines = [
-            {"y": self.phase_difference_degree, "label": r"$\Delta\phi$", "color": "#7294D4"}
+            {"y": self.phase_difference_degree, "label": r"$\Delta\phi$", "color": COLOR_BLUE}
         ]
         self.template_draw_diagram(title, ylabel, lines)
 
@@ -479,7 +523,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         title = "Angular velocity diagram"
         ylabel = r"Angular velocity $\omega$ / rad$s^{-1}$"
         lines = [
-            {"y": self.angular_velocity, "color": "red"},
+            {"y": self.angular_velocity, "color": COLOR_BLUE},
         ]
 
         self.template_draw_diagram(title, ylabel, lines)
@@ -488,7 +532,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         title = "Torque diagram"
         ylabel = r"Torque $T$ / Nm"
         lines = [
-            {"y": self.total_torque, "color": "red"},
+            {"y": self.total_torque, "color": COLOR_BLUE},
         ]
 
         self.template_draw_diagram(title, ylabel, lines)
@@ -497,7 +541,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         title = "Shear rate diagram"
         ylabel = r"Shear rate $\dot\gamma$ / $s^{-1}$"
         lines = [
-            {"y": self.shear_rate, "color": "red"},
+            {"y": self.shear_rate, "color": COLOR_BLUE},
         ]
 
         self.template_draw_diagram(title, ylabel, lines)
@@ -507,7 +551,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         title = "Shear stress diagram"
         ylabel = r"Shear stress $\tau$ / Pa"
         lines = [
-            {"y": self.shear_stress, "color": "red"},
+            {"y": self.shear_stress, "color": COLOR_BLUE},
         ]
 
         self.template_draw_diagram(title, ylabel, lines)
@@ -517,7 +561,7 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window, AnalyseCalculationMixin):
         title = "Viscosity diagram"
         ylabel = r"Viscosity $\eta$"
         lines = [
-            {"y": self.viscosity, "color": "red"},
+            {"y": self.viscosity, "color": COLOR_BLUE},
         ]
 
         self.template_draw_diagram(title, ylabel, lines)

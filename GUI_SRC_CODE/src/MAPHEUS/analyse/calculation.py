@@ -62,7 +62,7 @@ class AnalyseCalculationMixin:
         self.data[:, 2] = change_adc_hall(self.data[:, 2])          # Hall 2 [V]
         self.data[:, 3] = change_current_adc(self.data[:, 3] ) - (34634 / 16000 * 259)     # Current 1 [mA]
         self.data[:, 4] = change_current_adc(self.data[:, 4] ) - (34727 / 16000 * 259)     # Current 2 [mA]  
-
+        
         self.time = self.data[:, 0]
         self.voltage_1 = self.data[:, 1]
         self.voltage_2 = self.data[:, 2]
@@ -249,7 +249,7 @@ class AnalyseCalculationMixin:
             delta=np.mean(np.diff(self.time))  # time step
         )  # [rad /s]
         
-        self.shear_rate = self.angular_velocity * 3500 /280 # self.C_SR =R / h   # [1 / s] (max value since plate-plate geometry)
+        self.shear_rate = self.angular_velocity * self.C_SR # self.C_SR =R / h   # [1 / s] (max value since plate-plate geometry)
 
     def calculate_friction_moment(self):
         # self.friction_moment = self.angular_velocity * self.fr1 + self.fr0  # - y_0        # [Nm]

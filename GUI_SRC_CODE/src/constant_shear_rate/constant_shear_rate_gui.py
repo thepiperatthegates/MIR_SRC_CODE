@@ -315,8 +315,8 @@ class ConstShearGUI(QMainWindow, Ui_Title):
         #--------- Constants ---------
         self.tot_average = self.worker_downsample_property.tot_average
         self.time_increment = self.worker_downsample_property.current_time
-        self.COIL_CONSTANT = device_state.COIL_CONSTANT
-        self.DIPOLE_MOMENT = device_state.DIPOLE_MOMENT
+        self.COIL_CONSTANT = device_state.ExpConstant().COIL_CONSTANT
+        self.DIPOLE_MOMENT = device_state.ExpConstant().DIPOLE_MOMENT
 
         #--------- Global sync ---------
         device_state.CALIBRATION_FACTOR = self.worker_fr_property.CALIBRATION_FACTOR
@@ -767,7 +767,7 @@ class ConstShearGUI(QMainWindow, Ui_Title):
                 else:
                     #create empty template file if no file exist prior
                     data = np.array([], dtype = [
-                        ("ELECTRONICS_FLAGS", "i8"),
+                        ("ELECTRONICS_FLAG", "i8"),
                         ("k_b_1", "f8"),
                         ("k_b_2", "f8")
                     ])

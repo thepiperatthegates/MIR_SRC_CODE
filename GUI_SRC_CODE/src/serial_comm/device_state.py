@@ -52,15 +52,8 @@ MIN_V_AFTER_HALL = 0.0
 
 
 
-#default coefficients
-
-COIL_CONSTANT = 3.097e-3		# in T / A
-DIPOLE_MOMENT = 8.594e-3		# in A m^2
-
-
-
 #flag for electronics type
-ELECTRONICS_FLAG = 0
+ELECTRONICS_FLAG = 1
 
 
 ########################################################### FIRST COIL ###########################################################
@@ -122,7 +115,7 @@ class TxData():
     
     @data_2.setter
     def data_2(self, val):
-        C_SR = 37.099
+        C_SR = ExpConstant().C_SR
         running_frequency = float(val)/(2*pi*C_SR)
         self.__class__._data_2 = running_frequency
         
@@ -454,26 +447,26 @@ class fRCoefficients:
     _CALIBRATION_FACTOR = None
 
     @classmethod
-    def _initialize(cls):
+    def _initialize(cls) -> None:
         """Run once, based on ELECTRONICS_FLAG."""
         global ELECTRONICS_FLAG
         if cls._initialized:
             return
 
-        if ELECTRONICS_FLAG in (0, 1):
+        if ELECTRONICS_FLAG == 1:
             # cls._fr1 = 1.51e-8
             # cls._fr0 = -8.577e-08
             # cls._CALIBRATION_FACTOR = 0.773
             cls._fr1 = 1.0
             cls._fr0 = 0.0
-            cls._CALIBRATION_FACTOR = 1.0
+            cls._CALIBRATION_FACTOR = 0.78
         elif ELECTRONICS_FLAG == 2:
             # cls._fr1 = 2.613e-08
             # cls._fr0 = 1.186e-07
             # cls._CALIBRATION_FACTOR = 0.875
             cls._fr1 = 1.0
             cls._fr0 = 0.0
-            cls._CALIBRATION_FACTOR = 1.0
+            cls._CALIBRATION_FACTOR = 0.78 
             
         else:
             raise ValueError(f"Invalid ELECTRONICS_FLAG = {ELECTRONICS_FLAG}")
@@ -490,32 +483,32 @@ class fRCoefficients:
         
     # ---------- Properties ----------
     @property
-    def fr1(self):
+    def fr1(self) -> None | float:
         type(self)._initialize()
         return type(self)._fr1
 
     @fr1.setter
-    def fr1(self, value):
+    def fr1(self, value) -> None:
         type(self)._initialize()
         type(self)._fr1 = float(value)
 
     @property
-    def fr0(self):
+    def fr0(self) -> None | float:
         type(self)._initialize()
         return type(self)._fr0
 
     @fr0.setter
-    def fr0(self, value):
+    def fr0(self, value) -> None:
         type(self)._initialize()
         type(self)._fr0 = float(value)
 
     @property
-    def CALIBRATION_FACTOR(self):
+    def CALIBRATION_FACTOR(self) -> None | float:
         type(self)._initialize()
         return type(self)._CALIBRATION_FACTOR
 
     @CALIBRATION_FACTOR.setter
-    def CALIBRATION_FACTOR(self, value):
+    def CALIBRATION_FACTOR(self, value) -> None:
         type(self)._initialize()
         type(self)._CALIBRATION_FACTOR = float(value)
 
@@ -527,7 +520,7 @@ class kbCoefficient:
     _k_b_2 = 0.0
 
     @classmethod
-    def _initialize(cls):
+    def _initialize(cls) -> None:
         """Run once based on the global ELECTRONICS_FLAG.
            For MAPHEUS, kb is V/mA and previously it was kb is V/A"""
         global ELECTRONICS_FLAG
@@ -549,6 +542,7 @@ class kbCoefficient:
         if not np.any(index):
             raise ValueError(f"No matching ELECTRONICS_FLAG = {user_input} in CSV")
         
+        #index will only hold the TRUE value and [0] make it 1D
         row = data[index][0]
         
         #get the data
@@ -560,35 +554,98 @@ class kbCoefficient:
         
     # ---- reload ----
     @classmethod
-    def reload(cls):
+    def reload(cls) -> None:
         cls._initialized = False
         cls._initialize()
 
     # ---- k_b_1 ----
     @property
-    def k_b_1(self):
+    def k_b_1(self) -> float:
         type(self)._initialize()
         return type(self)._k_b_1
 
     @k_b_1.setter
-    def k_b_1(self, val):
+    def k_b_1(self, val) -> None:
         type(self)._initialize()
         type(self)._k_b_1 = float(val)
 
     # ---- k_b_2 ----
     @property
-    def k_b_2(self):
+    def k_b_2(self) -> float:
         type(self)._initialize()
         return type(self)._k_b_2
 
     @k_b_2.setter
-    def k_b_2(self, val):
+    def k_b_2(self, val) -> None:
         type(self)._initialize()
         type(self)._k_b_2 = float(val)
         
+class ExpConstant():
+    _initialized = False
+    
+    _C_SS = 0.0
+    _C_SR = 0.0
+    _COIL_CONSTANT = 0.0
+    _DIPOLE_MOMENT = 0.0
+
+    @classmethod 
+    def _initialize(cls) -> None:
+        """Run once during init."""
+        if cls._initialized:
+            return
         
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        filepath = os.path.join(project_root, "files", "experiment_coefficients.csv")
+        
+        const_data = np.genfromtxt(filepath, delimiter=";", names= True)
+    
+        user_input = ELECTRONICS_FLAG
+        #Boolean comparison in the first column
+        index = const_data["ELECTRONICS_FLAG"] == user_input 
+        if not np.any(index):
+            raise ValueError(f"No matching ELECTRONICS_FLAG = {user_input} in CSV")
+        
+        #index will only hold the TRUE value and [0] make it 1D
+        row = const_data[index][0]
+        
+        #get the data
+        cls._C_SS = float(row["C_SS"])
+        cls._C_SR = float(row["C_SR"])
+        cls._COIL_CONSTANT = float(row["COIL_CONSTANT"])
+        cls._DIPOLE_MOMENT = float(row["DIPOLE_MOMENT"])
+
+        cls._initialized = True 
+    
+    #--reload--
+    @classmethod
+    def reload(cls) -> None:
+        cls._initialized = False
+        cls._initialize()
+        
+    # --- C_SS ---
+    @property
+    def C_SS(self) -> float:
+        type(self)._initialize()
+        return type(self)._C_SS
+    
+    # --- C_SR ---
+    @property
+    def C_SR(self) -> float:
+        type(self)._initialize()
+        return type(self)._C_SR
+
+    @property
+    def COIL_CONSTANT(self) -> float:
+        type(self)._initialize()
+        return type(self)._COIL_CONSTANT
+
+    @property
+    def DIPOLE_MOMENT(self) -> float:
+        type(self)._initialize()
+        return type(self)._DIPOLE_MOMENT
         
 class VoltageNormaliseCoefficient:
+    
     _initialized = False
     
     _amp_voltage_1 = 0.0
@@ -777,8 +834,6 @@ def calculate_torque_fR( current_1, current_2, hall_1, hall_2, data_4, data_6):
         :rtype: float or np.ndarray
         """
         
-        global DIPOLE_MOMENT, COIL_CONSTANT
-        
         current_1 = np.array(current_1, dtype=float)
         current_2 = np.array(current_2, dtype=float)
         hall_1    = np.array(hall_1, dtype=float)
@@ -795,9 +850,10 @@ def calculate_torque_fR( current_1, current_2, hall_1, hall_2, data_4, data_6):
         magnitude_current = np.sqrt(power_of_2)
         
         worker_cal = fRCoefficients()
-        
-        total_torque = worker_cal.CALIBRATION_FACTOR * ( DIPOLE_MOMENT
-        * COIL_CONSTANT                    # [T/A]
+        worker_exp = ExpConstant()
+
+        total_torque = worker_cal.CALIBRATION_FACTOR * ( worker_exp.DIPOLE_MOMENT
+        * worker_exp.COIL_CONSTANT                    # [T/A]
         * magnitude_current / 1000         # mA; -> A, [A]
         * np.sin(phase_difference)   # dimensionless
         )

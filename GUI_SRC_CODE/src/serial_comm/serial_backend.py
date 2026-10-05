@@ -313,30 +313,6 @@ def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling
     col2_converted = (col2_converted - worker_normalise_properties.zero_offset_voltage_2) / worker_normalise_properties.amp_voltage_2
 
     #Average values to reduce amount of data saved
-    ####FOR CONSTANT SHEAR RATE 
-
-    ########################################################## debugging purpose ##########################################################
-    ########################################################## init object for setter getter ##############################################################################################################
-    # #init the object
-    # #default tot_average
-    # tot_average = worker_specific_downsampling.tot_average
-    # print("tot_average:", tot_average)
-    # #specified tot_average
-    # tot_average_specified = worker_specific_downsampling.tot_average_specified
-    # print("tot_average_specified:", tot_average_specified)
-    # #default time increment
-    # time_increment = worker_specific_downsampling.time_increment
-    # print("time_increment:", time_increment)
-    # #specified downsampling time increment
-    # time_increment_specified = worker_specific_downsampling.time_increment_specified
-    # print("time_increment_specified:", time_increment_specified)
-    # #current time init
-    # current_time = worker_specific_downsampling.current_time
-    # print("current_time:", current_time)
-    #####################################################################################################################################################################
-    
-    
-    
     #check if the need for specific downsample is needed
     if worker_specific_downsampling.flag_specific_downsample:
             col1_converted = average_values(col1_converted, worker_specific_downsampling.tot_average_specified).ravel()

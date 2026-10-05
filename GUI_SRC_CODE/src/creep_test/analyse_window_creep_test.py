@@ -89,8 +89,8 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.label_fr.setText(f"f<sub>r0</sub> = {self.fr0}&nbsp;&nbsp;&nbsp;"
                               f"f<sub>r1</sub> = {self.fr1}&nbsp;&nbsp;&nbsp;")
 
-        self.COIL_CONSTANT = packet_transmission.COIL_CONSTANT  # in T / A
-        self.DIPOLE_MOMENT = packet_transmission.DIPOLE_MOMENT  # in A m^2
+        self.COIL_CONSTANT = packet_transmission.ExpConstant().COIL_CONSTANT  # in T / A
+        self.DIPOLE_MOMENT = packet_transmission.ExpConstant().DIPOLE_MOMENT  # in A m^2
         self.CALIBRATION_FACTOR = self.worker_get_fr_coefficient.CALIBRATION_FACTOR  # torque calibration no units (K)
 
         self.worker_get_offset = packet_transmission.TxData()
@@ -103,8 +103,9 @@ class AnalyseWindow(QMainWindow, Ui_analyse_Window):
         self.textbox_offset2.setText(str(self.offset_2))
 
         # ------------------ geometry constants ------------------
-        self.C_SS = 11160103  # conversion factor to stress in Pa / Nm
-        self.C_SR = 37.099  # conversion factor to shear rate in s^-1 / s^-1
+        self.worker_experiment_constant = packet_transmission.ExpConstant()
+        self.C_SS = self.worker_experiment_constant.C_SS  # conversion factor to stress in Pa / Nm
+        self.C_SR = self.worker_experiment_constant.C_SR  # conversion factor to shear rate in s^-1 / s^-1
         
 
         # ------------------variables to save ------------------
