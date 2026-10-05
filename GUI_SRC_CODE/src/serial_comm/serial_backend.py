@@ -1,6 +1,6 @@
 #functions for socket
 
-from . import device_state as packet_transmission
+from . import device_state 
 
 import numpy as np
 import os
@@ -81,16 +81,16 @@ ETH_RECV_CHUNK_SIZE = 4096
 def thread_start():
     """Connect to the device, start the receive thread, and poll for outgoing transmissions."""
     sock = socket_start_connect()
-    worker_kb_property = packet_transmission.kbCoefficient()
-    worker_specific_downsampling = packet_transmission.DownSampleSpecificFlag()
-    worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
+    worker_kb_property = device_state.kbCoefficient()
+    worker_specific_downsampling = device_state.DownSampleSpecificFlag()
+    worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
     #Event for run time receiving data from the ETH socket
     thread_recv = threading.Thread(target=recv_thread, args=(sock,worker_kb_property, worker_specific_downsampling, worker_normalise_properties))
     thread_recv.start()
 
     while True:
-        packet_transmission.tx_event.wait()
-        packet_transmission.tx_event.clear()
+        device_state.tx_event.wait()
+        device_state.tx_event.clear()
         thread_send = threading.Thread(target=send_thread, daemon=False, args=(sock,))
         thread_send.start()
 
@@ -108,7 +108,7 @@ PAYLOAD_DATA_SIZE    = 4 * UINT16_SIZE
 BYTES_PER_SAMPLE     = HEADER_SIZE + PAYLOAD_DATA_SIZE
 TOTAL_ONE_CYCLE_BYTES    = BYTES_PER_SAMPLE * ADC_BUFFER_SIZE
 
-SAMPLE_FREQ = 5000  #Hz
+SAMPLE_FREQ = device_state.SAMPLE_FREQ  #Hz
 SAMPLE_PERIOD = 1.0/(SAMPLE_FREQ)   #s
 SAMPLE_PERIOD_TOTAL = SAMPLE_PERIOD * ADC_BUFFER_SIZE   #s
 TOT_COUNT_ACCUMULATE_RECV_IN_1_SEC   = int(0.1 / SAMPLE_PERIOD_TOTAL)
@@ -121,8 +121,8 @@ def recv_thread(sock, worker_kb_property, worker_specific_downsampling, worker_n
     """Accumulate ETH bytes until at least one interval's worth has arrived, forward the batch for live plotting, and save to CSV when recording. """
     global flag_for_process, p1, tot_count_accumulate_recv, flag_for_downsampling
     num_columns = 4
-    worker_process_flag = packet_transmission.ProcessUnpackingFlag()
-    worker_normalise_properties = packet_transmission.VoltageNormaliseCoefficient()
+    worker_process_flag = device_state.ProcessUnpackingFlag()
+    worker_normalise_properties = device_state.VoltageNormaliseCoefficient()
 
     carry = b''  # bytes read past target_bytes on the previous batch, carried forward so none get dropped
     while True:
@@ -153,9 +153,9 @@ def recv_thread(sock, worker_kb_property, worker_specific_downsampling, worker_n
                     pass  # nothing queued yet
 
                 # ---- Saving data function -------
-                if packet_transmission.running_time_event.is_set():
+                if device_state.running_time_event.is_set():
                     if sensor_data_recv:
-                        save_to_csv(sensor_data_recv, worker_kb_property, worker_specific_downsampling,
+                        save_to_bin(sensor_data_recv, worker_kb_property, worker_specific_downsampling,
                                     worker_normalise_properties, num_columns=num_columns)
                         sensor_data_recv = None
 
@@ -177,7 +177,7 @@ def recv_thread(sock, worker_kb_property, worker_specific_downsampling, worker_n
 ##########################################################################
 def send_thread(sock):
     """Pack and transmit the current command data over the ETH socket."""
-    worker_combined_send = packet_transmission.TxData()
+    worker_combined_send = device_state.TxData()
     #combined everything
     combined_send = worker_combined_send.combine_data()
     #reset the flag
@@ -259,129 +259,164 @@ def start_process_live_graph(q_to_process, q_to_graph, q_to_csv, q_to_watchdog):
             
         
 ##########################################################################
-#write to dummy csv 
-##########################################################################     
-def file_name_change_set(prefix, extension=".csv"):
-    """Set the global output file name used by save_to_csv."""
-    global file_name
-    
-    
-    file_name = f"{prefix}{extension}"
-    
+#write to dummy bin 
+##########################################################################  
+# Recording file layout: raw little-endian float64, 5 values per row (time, U1, U2, I1, I2), no header.
+RECORDING_DTYPE   = np.dtype('<f8')
+RECORDING_COLUMNS = 5
+PROJECT_ROOT      = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DUMMY_FILE_PATH   = os.path.join(PROJECT_ROOT, "files", "dummy.bin")
 
-def save_to_csv(cleaned_buffer, worker_kb_property, worker_specific_downsampling, worker_normalise_properties, num_columns=4):
-    """Calibrate, downsample, and append a batch of ADC samples to the CSV file."""
+
+def file_name_change_set(prefix, extension=".bin"):
+    """Set the global output file name used by save_to_bin."""
+    global file_name
+
+
+    file_name = f"{prefix}{extension}"
+
+def load_recording(path=DUMMY_FILE_PATH):
+    """Read a file written by save_to_bin back as a (rows, 5) array."""
+    return np.fromfile(path, dtype=RECORDING_DTYPE).reshape(-1, RECORDING_COLUMNS)
+    
+    
+# ---- straming downsample state ---------
+_ds_carry = None        # samples that didn't fill a full block yet
+_ds_N = None            # block size the carry was collected with
+    
+def downsample_factor(fs):
+    
+    fs = int(fs)
+    if fs <= 0 or fs > SAMPLE_FREQ or SAMPLE_FREQ % fs:
+        return None
+    
+    return SAMPLE_FREQ // fs
+    
+def save_to_bin(cleaned_buffer, worker_kb_property, worker_specific_downsampling, worker_normalise_properties, num_columns=4):
+    """Calibrate, downsample, and append a batch of ADC samples to the binary recording file."""
 
     global file_name, count_time
     
     count_time = count_time +1
     
-    print("How many times has this function been called? :", count_time)
+    # print("How many times has this function been called? :", count_time)
 
-    data = np.array(cleaned_buffer)
 
     # Reshape the data to have 'num_columns' columns per row
-    reshaped_data = np.array(data).reshape(-1, num_columns)
+    # asarray to not copy the data, just pointer
+    reshaped_data = np.asarray(cleaned_buffer, dtype=float).reshape(-1, num_columns)
     
-    
-    reshaped_data = reshaped_data.astype(float)
-    
-    col1 = reshaped_data[:, 0]             #take first column (U1)
+    col1 = reshaped_data[:, 0]           #take first column (U1)
     col2 = reshaped_data[:, 1]           #take second column (U2)
-    col3 = reshaped_data[:, 2]                #take third column (I1)
-    col4 = reshaped_data[:, 3]               #take fourth column (I2)
+    col3 = reshaped_data[:, 2]           #take third column (I1)
+    col4 = reshaped_data[:, 3]           #take fourth column (I2)
 
-    
-    
     #Hall Sensors
-    col1_converted = -packet_transmission.change_adc_hall(col1)               #convert col1
-    col2_converted = packet_transmission.change_adc_hall(col2)               #convert col2
-    
-    
-    #Current
-    col3_converted = -packet_transmission.change_current_adc(col3)               #convert col1
-    col4_converted = packet_transmission.change_current_adc(col4)               #convert col2
+    col1_converted = -device_state.change_adc_hall(col1)               #convert col1
+    col2_converted = device_state.change_adc_hall(col2)               #convert col2
 
-    # col3_converted = packet_transmission.calibration_input_coil_1(col3_converted)
-    # col4_converted = packet_transmission.calibration_input_coil_2(col4_converted)
+    #Current
+    col3_converted = -device_state.change_current_adc(col3)               #convert col1
+    col4_converted = device_state.change_current_adc(col4)               #convert col2
+
+    # col3_converted = device_state.calibration_input_coil_1(col3_converted)
+    # col4_converted = device_state.calibration_input_coil_2(col4_converted)
 
     # #Justified hall sensors
-    # col1_converted = packet_transmission.calibrated_hall_sensors1(worker_kb_property.k_b_1, col1_converted, col3_converted/1000)  
-    # col2_converted = packet_transmission.calibrated_hall_sensors2(worker_kb_property.k_b_2, col2_converted, col4_converted/1000)
+    # col1_converted = device_state.calibrated_hall_sensors1(worker_kb_property.k_b_1, col1_converted, col3_converted/1000)  
+    # col2_converted = device_state.calibrated_hall_sensors2(worker_kb_property.k_b_2, col2_converted, col4_converted/1000)
 
     col1_converted = (col1_converted- worker_normalise_properties.zero_offset_voltage_1) / worker_normalise_properties.amp_voltage_1
     col2_converted = (col2_converted - worker_normalise_properties.zero_offset_voltage_2) / worker_normalise_properties.amp_voltage_2
 
     #Average values to reduce amount of data saved
-    #check if the need for specific downsample is needed
-    if worker_specific_downsampling.flag_specific_downsample:
-            col1_converted = average_values(col1_converted, worker_specific_downsampling.tot_average_specified).ravel()
-            col2_converted = average_values(col2_converted, worker_specific_downsampling.tot_average_specified).ravel()
-            col3_converted = average_values(col3_converted, worker_specific_downsampling.tot_average_specified).ravel()
-            col4_converted = average_values(col4_converted, worker_specific_downsampling.tot_average_specified).ravel()
-    
-    elif worker_specific_downsampling.flag_specific_downsample is False:
-            col1_converted = average_values(col1_converted, worker_specific_downsampling.tot_average).ravel()
-            col2_converted = average_values(col2_converted, worker_specific_downsampling.tot_average).ravel()
-            col3_converted = average_values(col3_converted, worker_specific_downsampling.tot_average).ravel()
-            col4_converted = average_values(col4_converted, worker_specific_downsampling.tot_average).ravel()
+    ####FOR CONSTANT SHEAR RATE 
 
-    averaged_data = np.zeros((len(col1_converted), 4))  # shape (100,4)
-    averaged_data[:, 0] = col1_converted
-    averaged_data[:, 1] = col2_converted
-    averaged_data[:, 2] = col3_converted
-    averaged_data[:, 3] = col4_converted
+    ########################################################## debugging purpose ##########################################################
+    ########################################################## init object for setter getter ##############################################################################################################
+    # #init the object
+    # #default tot_average
+    # tot_average = worker_specific_downsampling.tot_average
+    # print("tot_average:", tot_average)
+    # #specified tot_average
+    # tot_average_specified = worker_specific_downsampling.tot_average_specified
+    # print("tot_average_specified:", tot_average_specified)
+    # #default time increment
+    # time_increment = worker_specific_downsampling.time_increment
+    # print("time_increment:", time_increment)
+    # #specified downsampling time increment
+    # time_increment_specified = worker_specific_downsampling.time_increment_specified
+    # print("time_increment_specified:", time_increment_specified)
+    # #current time init
+    # current_time = worker_specific_downsampling.current_time
+    # print("current_time:", current_time)
+    #####################################################################################################################################################################
     
-    num_rows = averaged_data.shape[0] 
-        
-    if worker_specific_downsampling.flag_specific_downsample:
-        step = worker_specific_downsampling.time_increment_specified
+    # ------ pick block size and time step for saving the data later ----
+    ds = worker_specific_downsampling
+
+    # ---- creep test: leave the fast-rate phase once its duration is reached ----
+    if ds.flag_specific_downsample and ds.current_time >= ds.specific_duration:
+        ds.flag_specific_downsample = False
+
+    if ds.flag_specific_downsample:
+        N = ds.tot_average_specified
+        step = ds.time_increment_specified
     else:
-        step = worker_specific_downsampling.time_increment
-        
-    print("What is the step?", step)
-
-    time_column = (worker_specific_downsampling.current_time + np.arange(num_rows) * step).reshape(-1, 1)
-
-    worker_specific_downsampling.current_time += step * num_rows
+        N = ds.tot_average
+        step = ds.time_increment
     
-
+    # ---  average every N samples, leftovers wait for the next batch ----
+    calibrated = np.column_stack((col1_converted, col2_converted, col3_converted, col4_converted))
+    averaged_data = downsample_function(calibrated, N)
+    if len(averaged_data) == 0:
+        return # not enough samples for a full block yet
+    
+    num_rows = averaged_data.shape[0]
+    time_column = (ds.current_time + np.arange(num_rows) * step).reshape(-1, 1)
+    ds.current_time += step * num_rows
+    
     final_data = np.hstack((time_column, averaged_data))
-
-            
+    
+    # ---- stop exactly at the requested duration ----
+    timestamps = time_column[:, 0]
+    end_time = ds.record_duration
+    keep = timestamps < end_time
+    final_data = final_data[keep]
+    
+    if not keep.all():
+        device_state.running_time_event.clear()
 
     #always save the data to file dir
-    project_root =  os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    file_name_full = os.path.join(project_root, "files", file_name)
-    
+    file_name_full = os.path.join(PROJECT_ROOT, "files", file_name)
+
     try:
-        if not os.path.exists(file_name_full):
-            np.savetxt(file_name_full, final_data, header="",  delimiter=";",  comments="", fmt='%.17g')
-        else:
-            with open(file_name_full, "a") as f:
-                np.savetxt(f, final_data, delimiter=";", fmt="%.17g", )
+        with open(file_name_full, "ab") as f:      # "ab" creates the file on the first batch
+            final_data.astype(RECORDING_DTYPE, copy=False).tofile(f)
     except Exception as e:
-        print(f"The fuck?: {e}")
-
-def downsampling_values(col1, col2, col3, col4, tot_average):
-    """Downsample all four sensor columns by averaging every tot_average consecutive samples."""
-    col1_after_average = average_values(col1, tot_average).ravel()
-    col2_after_average = average_values(col2, tot_average).ravel()
-    col3_after_average = average_values(col3, tot_average).ravel()
-    col4_after_average = average_values(col4, tot_average).ravel()
+        print(f"BIN write failed: {e}")
+        
+def downsample_function(samples, N):
+    """Block-average (rows, cols) samples by N, carrying the incomplete tail into the next call."""
     
-    return col1_after_average, col2_after_average, col3_after_average, col4_after_average
+    global _ds_carry, _ds_N
+
+    if _ds_carry is None or N != _ds_N:
+        _ds_carry = np.empty((0, samples.shape[1]))
+        _ds_N = N 
+        
+    buf = np.vstack((_ds_carry, samples))
+    n_full = (len(buf) // N) * N 
+    _ds_carry = buf[n_full:]
     
-    
-#for decreasing data size for csv purposes 
-def average_values(col, N):
-    """Downsample col by averaging every N consecutive elements. Returns a column vector."""
+    #average when turned into 3D array
+    return buf[:n_full].reshape(-1, N, buf.shape[1]).mean(axis=1)
 
-    average_val = col.reshape(-1, N).mean(axis=1).reshape(-1, 1)
-    return average_val
-
-
-
+def reset_downsample():
+    """Drop any partial block; call whenever a new recording starts."""
+    global _ds_carry, _ds_N
+    _ds_carry = None
+    _ds_N = None
 
     
 if __name__ == "__main__":

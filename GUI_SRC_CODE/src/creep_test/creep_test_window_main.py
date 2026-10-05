@@ -59,7 +59,8 @@ class TabWindowCreepTest(QMainWindow):
 
         #DELETE THE GODDAMN FILE
         try:
-            os.remove("dummy.csv")
+            os.remove(sockets_files.DUMMY_FILE_PATH)
+
         except OSError as e:
             print(f"Error deleting file: {e}")
 
