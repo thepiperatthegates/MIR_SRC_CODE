@@ -107,3 +107,4 @@ if __name__ == "__main__":
         extract_v1_uint16(input_csv, output_csv)
 
     plot_comparison([out for _, out, _ in recordings], [label for _, _, label in recordings])
+so
